@@ -2,7 +2,7 @@
 
 ## Abstract
 
-The **ENVI-met webReader** is a cutting-edge web-based solution designed for advanced environmental data analysis and visualization of **EDX/EDT files** produced by ENVI-met. Built on a **modular ES6 framework**, it offers a robust and adaptable architecture for seamless integration of various components and future scalability.
+The **ENVI-met webReader** is a cutting-edge web-based solution designed for advanced environmental data analysis and visualization of **EDX/EDT files** produced by [ENVI-met](https://envi-met.com). Built on a **modular ES6 framework**, it offers a robust and adaptable architecture for seamless integration of various components and future scalability.
 
 The user interface focuses on **user experience**, offering **light and dark mode** options and a comprehensive feature set for efficient data management, representation, and comparative analysis. Key capabilities include:
 
@@ -11,7 +11,7 @@ The user interface focuses on **user experience**, offering **light and dark mod
 - **Comparative analysis** tools for juxtaposing datasets and deriving insights.
 - **Advanced EDX/EDT file management**, enabling streamlined upload, organization, and access.
 
-Integration with **ECharts** elevates the user experience, providing dynamic, interactive visualizations such as line graphs, scatter plots, and heatmaps. The system is optimized through **data caching** and **performance techniques** for a smooth, responsive user experience.
+Integration with [ECharts](https://echarts.apache.org/en/index.html) elevates the user experience, providing dynamic, interactive visualizations such as line graphs, scatter plots, and heatmaps. The system is optimized through **data caching** and **performance techniques** for a smooth, responsive user experience.
 
 Designed for **environmental scientists, urban planners, and decision-makers**, the ENVI-met webReader is a robust tool for handling complex environmental data.
 
@@ -19,13 +19,13 @@ Designed for **environmental scientists, urban planners, and decision-makers**, 
 
 ## Project Objectives
 
-1. Develop a web-based platform for efficient analysis and visualization of ENVI-met **EDX/EDT files**.
+1. Develop a web-based platform for efficient analysis and visualization of **EDX/EDT files** produced by [ENVI-met](https://envi-met.com).
 2. Create a **modular ES6 framework** for a robust, adaptable architecture with seamless integration and scalability.
 3. Design an intuitive **user interface** with light and dark modes, comprehensive data management, and comparative analysis tools.
 4. Implement advanced **data manipulation** tools for filtering, aggregation, and statistical analysis.
-5. Integrate **charting and visualization components** (charts, 3D renderings, interactive maps) for meaningful data representation.
+5. Integrate **charting and visualization components** (charts, 3D renderings, interactive maps) for meaningful data representation using [ECharts](https://echarts.apache.org/en/index.html).
 6. Build a comprehensive **EDX/EDT file management system** for easy upload, organization, and access.
-7. Leverage **ECharts** for dynamic, interactive data visualizations, including customizable chart types.
+7. Leverage [ECharts](https://echarts.apache.org/en/index.html) for dynamic, interactive data visualizations, including customizable chart types.
 8. Develop tools for **data comparison**, highlighting differences with customizable color schemes and palette inversion.
 9. Optimize performance through **data caching** and efficient DOM manipulation for a responsive user experience.
 10. Create an **adaptive, responsive layout** for various screen sizes and devices.
@@ -45,11 +45,11 @@ Designed for **environmental scientists, urban planners, and decision-makers**, 
 
 ### 2. **Visualization Components**
 - **Charts**, **3D renderings**, and **interactive maps**.
-- Integration with **ECharts** for dynamic visualizations (e.g., scatter plots, heatmaps).
+- Integration with [ECharts](https://echarts.apache.org/en/index.html) for dynamic visualizations (e.g., scatter plots, heatmaps).
 - Customizable color schemes and palette inversion for enhanced representation.
 
 ### 3. **EDX/EDT File Management**
-- Seamless handling of specialized file formats.
+- Seamless handling of specialized file formats produced by [ENVI-met](https://envi-met.com).
 - Efficient upload, organization, and access capabilities.
 
 ### 4. **Comparative Analysis**
@@ -77,8 +77,8 @@ Designed for **environmental scientists, urban planners, and decision-makers**, 
 ## Target Audience
 
 The ENVI-met webReader is an invaluable tool for:
-- **Environmental scientists** conducting microclimate studies.
-- **Urban planners** designing sustainable cities.
+- **Environmental scientists** conducting microclimate studies using [ENVI-met](https://envi-met.com) outputs.
+- **Urban planners** designing sustainable cities with data-driven insights.
 - **Decision-makers** analyzing complex environmental scenarios.
 
 ---
@@ -89,9 +89,16 @@ The ENVI-met webReader is accessible at [https://envireader.altervista.org](http
 
 ---
 
+## References
+
+- [ENVI-met Official Website](https://envi-met.com): A powerful 3D simulation software for urban microclimate analysis.
+- [ECharts Official Website](https://echarts.apache.org/en/index.html): A robust JavaScript charting library used for dynamic and interactive visualizations.
+
+---
+
 ## Why Choose ENVI-met webReader?
 
-The ENVI-met webReader provides an unparalleled combination of **advanced analytical tools**, **intuitive interface design**, and **powerful visualization capabilities**, making it the go-to solution for working with **EDX/EDT files** and complex environmental data. Its modular architecture ensures adaptability and growth, while performance optimizations guarantee efficiency and responsiveness.
+The ENVI-met webReader provides an unparalleled combination of **advanced analytical tools**, **intuitive interface design**, and **powerful visualization capabilities**, making it the go-to solution for working with **EDX/EDT files** and complex environmental data from [ENVI-met](https://envi-met.com). Its integration with [ECharts](https://echarts.apache.org/en/index.html) ensures dynamic and engaging data exploration.
 
 Experience the future of environmental data analysis and visualization with ENVI-met webReader.
 
