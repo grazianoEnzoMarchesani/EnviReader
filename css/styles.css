@@ -1,0 +1,884 @@
+/* Variabili CSS */
+:root {
+    /* Dimensioni */
+    --sidebar-width: 350px;
+    --border-radius: 25px;
+    --transition: all 0.3s ease;
+
+    /* Ombre */
+    --box-shadow: 0 2px 5px rgba(255, 255, 255, 0.1);
+    --hover-box-shadow: 0 4px 10px rgba(255, 255, 255, 0.2);
+
+    /* Colori */
+    --text-color: #fff;
+    --sidebar-bg: #333;
+    --border-color: #555;
+    --control-bg: #444;
+    --hover-bg: #fff;
+    --hover-color: #000;
+    --slider-bg: #555;
+    --thumb-bg: #fff;
+    --progress-bg: #fff;
+    --btn-bg: #444;
+    --placeholder-bg: #555;
+    --path-text-color: #ccc;
+    --path-bg: #444;
+    --path-bg-hover: #555;
+    --icon-color: #fff;
+    --active-toggle-bg: #5f5f5f;
+    --active-toggle-thumb: #333;
+    --focus-color: rgba(138, 180, 248, 0.5);
+    --text-color: #666
+
+    /* Colori personalizzati */
+    --primary-color: #494949; /* Colore ottanio */
+    --primary-hover-color: #8e8e8e; /* Colore ottanio più chiaro */
+
+    /* Aggiungi queste variabili per il tema chiaro */
+    --light-text-color: #000;
+    --light-sidebar-bg: #fff;
+    --light-border-color: #ccc;
+    --light-control-bg: #f0f0f0;
+    --light-hover-bg: #e0e0e0;
+    --light-hover-color: #000;
+
+    /* Tema scuro (default) */
+    --dark-bg: #121212;
+    --dark-sidebar-bg: #1E1E1E;
+    --dark-text: #c6c6c6;
+    --dark-border: #333333;
+    --dark-hover: #2C2C2C;
+    --dark-button: #d8d8d8;
+    --dark-button-hover: #868686;
+
+    /* Tema chiaro */
+    --light-bg: #FFFFFF;
+    --light-sidebar-bg: #F5F5F5;
+    --light-text: #2a2a2a;
+    --light-border: #E0E0E0;
+    --light-hover: #EEEEEE;
+    --light-button: --dark-button-hover;
+    --light-button-hover:  --dark-button;
+
+    /* Variabili dinamiche */
+    --bg-color: var(--dark-bg);
+    --sidebar-bg-color: var(--dark-sidebar-bg);
+    --text-color: var(--dark-text);
+    --border-color: var(--dark-border);
+    --hover-color: var(--dark-hover);
+    --button-color: var(--dark-button);
+    --button-hover-color: var(--dark-button-hover);
+
+
+}
+
+/* Reset e impostazioni generali */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body, html {
+    font-family: Helvetica, Arial, sans-serif;
+    height: 100%;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+/* Layout principale */
+.container {
+    display: grid;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    border-radius: var(--border-radius);
+    background-color: var(--bg-color);
+}
+
+.sidebar {
+    width: var(--sidebar-width);
+    flex-shrink: 0;
+    background-color: var(--sidebar-bg);
+    padding: 30px;
+    overflow-y: auto;
+    box-shadow: var(--box-shadow);
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 2;
+}
+
+.main-content {
+    flex-grow: 1;
+    overflow: auto;
+    padding: 30px;
+    margin-left: var(--sidebar-width);
+    background-color: var(--bg-color);
+}
+
+/* Tipografia */
+h1, h2, h3, .slider-title {
+    font-weight: bold;
+    margin-bottom: 15px;
+    color: var(--text-color);
+}
+
+h1 {
+    font-size: 28px;
+    border-bottom: 2px solid var(--text-color);
+    padding-bottom: 15px;
+    margin-bottom: 25px;
+}
+
+h2 { font-size: 20px; }
+h3 { font-size: 18px; }
+
+.slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.slider-column {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.slider-with-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Controlli comuni */
+.common-control {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 20px;
+    background-color: var(--primary-color);
+    border: 1px solid var(--control-border-color);
+    font-size: 16px;
+    border-radius: var(--border-radius);
+    transition: var(--transition);
+}
+
+button, select, input[type="range"] {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 20px;
+    background-color: var(--primary-color);
+    border: 1px solid var(--control-border-color);
+    font-size: 16px;
+    border-radius: var(--border-radius);
+    transition: var(--transition);
+    color: var(--text-color);
+}
+
+button {
+    cursor: pointer;
+}
+
+button:hover, select:hover {
+    background-color: var(--primary-hover-color);
+    color: var(--hover-color);
+}
+
+.hidden {
+    display: none;
+}
+
+.path-display-b {
+    display: none;
+}
+
+.path-display-b.visible {
+    display: block;
+}
+
+select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23000000%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 15px top 50%;
+    background-size: 12px auto;
+    padding-right: 40px;
+}
+
+/* Slider personalizzati */
+input[type="range"] {
+    appearance: none;
+    width: 100%;
+    background: transparent;
+    margin: 20px 0;
+    border: none;
+}
+
+input[type="range"]:focus {
+    outline: none;
+}
+
+/* Traccia slider */
+input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 2px;
+    cursor: pointer;
+    background: var(--slider-bg);
+    border-radius: 1px;
+    border: none;
+}
+
+input[type="range"]::-moz-range-track {
+    width: 100%;
+    height: 2px;
+    cursor: pointer;
+    background: var(--slider-bg);
+    border-radius: 1px;
+    border: none;
+}
+
+input[type="range"]::-ms-track {
+    width: 100%;
+    height: 2px;
+    cursor: pointer;
+    background: transparent;
+    border-color: transparent;
+    color: transparent;
+    border: none;
+}
+
+/* Thumb slider */
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 24px;
+    width: 24px;
+    border-radius: 50%;
+    background: var(--thumb-bg);
+    cursor: pointer;
+    margin-top: -11px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    border: none;
+}
+
+input[type="range"]::-moz-range-thumb {
+    height: 24px;
+    width: 24px;
+    border-radius: 50%;
+    background: var(--thumb-bg);
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    border: none;
+}
+
+input[type="range"]::-ms-thumb {
+    appearance: none;
+    height: 24px;
+    width: 24px;
+    border-radius: 50%;
+    background: var(--thumb-bg);
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    border: none;
+}
+
+/* Slider Firefox */
+input[type="range"]::-moz-range-progress {
+    background-color: var(--progress-bg);
+    height: 2px;
+    border: none;
+}
+
+/* Controlli slider */
+.slider-control {
+    margin-bottom: 10px;
+}
+
+.slider-btn {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    font-size: 14px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--btn-bg);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: var(--transition);
+    min-width: 24px;
+    color: #fff; /* Colore del testo bianco */
+}
+
+.slider-btn:hover {
+    background-color: var(--hover-bg);
+    color: var(--hover-color); /* Questo cambierà il colore al passaggio del mouse */
+}
+
+/* Preset buttons */
+.preset-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+/* Contenuto principale */
+.scale-charts {
+    margin-bottom: 30px;
+}
+
+.fileset-container {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 30px;
+    min-width: max-content;
+}
+
+.fileset {
+    flex: 1 1 100%;
+    min-width: 300px;
+    margin-bottom: 30px;
+}
+
+.chart-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.echarts-container {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+}
+
+/* Hover su chart-container */
+.chart-container:hover {
+    box-shadow: var(--hover-box-shadow);
+}
+
+/* Visualizzazione percorso */
+.path-display {
+    font-size: 12px;
+    font-style: italic;
+    color: var(--path-text-color);
+    margin-top: -15px;
+    margin-bottom: 20px;
+    padding: 5px 10px;
+    background-color: var(--primary-color);
+    border-radius: 15px;
+    transition: var(--transition);
+}
+
+.path-display:hover {
+    background-color: var(--primary-hover-color);
+}
+
+/* Label del tempo */
+.slider-title {
+    margin-bottom: 3px;
+}
+
+.slider-title span:first-child {
+    font-weight: bold;
+}
+
+.slider-title span:last-child {
+    font-weight: 300;
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+.slider-title .title-fixed {
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.slider-title .title-variable {
+    font-weight: 300;
+    font-style: italic;
+    font-size: 14px;
+    margin-left: 5px;
+}
+
+/* Icone del tema */
+.theme-switcher {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    cursor: pointer;
+    z-index: 1000;
+}
+
+.material-icons {
+    font-size: 24px;
+    transition: transform 0.3s ease;
+}
+
+.material-icons:hover {
+    transform: scale(1.2);
+}
+
+/* Tema scuro */
+body.dark-mode {
+    --text-color: #fff;
+    --sidebar-bg: #333;
+    --border-color: #555;
+    --control-bg: #444;
+    --hover-bg: #fff;
+    --hover-color: #000;
+    --slider-bg: #555;
+    --thumb-bg: #fff;
+    --progress-bg: #fff;
+    --btn-bg: #444;
+    --placeholder-bg: #555;
+    --path-text-color: #ccc;
+    --path-bg: #444;
+    --path-bg-hover: #555;
+    --icon-color: #fff;
+    --active-toggle-bg: #5f5f5f;
+    --active-toggle-thumb: #333;
+    background-color: #333;
+    color: #fff;
+    --control-border-color: #005B4D; /* Colore verde scuro per il tema scuro */
+}
+
+/* Tema chiaro */
+body.light-mode {
+    --text-color: var(--light-text-color);
+    --sidebar-bg: var(--light-sidebar-bg);
+    --border-color: var(--light-border-color);
+    --control-bg: var(--light-control-bg);
+    --hover-bg: var(--light-hover-bg);
+    --hover-color: var(--light-hover-color);
+    background-color: var(--light-sidebar-bg);
+    color: var(--light-text-color);
+    --control-border-color: #7b7b7b; /* Colore verde chiaro per il tema chiaro */
+}
+
+/* Transizioni fluide */
+body {
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Scrollbar */
+.scrollable-container, * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--thumb-bg) var(--sidebar-bg);
+}
+
+.scrollable-container::-webkit-scrollbar, *::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+.scrollable-container::-webkit-scrollbar-track, *::-webkit-scrollbar-track {
+    background: var(--sidebar-bg);
+    border-radius: 10px;
+}
+
+.scrollable-container::-webkit-scrollbar-thumb, *::-webkit-scrollbar-thumb {
+    background-color: var(--thumb-bg);
+    border-radius: 10px;
+    border: 3px solid var(--sidebar-bg);
+}
+
+.scrollable-container::-webkit-scrollbar-thumb:hover, *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--hover-bg);
+}
+
+/* Toggle button */
+.toggle-button {
+    position: relative;
+    width: 46px;
+    height: 28px;
+    border-radius: 16px;
+    background-color: var(--control-bg);
+    border: 2px solid var(--border-color);
+    cursor: pointer;
+    transition: var(--transition);
+    padding: 0;
+    margin-bottom: 20px;
+}
+
+.toggle-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--focus-color);
+}
+
+.toggle-slider {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: var(--thumb-bg);
+    transition: transform 0.3s ease;
+}
+
+.toggle-button[aria-checked="true"] {
+    background-color: var(--active-toggle-bg);
+    border-color: var(--active-toggle-bg);
+}
+
+.toggle-button[aria-checked="true"] .toggle-slider {
+    transform: translateX(20px);
+    background-color: var(--active-toggle-thumb);
+}
+
+/* Toggle containers */
+.follow-terrain-container,
+.difference-order-container {
+    margin-bottom: 20px;
+}
+
+.follow-terrain-wrapper,
+.difference-order-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.follow-terrain-wrapper .slider-title,
+.difference-order-wrapper .slider-title {
+    margin-bottom: 0;
+    margin-right: 10px;
+}
+
+.follow-terrain-wrapper .toggle-button,
+.difference-order-wrapper .toggle-button {
+    margin-bottom: 0;
+}
+
+/* Color palette selector */
+.color-palette-selector {
+    position: relative;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.selected-palette {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background-color: var(--control-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    color: var(--text-color);
+}
+
+.arrow-down {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid var(--text-color);
+}
+
+.palette-options {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: var(--control-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 15px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 10;
+}
+
+.palette-option {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    cursor: pointer;
+    color: var(--text-color);
+}
+
+.palette-option:hover {
+    background-color: var(--hover-bg);
+}
+
+.palette-preview {
+    display: flex;
+    margin-right: 10px;
+}
+
+.color-sample {
+    width: 20px;
+    height: 20px;
+    margin-right: 2px;
+}
+
+.palette-name {
+    flex-grow: 1;
+    color: var(--text-color);
+}
+
+.palette-options.show {
+    display: block;
+}
+
+/* Chart container */
+.chart-container {
+    border: 1px solid var(--border-color);
+    border-radius: 15px;
+    padding: 10px;
+    margin-bottom: 25px;
+    overflow: hidden;
+    width: 100%;
+    height: auto;
+    min-height: 40px;
+    display: flex;
+    flex-direction: column;
+}
+
+.echarts-container {
+    width: 100%;
+    height: 100%;
+    flex-grow: 1;
+    transition: width 0.3s ease, height 0.3s ease;
+    min-height: 30px; /* Aggiungi un'altezza minima */
+}
+
+/* Hover su chart-container */
+.chart-container:hover {
+    box-shadow: var(--hover-box-shadow);
+}
+
+/* Media queries */
+@media (max-width: 1200px) {
+    .fileset-container {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        width: 100%;
+        height: 300px;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .main-content {
+        margin-left: 0;
+        margin-top: 300px;
+    }
+}
+
+.save-charts-button {
+    background-color: var(--primary-color); /* Colore ottanio per il pulsante */
+    color: var(--text-color); /* Colore del testo chiaro */
+    border: 1px solid var; /* Bordo più scuro per contrasto */
+    padding: 10px 15px;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: var(--transition);
+    font-size: 14px;
+    margin-top: 20px;
+    width: 100%;
+}
+
+.save-charts-button:hover {
+    background-color: var(--primary-hover-color); /* Colore ottanio più chiaro al passaggio del mouse */
+    color: var(--hover-color); /* Colore del testo al passaggio del mouse */
+}
+
+.time-series-container {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: var(--sidebar-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    width: 100%;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+}
+
+.time-series-container.visible {
+    display: block;
+    opacity: 1;
+}
+
+#timeSeriesChart {
+    width: 100%;
+    height: 400px; /* Altezza fissa o percentuale come preferisci */
+}
+
+.difference-palette-selector {
+    margin-top: 20px;
+}
+
+.difference-palette-selector .selected-palette {
+    background-color: var(--control-bg);
+    border: 1px solid var(--border-color);
+}
+
+.difference-palette-selector .palette-options {
+    background-color: var(--control-bg);
+    border: 1px solid var(--border-color);
+}
+
+.difference-palette-selector .palette-option:hover {
+    background-color: var(--hover-bg);
+}
+
+.fileset-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    width: 100%;
+    overflow-x: auto;
+}
+
+.fileset-column {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.fileset-column h2 {
+    margin-bottom: 15px;
+    color: var(--text-color);
+}
+
+@media (max-width: 1200px) {
+    .fileset-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.color-palette-selector {
+    margin-bottom: 20px;
+}
+
+.selected-palette,
+.reverse-palette {
+    margin-bottom: 10px;
+}
+
+#creditsPopup {
+    display: none; /* Nascondi il popup di default */
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--light-sidebar-bg); /* Sfondo chiaro per il tema chiaro */
+    color: var(--light-text-color); /* Testo chiaro per il tema chiaro */
+    padding: 20px;
+    border: 1px solid var(--light-border-color); /* Bordo chiaro per il tema chiaro */
+    z-index: 1000;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Tema scuro */
+body.dark-mode #creditsPopup {
+    background: var(--dark-bg); /* Sfondo scuro per il tema scuro */
+    color: var(--dark-text); /* Testo chiaro per il tema scuro */
+    border: 1px solid var(--dark-border); /* Bordo scuro per il tema scuro */
+}
+
+#creditsPopup h2 {
+    margin-top: 0;
+}
+
+#creditsPopup button {
+    margin-top: 10px;
+    background: #555; /* Sfondo del pulsante */
+    color: #fff; /* Testo del pulsante chiaro */
+    border: none; /* Rimuovi il bordo */
+    padding: 10px 15px; /* Padding per il pulsante */
+    cursor: pointer; /* Cambia il cursore */
+}
+
+#creditsPopup button:hover {
+    background: #666; /* Colore del pulsante al passaggio del mouse */
+}
+
+/* Aggiungi dopo la riga 579 */
+.chart-title-container {
+    margin-bottom: 10px;
+    font-family: Helvetica, Arial, sans-serif;
+    color: var(--text-color);
+}
+
+.chart-title {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.chart-stats {
+    font-size: 14px;
+    font-style: italic;
+    color: var(--path-text-color);
+}
+
+body.light-theme {
+    --bg-color: var(--light-bg);
+    --sidebar-bg-color: var(--light-sidebar-bg);
+    --text-color: var(--light-text);
+    --border-color: var(--light-border);
+    --hover-color: var(--light-hover);
+    --button-color: var(--light-button);
+    --button-hover-color: var(--light-button-hover);
+    --control-bg: var(--light-control-bg);
+    --sidebar-bg: var(--light-sidebar-bg);
+    background-color: var(--light-bg);
+}
+body.dark-theme {
+    --bg-color: var(--dark-bg);
+    --sidebar-bg-color: var(--dark-sidebar-bg);
+    --text-color: var(--dark-text);
+    --border-color: var(--dark-border);
+    --hover-color: var(--dark-hover);
+    --button-color: var(--dark-button);
+    --button-hover-color: var(--dark-button-hover);
+    --control-bg: var(--dark-sidebar-bg);
+    --sidebar-bg: var(--dark-sidebar-bg);
+    background-color: var(--dark-bg);
+}
+
+.theme-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(background-color);
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    z-index: 1000;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.theme-toggle:hover {
+    background: var(--button-hover-color);
+    transform: scale(1.1);
+}
+
+.theme-toggle .material-icons {
+    font-size: 24px;
+}
+
