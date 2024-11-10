@@ -37,7 +37,7 @@ Designed for **environmental scientists, urban planners, and decision-makers**, 
 
 ---
 
-## Key Features
+## Key Features (done and to do)
 
 ### 1. **Advanced Data Manipulation**
 - Tools for **filtering, aggregation, and statistical analysis**.
