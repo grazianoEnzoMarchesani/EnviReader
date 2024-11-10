@@ -9,7 +9,7 @@ The user interface focuses on **user experience**, offering **light and dark mod
 - **Sophisticated data manipulation** tools (filtering, aggregation, statistical analysis).
 - **Powerful visualization** components (charts, 3D renderings, interactive maps).
 - **Comparative analysis** tools for juxtaposing datasets and deriving insights.
-- **Advanced EDX/EDT file management**, enabling streamlined upload, organization, and access.
+- **Local file handling**, enabling users to open **EDX/EDT files directly on their computer** without the need for uploading or transferring data, ensuring instant access and maintaining data privacy.
 
 Integration with [**ECharts**](https://echarts.apache.org/en/index.html) elevates the user experience, providing dynamic, interactive visualizations such as line graphs, scatter plots, and heatmaps. The system is optimized through **data caching** and **performance techniques** for a smooth, responsive user experience.
 
@@ -24,7 +24,7 @@ Designed for **environmental scientists, urban planners, and decision-makers**, 
 3. Design an intuitive **user interface** with light and dark modes, comprehensive data management, and comparative analysis tools.
 4. Implement advanced **data manipulation** tools for filtering, aggregation, and statistical analysis.
 5. Integrate **charting and visualization components** (charts, 3D renderings, interactive maps) for meaningful data representation.
-6. Build a comprehensive **EDX/EDT file management system** for easy upload, organization, and access.
+6. Enable **instant local file handling**, allowing users to open and analyze files directly on their device without data upload or server interaction.
 7. Leverage [**ECharts**](https://echarts.apache.org/en/index.html) for dynamic, interactive data visualizations, including customizable chart types.
 8. Develop tools for **data comparison**, highlighting differences with customizable color schemes and palette inversion.
 9. Optimize performance through **data caching** and efficient DOM manipulation for a responsive user experience.
@@ -39,18 +39,19 @@ Designed for **environmental scientists, urban planners, and decision-makers**, 
 
 ## Key Features
 
-### 1. **Advanced Data Manipulation**
+### 1. **Local File Handling**
+- Open **EDX/EDT files instantly** without the need to upload them to a server.
+- All data remains on the user’s device, ensuring **privacy** and **data security**.
+- The direct file handling approach enables **fast access** and avoids delays associated with heavy file uploads.
+
+### 2. **Advanced Data Manipulation**
 - Tools for **filtering, aggregation, and statistical analysis**.
 - Enables users to explore and refine datasets for deeper insights.
 
-### 2. **Visualization Components**
+### 3. **Visualization Components**
 - **Charts**, **3D renderings**, and **interactive maps**.
 - Integration with [**ECharts**](https://echarts.apache.org/en/index.html) for dynamic visualizations (e.g., scatter plots, heatmaps).
 - Customizable color schemes and palette inversion for enhanced representation.
-
-### 3. **EDX/EDT File Management**
-- Seamless handling of specialized file formats produced by [ENVI-met](https://envi-met.com).
-- Efficient upload, organization, and access capabilities.
 
 ### 4. **Comparative Analysis**
 - Juxtapose datasets to identify trends, anomalies, and insights.
@@ -85,7 +86,7 @@ While the ENVI-met webReader provides robust tools for environmental data analys
    - The project is built using **pure JavaScript**, avoiding frameworks like React, Angular, or Vue. While this ensures simplicity, it may limit scalability and ease of maintenance compared to modern framework-based approaches.
 
 3. **Feature Availability**
-   - Not all features described in this document are currently available. Many advanced functionalities, such as **wind integration**, **terrain following**, and certain comparative tools, are planned for **future development** and will be added in subsequent releases.
+   - Not all features described in this document are currently available. Many advanced functionalities, such as **wind integration**, are planned for **future development** and will be added in subsequent releases.
 
 These limitations highlight the project's ongoing nature, with planned updates to address compatibility, feature expansion, and enhanced architecture.
 
