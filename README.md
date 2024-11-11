@@ -37,6 +37,13 @@ Designed for **environmental scientists, urban planners, and decision-makers**, 
 
 ---
 
+## Demo Video
+
+Watch a short video demonstration of the ENVI-met webReader in action:  
+[ENVI-met webReder - nov 2](https://youtu.be/ar0BFAbNEJo?si=NHZmQHQiElM4ShYy)
+
+---
+
 ## Key Features
 
 ### 1. **Local File Handling**
@@ -86,7 +93,7 @@ While the ENVI-met webReader provides robust tools for environmental data analys
    - The project is built using **pure JavaScript**, avoiding frameworks like React, Angular, or Vue. While this ensures simplicity, it may limit scalability and ease of maintenance compared to modern framework-based approaches.
 
 3. **Feature Availability**
-   - Not all features described in this document are currently available. Many advanced functionalities, such as **wind integration**, are planned for **future development** and will be added in subsequent releases.
+   - Not all features described in this document are currently available. Many advanced functionalities, such as **wind integration**, **terrain following**, and certain comparative tools, are planned for **future development** and will be added in subsequent releases.
 
 These limitations highlight the project's ongoing nature, with planned updates to address compatibility, feature expansion, and enhanced architecture.
 
