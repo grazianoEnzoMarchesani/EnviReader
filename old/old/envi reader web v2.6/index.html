@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENVI-met Advanced Output Analyzer</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2/dist/echarts-gl.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="panel">
+                <h3>File Selection</h3>
+                <div class="control-group">
+                    <button id="selectFolder">Select Main Folder</button>
+                    <select id="subfolderSelect" disabled>
+                        <option value="">Select a subfolder</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="controls" class="panel" style="display: none;">
+                <h3>Data Controls</h3>
+                <div class="control-group">
+                    <label for="timeSlider">Time: <span id="timeDisplay"></span></label>
+                    <input type="range" id="timeSlider" min="0" max="0" value="0">
+                </div>
+                <div class="control-group">
+                    <label for="variableSelect">Variable:</label>
+                    <select id="variableSelect"></select>
+                </div>
+                <div class="control-group">
+                    <label for="zLevelSlider">Z-level: <span id="zLevelDisplay">0</span></label>
+                    <input type="range" id="zLevelSlider" min="0" max="0" value="0">
+                </div>
+                <div class="control-group">
+                    <label for="followTerrain">
+                        <input type="checkbox" id="followTerrain"> Follow Terrain
+                    </label>
+                </div>
+                <div class="control-group">
+                    <label for="colormapSelect">Colormap:</label>
+                    <select id="colormapSelect"></select>
+                </div>
+                <div class="control-group">
+                    <label for="rangeType">Range Type:</label>
+                    <select id="rangeType">
+                        <option value="auto">Auto</option>
+                        <option value="manual">Manual</option>
+                    </select>
+                </div>
+                <div id="manualRange" class="control-group" style="display: none;">
+                    <label for="minRange">Min:</label>
+                    <input type="number" id="minRange">
+                    <label for="maxRange">Max:</label>
+                    <input type="number" id="maxRange">
+                </div>
+                <div class="control-group">
+                    <button id="exportCSV">Export as CSV</button>
+                    <button id="exportImage">Export as Image</button>
+                </div>
+                <div class="control-group">
+                    <label for="showWindFlow">
+                        <input type="checkbox" id="showWindFlow"> Show Wind Flow
+                    </label>
+                </div>
+                <div id="windFlowControls" style="display: none;">
+                    <div class="control-group">
+                        <label for="particleDensity">Particle Density:</label>
+                        <input type="range" id="particleDensity" min="1" max="128" value="64">
+                    </div>
+                    <div class="control-group">
+                        <label for="particleSize">Particle Size:</label>
+                        <input type="range" id="particleSize" min="1" max="10" value="3">
+                    </div>
+                    <div class="control-group">
+                        <label for="particleOpacity">Particle Opacity:</label>
+                        <input type="range" id="particleOpacity" min="0" max="1" step="0.1" value="0.5">
+                    </div>
+                    <div class="control-group">
+                        <label for="windFlowColor">Wind Flow Color:</label>
+                        <input type="color" id="windFlowColor" value="#ffffff">
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3>Log</h3>
+                <div id="log"></div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="panel">
+                <div id="chart"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

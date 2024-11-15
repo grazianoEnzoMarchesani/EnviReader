@@ -1,0 +1,60 @@
+/* styles/main.css */
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+}
+
+#app {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+#controls {
+    margin-top: 20px;
+}
+
+#chart {
+    margin-top: 20px;
+    width: 100%;
+    height: 600px;
+}
+
+#log {
+    margin-top: 20px;
+    border: 1px solid #ccc;
+    padding: 10px;
+    height: 200px;
+    overflow-y: scroll;
+}
+
+/* Styling for form elements */
+label {
+    display: inline-block;
+    margin-right: 10px;
+}
+
+input[type="range"],
+select {
+    margin-right: 10px;
+}
+
+button {
+    margin-right: 10px;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+/* Log entry styles */
+#log .info {
+    color: #000;
+}
+
+#log .warn {
+    color: #ff9900;
+}
+
+#log .error {
+    color: #ff0000;
+}

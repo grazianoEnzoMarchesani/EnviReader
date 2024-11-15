@@ -1,0 +1,147 @@
+:root {
+    --primary-color: #3498db;
+    --secondary-color: #2c3e50;
+    --background-color: #ecf0f1;
+    --panel-color: #ffffff;
+    --text-color: #34495e;
+    --border-color: #bdc3c7;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: var(--background-color);
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+header {
+    background-color: var(--primary-color);
+    color: white;
+    text-align: center;
+    padding: 1rem;
+}
+
+main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 300px;
+    background-color: var(--panel-color);
+    overflow-y: auto;
+    padding: 1rem;
+    border-right: 1px solid var(--border-color);
+}
+
+.main-content {
+    flex: 1;
+    overflow: hidden;
+    padding: 1rem;
+}
+
+.panel {
+    background-color: var(--panel-color);
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1rem;
+    padding: 1rem;
+}
+
+h1, h2 {
+    margin-bottom: 1rem;
+}
+
+.control {
+    margin-bottom: 1rem;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+input[type="range"],
+select,
+input[type="number"],
+input[type="color"] {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: white;
+}
+
+button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: var(--secondary-color);
+}
+
+.slider-group {
+    display: flex;
+    align-items: center;
+}
+
+.slider-btn {
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+    margin: 0 5px;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    background-color: white;
+    color: var(--text-color);
+}
+
+input[type="range"] {
+    flex: 1;
+}
+
+#log {
+    height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    padding: 0.5rem;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+#chart {
+    width: 100%;
+    height: 100%;
+    min-height: 400px;
+}
+
+@media (max-width: 768px) {
+    main {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+}

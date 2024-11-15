@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Custom Rectangles with Dynamic Sizing and Adaptive Slider (6x8 Matrix)</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #main {
+            width: 80vw;
+            height: 80vh;
+            margin: auto;
+        }
+        #slider-container {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="slider-container">
+        <label for="scale-slider">Scale: <span id="scale-value">30</span></label>
+        <input type="range" id="scale-slider" min="10" max="100" value="30">
+    </div>
+    <div id="main"></div>
+    <script type="text/javascript">
+        const colorData = [
+            [1, 2, 3, 4, 5, 6, 7, 8],
+            [41, 42, 43, 44, 45, 46, 47, 48],
+            [1, 2, 3, 4, 5, 6, 7, 8]
+        ];
+
+        const rowHeightsBase = [1, 1,10];
+        const columnWidthsBase = [1, 1, 1, 1, 1, 1, 1, 1];
+
+        const mainElement = document.getElementById('main');
+        const scaleSlider = document.getElementById('scale-slider');
+        const scaleValueLabel = document.getElementById('scale-value');
+
+        function calculateMaxScale() {
+            const containerWidth = mainElement.clientWidth * 0.85;
+            const containerHeight = mainElement.clientHeight * 0.85;
+
+            const totalBaseWidth = columnWidthsBase.reduce((a, b) => a + b, 0);
+            const totalBaseHeight = rowHeightsBase.reduce((a, b) => a + b, 0);
+
+            const maxScaleWidth = Math.floor(containerWidth / totalBaseWidth);
+            const maxScaleHeight = Math.floor(containerHeight / totalBaseHeight);
+
+            return Math.min(maxScaleWidth, maxScaleHeight);
+        }
+
+        function updateSliderMax() {
+            const maxScale = calculateMaxScale();
+            scaleSlider.max = maxScale;
+            scaleSlider.value = Math.min(scaleSlider.value, maxScale);
+            scaleValueLabel.textContent = scaleSlider.value;
+        }
+
+        function renderChart(scale) {
+            const rowHeights = rowHeightsBase.map(height => height * scale);
+            const columnWidths = columnWidthsBase.map(width => width * scale);
+
+            const totalHeight = rowHeights.reduce((a, b) => a + b, 0);
+            const totalWidth = columnWidths.reduce((a, b) => a + b, 0);
+
+            const chart = echarts.init(mainElement);
+            const option = {
+                xAxis: {
+                    type: 'value',
+                    min: 0,
+                    max: totalWidth,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    splitLine: { show: false },
+                    axisLabel: { show: false }
+                },
+                yAxis: {
+                    type: 'value',
+                    min: 0,
+                    max: totalHeight,
+                    axisLine: { show: false },
+                    axisTick: { show: false },
+                    splitLine: { show: false },
+                    axisLabel: { show: false }
+                },
+                series: [{
+                    type: 'custom',
+                    renderItem: (params, api) => {
+                        const rowIndex = api.value(0);
+                        const colIndex = api.value(1);
+
+                        const startY = rowHeights.slice(0, rowIndex).reduce((a, b) => a + b, 0);
+                        const startX = columnWidths.slice(0, colIndex).reduce((a, b) => a + b, 0);
+
+                        const width = columnWidths[colIndex];
+                        const height = rowHeights[rowIndex];
+
+                        return {
+                            type: 'rect',
+                            shape: {
+                                x: startX,
+                                y: totalHeight - startY - height,
+                                width: width,
+                                height: height
+                            },
+                            style: {
+                                fill: api.visual('color')
+                            }
+                        };
+                    },
+                    encode: {
+                        x: 1,
+                        y: 0
+                    },
+                    data: colorData.flatMap((row, rowIndex) =>
+                        row.map((value, colIndex) => [rowIndex, colIndex, value])
+                    )
+                }],
+                visualMap: {
+                    min: 1,
+                    max: 48,
+                    dimension: 2,
+                    inRange: {
+                        color: ['#ef476f','#ffd166','#06d6a0','#118ab2','#073b4c']
+                    },
+                    right: '5%',
+                    top: 'center',
+                    orient: 'vertical',
+                    text: ['High', 'Low'],
+                    formatter: value => value.toFixed(1)
+                },
+                grid: {
+                    left: '5%',
+                    right: '15%',
+                    top: '5%',
+                    bottom: '5%',
+                    containLabel: true
+                }
+            };
+
+            chart.setOption(option);
+
+            chart.on('click', function (params) {
+                if (params.componentType === 'series') {
+                    const [rowIndex, colIndex] = params.data;
+                    console.log(`Clicked Rectangle - Rows: ${rowIndex}, Columns: ${colIndex}`);
+                }
+            });
+        }
+
+        updateSliderMax();
+        renderChart(parseInt(scaleSlider.value));
+
+        scaleSlider.addEventListener('input', function () {
+            const scale = parseInt(scaleSlider.value);
+            scaleValueLabel.textContent = scale;
+            renderChart(scale);
+        });
+
+        function debounce(func, wait) {
+            let timeout;
+            return function() {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, arguments), wait);
+            };
+        }
+
+        window.addEventListener('resize', debounce(() => {
+            updateSliderMax();
+            renderChart(parseInt(scaleSlider.value));
+        }, 150));
+    </script>
+</body>
+</html>

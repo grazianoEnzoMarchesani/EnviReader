@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENVI-met Analyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ENVI-met Analyzer</h1>
+        </header>
+        
+        <main>
+            <aside class="sidebar">
+                <section class="panel">
+                    <h2>File Selection</h2>
+                    <button id="selectFolder">Select Main Folder</button>
+                    <select id="subfolderSelect" disabled>
+                        <option value="">Select a subfolder</option>
+                    </select>
+                </section>
+
+                <section id="controls" class="panel">
+                    <h2>Data Controls</h2>
+                    
+                    <div class="control">
+                        <label for="timeSlider">Time: <span id="timeDisplay"></span></label>
+                        <div class="slider-group">
+                            <input type="range" id="timeSlider" min="0" max="0" value="0">
+                            <div class="slider-buttons">
+                                <button class="slider-btn" id="timeSliderPrev">-</button>
+                                <button class="slider-btn" id="timeSliderNext">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control">
+                        <label for="variableSelect">Variable:</label>
+                        <select id="variableSelect"></select>
+                    </div>
+
+                    <div class="control">
+                        <label for="zLevelSlider">Z-level: <span id="zLevelDisplay"></span></label>
+                        <div class="slider-group">
+                            <input type="range" id="zLevelSlider" min="0" max="0" value="0">
+                            <div class="slider-buttons">
+                                <button class="slider-btn" id="zLevelSliderPrev">-</button>
+                                <button class="slider-btn" id="zLevelSliderNext">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control">
+                        <label for="followTerrain">
+                            <input type="checkbox" id="followTerrain">
+                            Follow Terrain
+                        </label>
+                    </div>
+
+                    <div class="control">
+                        <label for="windOpacitySlider">Wind Opacity:</label>
+                        <div class="slider-group">
+                            <input type="range" id="windOpacitySlider" min="0" max="1" step="0.1" value="0.5">
+                            <div class="slider-buttons">
+                                <button class="slider-btn" id="windOpacitySliderPrev">-</button>
+                                <button class="slider-btn" id="windOpacitySliderNext">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control">
+                        <label for="windDensitySlider">Wind Density:</label>
+                        <div class="slider-group">
+                            <input type="range" id="windDensitySlider" min="1" max="256" value="128">
+                            <div class="slider-buttons">
+                                <button class="slider-btn" id="windDensitySliderPrev">-</button>
+                                <button class="slider-btn" id="windDensitySliderNext">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control">
+                        <label for="windSpeedSlider">Wind Speed:</label>
+                        <div class="slider-group">
+                            <input type="range" id="windSpeedSlider" min="0.1" max="10" step="0.1" value="1">
+                            <div class="slider-buttons">
+                                <button class="slider-btn" id="windSpeedSliderPrev">-</button>
+                                <button class="slider-btn" id="windSpeedSliderNext">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control">
+                        <label for="windSizeSlider">Wind Size:</label>
+                        <div class="slider-group">
+                            <input type="range" id="windSizeSlider" min="0.1" max="10" step="0.1" value="1">
+                            <div class="slider-buttons">
+                                <button class="slider-btn" id="windSizeSliderPrev">-</button>
+                                <button class="slider-btn" id="windSizeSliderNext">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control">
+                        <label for="windColorPicker">Wind Color:</label>
+                        <input type="color" id="windColorPicker" value="#ffffff">
+                    </div>
+
+                    <div class="control">
+                        <label for="colormapSelect">Colormap:</label>
+                        <select id="colormapSelect"></select>
+                    </div>
+
+                    <div class="control">
+                        <label for="rangeType">Range Type:</label>
+                        <select id="rangeType">
+                            <option value="auto">Auto</option>
+                            <option value="manual">Manual</option>
+                        </select>
+                    </div>
+
+                    <div id="manualRange" class="control">
+                        <label for="minRange">Min:</label>
+                        <input type="number" id="minRange" step="0.1">
+                        <label for="maxRange">Max:</label>
+                        <input type="number" id="maxRange" step="0.1">
+                    </div>
+
+                    <div class="control">
+                        <button id="exportCSV">Export as CSV</button>
+                        <button id="exportImage">Export as Image</button>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <h2>Log</h2>
+                    <div id="log"></div>
+                </section>
+            </aside>
+
+            <div class="main-content">
+                <div class="chart-container">
+                    <div class="chart-wrapper">
+                        <div id="chart"></div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <div id="verticalChartX"></div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <div id="verticalChartY"></div>
+                    </div>
+                </div>
+            </div>
+
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.2/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-gl@2.0.9/dist/echarts-gl.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

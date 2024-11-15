@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENVI-met Advanced Output Analyzer</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        #app { max-width: 1200px; margin: 0 auto; }
+        #controls { margin-top: 20px; }
+        #chart { margin-top: 20px; width: 100%; height: 600px; }
+        #log { margin-top: 20px; border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: scroll; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.2/echarts.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <h1>ENVI-met Advanced Output Analyzer</h1>
+        <div id="fileSelection">
+            <button id="selectFolder">Select Main Folder</button>
+            <select id="subfolderSelect" disabled>
+                <option value="">Select a subfolder</option>
+            </select>
+        </div>
+        <div id="controls" style="display: none;">
+            <div>
+                <label for="timeSlider">Time:</label>
+                <input type="range" id="timeSlider" min="0" max="0" value="0">
+                <span id="timeDisplay"></span>
+            </div>
+            <div>
+                <label for="variableSelect">Variable:</label>
+                <select id="variableSelect"></select>
+            </div>
+            <div>
+                <label for="zLevelSlider">Z-level:</label>
+                <input type="range" id="zLevelSlider" min="0" max="0" value="0">
+                <span id="zLevelDisplay"></span>
+            </div>
+            <div>
+                <label for="followTerrain">
+                    <input type="checkbox" id="followTerrain">
+                    Follow Terrain
+                </label>
+            </div>
+            <div>
+                <label for="colormapSelect">Colormap:</label>
+                <select id="colormapSelect"></select>
+            </div>
+            <div>
+                <label for="rangeType">Range Type:</label>
+                <select id="rangeType">
+                    <option value="auto">Auto</option>
+                    <option value="manual">Manual</option>
+                </select>
+            </div>
+            <div id="manualRange" style="display: none;">
+                <label for="minRange">Min:</label>
+                <input type="number" id="minRange" step="any">
+                <label for="maxRange">Max:</label>
+                <input type="number" id="maxRange" step="any">
+            </div>
+            <button id="exportCSV">Export as CSV</button>
+            <button id="exportImage">Export as Image</button>
+        </div>
+        <div id="chart"></div>
+        <div id="log"></div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
