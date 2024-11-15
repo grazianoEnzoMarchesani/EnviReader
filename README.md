@@ -125,4 +125,5 @@ The ENVI-met webReader is accessible at [https://envireader.altervista.org](http
 
 The ENVI-met webReader provides an unparalleled combination of **advanced analytical tools**, **intuitive interface design**, and **powerful visualization capabilities**, making it the go-to solution for working with **EDX/EDT files** and complex environmental data. Its modular architecture ensures adaptability and growth, while performance optimizations guarantee efficiency and responsiveness.
 
-Experience the future of environmental data analysis and visualization with ENVI-met webReader.
+
+Experience the future of environmental data analysis and visualization with ENVI-met webReader..
