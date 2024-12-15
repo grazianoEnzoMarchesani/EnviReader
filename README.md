@@ -82,6 +82,35 @@ Watch a short video demonstration of the ENVI-met webReader in action:
 
 ---
 
+## Changelog
+
+### Version 1.5 (November 2023)
+
+#### New Features
+1. **Wind Field Visualisation**
+   - Added the ability to visualise wind fields through a dedicated option
+   - Controls for customising the visualisation:
+     - Opacity adjustment
+     - Arrow density control
+     - Indicator size settings
+   - Full integration with the main data view
+
+2. **Preset System**
+   - Implemented a comprehensive system for saving and loading presets
+   - Ability to save customised configurations for:
+     - Visualisation settings
+     - Wind field parameters
+     - Colour palette choices
+     - Section configurations
+   - Complete documentation available in the "Complete Guide to Creating JSON Presets" section
+
+#### Improvements
+- Optimised performance in wind field visualisation
+- Enhanced user interface for preset management
+- Improved stability in data processing
+
+---
+
 ## Limitations
 
 While the ENVI-met webReader provides robust tools for environmental data analysis, there are a few limitations to consider:
@@ -118,6 +147,163 @@ The ENVI-met webReader is accessible at [https://envireader.altervista.org](http
 
 - Explore **ENVI-met** software for comprehensive environmental modeling: [https://envi-met.com](https://envi-met.com).
 - Learn more about **ECharts** for interactive data visualization: [https://echarts.apache.org/en/index.html](https://echarts.apache.org/en/index.html).
+
+---
+
+# Complete Guide to Creating JSON Presets
+
+## Basic Structure
+
+```json
+{
+    "presetN": {  // where N is the preset number or a descriptive name
+        // preset properties
+    }
+}
+```
+
+## Available Properties
+
+### 1. Data and Group
+
+```json
+"Data group": "atmosphere",  // data group
+"Data": "Potential Air Temperature (°C)"  // data type
+```
+
+### 2. Temporal and Spatial Parameters
+
+```json
+"time": 0,      // temporal index (0-n)
+"level": 0,     // vertical level (0-n)
+"sectionX": 9,  // X section (1-n)
+"sectionY": 5   // Y section (1-n)
+```
+
+### 3. Display Parameters
+
+```json
+"followTerrain": true,    // true/false
+"scaleFactor": 3.0,       // scale factor (1.0-10.0)
+"Show Wind Field": true,  // display wind field (true/false)
+"Legend bounds": "individual"  // legend bounds type
+```
+
+### 4. Wind Parameters
+
+```json
+"windOpacity": 60,   // opacity (0-100)
+"windDensity": 30,   // density (1-100)
+"windSize": 20       // size (1-100)
+```
+
+### 5. Colour Palettes
+
+```json
+"colorPalette": {
+    "category": "Palette",
+    "number": "1"
+},
+"colorDiffPalette": {
+    "category": "Palette",
+    "number": "2"
+}
+```
+
+## Allowed Values and Details
+
+### **Legend bounds**
+- **"individual"**: Each display has an independent colour scale based on its own min/max values.
+- **"syncedViews"**: Views belonging to the same fileset share the same colour scale.
+- **"filesetGlobal"**: Colour scale is calculated across all data from a single fileset.
+- **"allFilesets"**: Colour scale is shared between all loaded filesets (A and B).
+
+### Other Parameters
+- **`followTerrain`**: true/false
+- **`Show Wind Field`**: true/false
+- **`scaleFactor`**: decimal number between 1.0 and 10.0
+- **`time`, `level`**: non-negative integers
+- **`sectionX`, `sectionY`**: positive integers
+- **`windOpacity`, `windDensity`, `windSize`**: integers between 1 and 100
+
+## Example Presets
+
+### Complete Preset
+
+```json
+{
+    "preset1": {
+        "Data group": "atmosphere",
+        "Data": "Potential Air Temperature (°C)",
+        "time": 0,
+        "level": 0,
+        "sectionX": 9,
+        "sectionY": 5,
+        "followTerrain": true,
+        "scaleFactor": 3.0,
+        "windOpacity": 60,
+        "windDensity": 30,
+        "windSize": 20,
+        "Show Wind Field": true,
+        "Legend bounds": "individual",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "1"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "2"
+        }
+    }
+}
+```
+
+### Minimal Preset
+
+```json
+{
+    "preset_minimal": {
+        "Data group": "atmosphere",
+        "Data": "Potential Air Temperature (°C)",
+        "time": 0,
+        "level": 0,
+        "Legend bounds": "individual"
+    }
+}
+```
+
+## Important Notes
+
+1. All property names are **case-sensitive**.
+2. Numerical values must fall within the specified range.
+3. `scaleFactor` cannot be lower than 1.0.
+4. Colour palettes must exist in the system.
+5. Presets can be saved and loaded at any time.
+6. Any options not included in the preset will be ignored during loading, retaining the current application values.
+7. Use appropriate values to ensure optimal data display.
+
+## Practical Usage
+
+- Presets can be saved via the "Save Preset" button in the interface.
+- Saved presets can be loaded to quickly restore specific configurations.
+- The choice of **Legend bounds** directly affects how data differences are displayed.
+- Wind parameters are relevant only when `"Show Wind Field"` is **true**.
+- Partial presets can be created by including only the options you wish to modify.
+- Unspecified options will retain their current values in the application.
+
+## Error Management
+
+- Invalid values will be ignored, and the application will keep the previous settings.
+- If a required property is missing or invalid, the preset may not load properly.
+- If there are errors in the JSON format, the preset will not load.
+
+## Best Practices
+
+1. Test presets after creation.
+2. Use descriptive names for presets.
+3. Include only necessary properties.
+4. Keep a backup copy of important presets.
+5. Document the purpose of each preset you create.
 
 ---
 
