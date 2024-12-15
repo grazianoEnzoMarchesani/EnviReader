@@ -150,7 +150,7 @@ The ENVI-met webReader is accessible at [https://envireader.altervista.org](http
 
 ---
 
-# Complete Guide to Creating JSON Presets
+# Creating JSON Presets
 
 ## Basic Structure
 
