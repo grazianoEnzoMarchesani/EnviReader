@@ -84,7 +84,7 @@ Watch a short video demonstration of the ENVI-met webReader in action:
 
 ## Changelog
 
-### Version 1.5 (November 2023)
+### Version 1.5 (December 2023)
 
 #### New Features
 1. **Wind Field Visualisation**
