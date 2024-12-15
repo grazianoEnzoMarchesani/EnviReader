@@ -12,6 +12,7 @@ export let state = {
     dimensions: { x: 0, y: 0, z: 0 },
     differenceOrder: 'A-B',
     scaleFactor: 1,
+    showWindField: false,
     crossPosition: {
         x: null,
         y: null,
@@ -61,12 +62,11 @@ export function initializeScaleFactorSlider() {
 // Funzione per aggiornare il scaleFactor
 export function updateScaleFactor(newScaleFactor) {
     state.scaleFactor = newScaleFactor;
-    const scaleFactorValue = document.getElementById('scaleFactorValue');
-    if (scaleFactorValue) {
-        scaleFactorValue.textContent = state.scaleFactor.toFixed(1);
-        scaleFactorValue.classList.add('hidden');
+    const scaleFactorValue = document.getElementById('scaleFactorSlider');
+    if (scaleFactorSlider) {
+        scaleFactorSlider.textContent = state.scaleFactor.toFixed(1);
     } else {
-        console.error("Elemento 'scaleFactorValue' non trovato nel DOM.");
+        console.error("Elemento 'scaleFactorSlider' non trovato nel DOM.");
     }
 }
 
@@ -88,3 +88,4 @@ async function updateAllCharts() {
     // Ridimensiona i contenitori dei grafici
     resizeChartContainers();
 }
+

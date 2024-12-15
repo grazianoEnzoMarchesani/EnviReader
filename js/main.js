@@ -13,6 +13,8 @@ import { initializeScaleFactorSlider } from './enviropment.js';
 import { selectedPalette, selectedDifferencePalette, reversePalette } from './fileMan.js';
 import { saveAllChartsAsSVG } from './imageExport.js';
 import { initThemeManager } from './theme.js';
+import { initializeEventListeners } from './events.js';
+import { initializePresetButtons } from './presetManager.js';
 
 
 
@@ -118,25 +120,96 @@ async function init() {
         selectedPalette = reversePalette(selectedPalette);
         updateVisualization('filesetA');
         updateVisualization('filesetB');
-        console.log('Palette ribaltata:', selectedPalette);
+        // console.log('Palette ribaltata:', selectedPalette);
     });
 
     document.getElementById('reverseDifferencePaletteButton').addEventListener('click', () => {
         selectedDifferencePalette = reversePalette(selectedDifferencePalette);
         updateVisualization('filesetA');
         updateVisualization('filesetB');
-        console.log('Palette differenze ribaltata:', selectedDifferencePalette);
+        // console.log('Palette differenze ribaltata:', selectedDifferencePalette);
     });
 
-    console.log('Inizializzazione dei pulsanti di ribaltamento');
-    console.log('Selected Palette:', selectedPalette);
-    console.log('Selected Difference Palette:', selectedDifferencePalette);
+    // console.log('Inizializzazione dei pulsanti di ribaltamento');
+    // console.log('Selected Palette:', selectedPalette);
+    // console.log('Selected Difference Palette:', selectedDifferencePalette);
+
+    initializePresetButtons(); // Inizializza i pulsanti preset
 }
 
 
 // Event listener per il caricamento del DOM
 document.addEventListener('DOMContentLoaded', () => {
-    initThemeManager();
     initializeScaleFactorSlider();
+    initializeEventListeners();
+    initThemeManager();
     init();
+});
+
+let presets = {}; // Inizializza la variabile presets
+
+// Funzione per caricare i preset esistenti
+async function loadPresets() {
+    try {
+        const response = await fetch('data/presets.json');
+        presets = await response.json();
+    } catch (error) {
+        console.error('Errore nel caricamento dei preset:', error);
+    }
+}
+
+// Chiamata per caricare i preset all'avvio
+loadPresets();
+
+document.getElementById('savePreset').addEventListener('click', () => {
+    // Ottieni i valori delle palette correnti dai selettori DOM
+    const regularPaletteSelector = document.querySelector('.color-palette-selector:not(.difference-palette-selector)');
+    const differencePaletteSelector = document.querySelector('.difference-palette-selector');
+    
+    // Ottieni i nomi delle palette dai selettori
+    const regularPaletteName = regularPaletteSelector?.querySelector('.selected-palette-name')?.textContent || '';
+    const differencePaletteName = differencePaletteSelector?.querySelector('.selected-palette-name')?.textContent || '';
+    
+    // Estrai i numeri delle palette dal testo (es: "Palette - Palette 3" -> "3")
+    const regularPaletteNumber = regularPaletteName.match(/Palette (\d+)/)?.[1] || "1";
+    const differencePaletteNumber = differencePaletteName.match(/Palette (\d+)/)?.[1] || "2";
+
+    const presetKey = `preset${Object.keys(presets).length + 1}`;
+    const preset = {
+        [presetKey]: {
+            "Data group": document.getElementById('dataGroupSelector')?.value || '',
+            "Data": document.getElementById('dataSelector')?.value || '',
+            "time": parseInt(document.getElementById('timeSlider')?.value) || 0,
+            "level": parseInt(document.getElementById('levelSlider')?.value) || 0,
+            "sectionX": parseInt(document.getElementById('sectionXSlider')?.value) || 0,
+            "sectionY": parseInt(document.getElementById('sectionYSlider')?.value) || 0,
+            "followTerrain": DOM.followTerrainToggle?.getAttribute('aria-checked') === 'true',
+            "scaleFactor": state.scaleFactor,
+            "windOpacity": parseInt(document.getElementById('windOpacitySlider')?.value) || 0,
+            "windDensity": parseInt(document.getElementById('windDensitySlider')?.value) || 0,
+            "windSize": parseInt(document.getElementById('windSizeSlider')?.value) || 0,
+            "Show Wind Field": DOM.showWindFieldToggle?.getAttribute('aria-checked') === 'true',
+            "Legend bounds": document.getElementById('scaleType')?.value || '',
+            "colorPalette": {
+                "category": "Palette",
+                "number": regularPaletteNumber
+            },
+            "colorDiffPalette": {
+                "category": "Palette",
+                "number": differencePaletteNumber
+            }
+        }
+    };
+
+    const json = JSON.stringify(preset, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'preset.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 });

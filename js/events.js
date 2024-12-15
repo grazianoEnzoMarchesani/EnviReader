@@ -29,7 +29,7 @@ import { changeSliderValue } from './utils.js';
 import { updateWindOpacityLabel } from './fileMan.js';
 import { updateWindDensityLabel } from './fileMan.js';
 import { updateFileset } from './fileMan.js';
-import { updateWindAnimationLabel } from './fileMan.js';
+import { updateWindSizeLabel } from './fileMan.js';
 
 
 import { incrementTime } from './viz.js';
@@ -64,16 +64,28 @@ export async function handleDataGroupChange() {
         await updateVisualization('filesetA');
         await updateVisualization('filesetB');
     } else {
-        //console.warn("Nessun dato disponibile per il percorso selezionato.");
+        //console.warn("No data available for the selected path.");
     }
 }
 
 // Gestione del cambio dello slider del tempo
 export async function handleTimeSliderChange() {
+    console.log("handleTimeSliderChange chiamata");
     updateTimeLabel();
     updateTimeButtons();
-    await updateVisualization('filesetA', 'all');
-    await updateVisualization('filesetB', 'all');
+    
+    // Ottieni il tipo di vista corrente
+    const viewTypes = ['level', 'section-x', 'section-y'];
+    
+    // Aggiorna tutte le visualizzazioni per ogni fileset
+    for (const viewType of viewTypes) {
+        if (state.filesetA) {
+            await updateVisualization('filesetA', viewType);
+        }
+        if (state.filesetB) {
+            await updateVisualization('filesetB', viewType);
+        }
+    }
 }
 // Gestione del cambio dello slider del livello
 export function handleLevelSliderChange() {
@@ -91,19 +103,9 @@ export async function handleSectionXSliderChange() {
     state.crossPosition = {
         xIndex: xIndex,
         yIndex: currentY,
-        viewType: 'level',
+        viewType: 'section-x',
         value: null
     };
-
-    Object.values(chartInstances).forEach(chart => {
-        if (chart) {
-            const option = chart.getOption();
-            if (option.series && option.series[1]) {
-                option.series[1].data = [[xIndex, currentY, null]];
-                chart.setOption(option);
-            }
-        }
-    });
 
     await updateVisualization('filesetA', 'section-x');
     await updateVisualization('filesetB', 'section-x');
@@ -118,41 +120,26 @@ export async function handleSectionYSliderChange() {
     state.crossPosition = {
         xIndex: currentX,
         yIndex: yIndex,
-        viewType: 'level',
+        viewType: 'section-y',
         value: null
     };
-
-    Object.values(chartInstances).forEach(chart => {
-        if (chart) {
-            const option = chart.getOption();
-            if (option.series && option.series[1]) {
-                option.series[1].data = [[currentX, yIndex, null]];
-                chart.setOption(option);
-            }
-        }
-    });
 
     await updateVisualization('filesetA', 'section-y');
     await updateVisualization('filesetB', 'section-y');
 }
 
-// Gestione del cambio dell'opacitÃ  del vento
+// Gestione del cambio dell'opacità del vento
 export function handleWindOpacityChange() {
-    //console.log("Wind opacity:", DOM.windOpacitySlider.value);
+    const opacityValue = DOM.windOpacitySlider.value;
+    updateWindOpacityLabel();
     updateVisualization('filesetA');
     updateVisualization('filesetB');
 }
 
-// Gestione del cambio dell'animazione del vento
-export function handleWindAnimationChange() {
-    //console.log("Wind animation:", DOM.windAnimationSlider.value);
-    updateVisualization('filesetA');
-    updateVisualization('filesetB');
-}
-
-// Gestione del cambio della densitÃ  del vento
+// Gestione del cambio della densità del vento
 export function handleWindDensityChange() {
-    //console.log("Wind density", DOM.windDensitySlider.value);
+    const densityValue = DOM.windDensitySlider.value;
+    updateWindDensityLabel();
     updateVisualization('filesetA');
     updateVisualization('filesetB');
 }
@@ -167,18 +154,15 @@ export function handleSavePreset() {
 // Gestione del toggle "Follow Terrain"
 export async function handleFollowTerrainToggle() {
     if (!DOM.followTerrainToggle) {
-        //console.error("Elemento 'followTerrainToggle' non trovato. Impossibile gestire il toggle.");
         return;
     }
 
     handleToggleButton(DOM.followTerrainToggle, async (isEnabled) => {
-        //console.log("Follow terrain:", isEnabled);
         if (isEnabled) {
             state.terrainDataA = await loadTerrainData('filesetA');
             state.terrainDataB = state.filesetB ? await loadTerrainData('filesetB') : null;
 
             if (!state.terrainDataA && (!state.filesetB || !state.terrainDataB)) {
-                //console.warn("Impossibile caricare i dati del terreno. La funzione 'Follow terrain' potrebbe non funzionare correttamente.");
                 DOM.followTerrainToggle.setAttribute('aria-checked', 'false');
                 state.terrainDataA = null;
                 state.terrainDataB = null;
@@ -190,6 +174,14 @@ export async function handleFollowTerrainToggle() {
 
         await updateVisualization('filesetA');
         if (state.filesetB) await updateVisualization('filesetB');
+
+        // Mostra o nascondi gli slider del vento
+        const windControls = document.getElementById('windControls');
+        if (state.showWindField) {
+            windControls.style.display = 'block'; // Mostra gli slider
+        } else {
+            windControls.style.display = 'none'; // Nascondi gli slider
+        }
     });
 }
 
@@ -354,21 +346,18 @@ export function addEventListeners() {
 
     if (DOM.followTerrainToggle) {
         DOM.followTerrainToggle.addEventListener('click', handleFollowTerrainToggle);
-    } else {
-        //console.warn("Impossibile aggiungere l'event listener per 'followTerrainToggle'. L'elemento non Ã¨ stato trovato.");
     }
-
 
     if (DOM.windOpacitySlider) {
-        DOM.windOpacitySlider.addEventListener('change', updateWindOpacityLabel);
+        DOM.windOpacitySlider.addEventListener('input', handleWindOpacityChange);
     }
 
-    if (DOM.windAnimationSlider) {
-        DOM.windAnimationSlider.addEventListener('change', updateWindAnimationLabel);
+    if (DOM.windSizeSlider) {
+        DOM.windSizeSlider.addEventListener('input', handleWindSizeChange);
     }
 
     if (DOM.windDensitySlider) {
-        DOM.windDensitySlider.addEventListener('change', updateWindDensityLabel);
+        DOM.windDensitySlider.addEventListener('input', handleWindDensityChange);
     }
 
     if (DOM.savePresetButton) {
@@ -381,4 +370,57 @@ export function addEventListeners() {
         DOM.differenceOrderValue.textContent = state.differenceOrder;
     }
 
+    // Inizializza la visibilità degli slider del vento
+    const windControls = document.getElementById('windControls');
+    windControls.style.display = state.showWindField ? 'block' : 'none';
+}
+
+// Inizializza gli event listener
+export function initializeEventListeners() {
+    // ... existing event listeners ...
+
+    // Aggiungi l'event listener per il toggle del campo di vento
+    const showWindFieldToggle = document.getElementById('showWindFieldToggle');
+    if (showWindFieldToggle) {
+        showWindFieldToggle.addEventListener('click', handleWindFieldToggle);
+    }
+}
+
+// Gestisce il toggle del campo di vento
+export function handleWindFieldToggle(event) {
+    const button = event.currentTarget;
+    const isChecked = button.getAttribute('aria-checked') === 'true';
+    button.setAttribute('aria-checked', (!isChecked).toString());
+    state.showWindField = !isChecked;
+    
+    console.log('=== Wind Field Toggle ===');
+    console.log('Toggle state:', !isChecked);
+    console.log('Selected path:', DOM.selectDataGroup.value);
+    
+    const windControls = document.getElementById('windControls');
+    if (state.showWindField) {
+        console.log('Enabling wind controls');
+        windControls.style.display = 'block';
+    } else {
+        console.log('Disabling wind controls');
+        windControls.style.display = 'none';
+    }
+    
+    if (DOM.selectDataGroup.value === 'atmosphere') {
+        console.log('Atmosphere data selected, updating visualizations...');
+        if (state.filesetA) {
+            updateVisualization('filesetA', 'all');
+        }
+        if (state.filesetB) {
+            updateVisualization('filesetB', 'all');
+        }
+    }
+}
+
+// Gestione del cambio della dimensione del vento
+export function handleWindSizeChange() {
+    const sizeValue = DOM.windSizeSlider.value;
+    updateWindSizeLabel();
+    updateVisualization('filesetA');
+    updateVisualization('filesetB');
 }

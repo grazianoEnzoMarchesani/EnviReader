@@ -20,7 +20,7 @@ export function captureSingleChartSVG(chartKey) {
 
             resolve(svgContent);
         } catch (error) {
-            reject(new Error(`Errore durante la generazione SVG: ${error.message}`));
+            // console.error(`Errore durante la generazione SVG: ${error.message}`);
         }
     });
 }
@@ -112,7 +112,7 @@ export function saveAllChartsAsSVG() {
     const savePromises = chartKeys.map(chartKey => 
         captureSingleChartSVG(chartKey).then(svgContent => {
             if (!svgContent) {
-                console.warn(`Nessun contenuto SVG generato per ${chartKey}`);
+                // console.warn(`No SVG content generated for ${chartKey}`);
                 return;
             }
 
@@ -129,13 +129,13 @@ export function saveAllChartsAsSVG() {
 
             return saveChartAsImage(svgContent, baseFileName);
         }).catch(error => {
-            console.error(`Errore nel salvataggio del grafico ${chartKey}:`, error);
+            // console.error(`Errore nel salvataggio del grafico ${chartKey}:`, error);
         })
     );
 
     Promise.all(savePromises).then(() => {
-        console.log('Tutti i grafici sono stati salvati come SVG.');
+        // console.log('Tutti i grafici sono stati salvati come SVG.');
     }).catch(error => {
-        console.error('Errore nel salvataggio dei grafici:', error);
+        // console.error('Errore nel salvataggio dei grafici:', error);
     });
 }

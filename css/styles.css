@@ -322,9 +322,9 @@ input[type="range"]::-moz-range-progress {
 
 /* Preset buttons */
 .preset-buttons {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
     margin-bottom: 20px;
 }
 
@@ -773,44 +773,77 @@ body {
 }
 
 #creditsPopup {
-    display: none; /* Nascondi il popup di default */
+    display: none;
     position: fixed;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: var(--light-sidebar-bg); /* Sfondo chiaro per il tema chiaro */
-    color: var(--light-text-color); /* Testo chiaro per il tema chiaro */
-    padding: 20px;
-    border: 1px solid var(--light-border-color); /* Bordo chiaro per il tema chiaro */
+    padding: 30px;
     z-index: 1000;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+    border-radius: var(--border-radius);
+    max-width: 600px;
+    width: 90%;
+}
+
+/* Tema chiaro */
+body.light-theme #creditsPopup {
+    background: var(--light-bg);
+    color: var(--light-text);
+    border: 1px solid var(--light-border);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* Tema scuro */
-body.dark-mode #creditsPopup {
-    background: var(--dark-bg); /* Sfondo scuro per il tema scuro */
-    color: var(--dark-text); /* Testo chiaro per il tema scuro */
-    border: 1px solid var(--dark-border); /* Bordo scuro per il tema scuro */
+body.dark-theme #creditsPopup {
+    background: var(--dark-sidebar-bg);
+    color: var(--dark-text);
+    border: 1px solid var(--dark-border);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+#creditsPopup h1 {
+    color: inherit;
+    font-size: 24px;
+    margin-bottom: 20px;
 }
 
 #creditsPopup h2 {
-    margin-top: 0;
+    color: inherit;
+    font-size: 20px;
+    margin: 20px 0 10px;
+}
+
+#creditsPopup p {
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+#creditsPopup a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+#creditsPopup a:hover {
+    color: var(--primary-hover-color);
+    text-decoration: underline;
 }
 
 #creditsPopup button {
-    margin-top: 10px;
-    background: #555; /* Sfondo del pulsante */
-    color: #fff; /* Testo del pulsante chiaro */
-    border: none; /* Rimuovi il bordo */
-    padding: 10px 15px; /* Padding per il pulsante */
-    cursor: pointer; /* Cambia il cursore */
+    width: 100%;
+    padding: 12px;
+    margin-top: 20px;
+    background: var(--primary-color);
+    color: var(--text-color);
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: var(--transition);
 }
 
 #creditsPopup button:hover {
-    background: #666; /* Colore del pulsante al passaggio del mouse */
+    background: var(--primary-hover-color);
 }
 
-/* Aggiungi dopo la riga 579 */
 .chart-title-container {
     margin-bottom: 10px;
     font-family: Helvetica, Arial, sans-serif;

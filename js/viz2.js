@@ -30,18 +30,20 @@ export function resizeChartContainers() {
             width: containerWidth,
             height: containerHeight
         });
+
+        console.log(`Time Series Chart resized to: ${containerWidth}px x ${containerHeight}px`);
     }
 }
 
 function calculateOptimalChartSize(sumSpacing, viewType, scale = state.scaleFactor) {
     if (!sumSpacing) {
-        console.warn('sumSpacing non valido, uso dimensioni di default');
+        // console.warn('sumSpacing non valido, uso dimensioni di default');
         return { width: 400, height: 300 };
     }
 
     // Verifica che tutte le proprietà necessarie esistano
     if (!sumSpacing.x || !sumSpacing.y || !sumSpacing.z) {
-        console.warn('sumSpacing incompleto, uso dimensioni di default');
+        // console.warn('sumSpacing incompleto, uso dimensioni di default');
         return { width: 400, height: 300 };
     }
 
@@ -102,7 +104,23 @@ function hideLoading(elementId) {
 
 
 // Visualizza i dati sul canvas
-export function visualizeData(sliceData, dimensions, sliceConfig, variableName, viewType, filesetKey, differenceOrder, scaleType, globalMinValue, globalMaxValue) {
+export function visualizeData(sliceData, dimensions, sliceConfig, variableName, viewType, filesetKey, differenceOrder, scaleType, globalMinValue, globalMaxValue, windData) {
+    console.log('=== Debug Wind Field ===');
+    console.log('State showWindField:', state.showWindField);
+    console.log('Wind data received:', windData ? {
+        speedSample: windData.speed?.slice(0, 5),
+        directionSample: windData.direction?.slice(0, 5),
+        totalPoints: windData.speed?.length
+    } : 'No wind data');
+    
+    if (state.showWindField && windData) {
+        console.log('Wind data validation:', {
+            hasValidSpeed: windData.speed?.some(s => s !== -999 && isFinite(s)),
+            hasValidDirection: windData.direction?.some(d => d !== -999 && isFinite(d)),
+            indices: windData.indices?.slice(0, 5)
+        });
+    }
+
     const scale = state.scaleFactor;
 
     const isPaletteData = filesetKey !== 'filesetDiff';
@@ -143,7 +161,7 @@ export function visualizeData(sliceData, dimensions, sliceConfig, variableName, 
 
     const visualizationContainer = document.querySelector(containerSelector);
     if (!visualizationContainer) {
-        console.error(`Container not found for ${filesetKey}. Selector: ${containerSelector}`);
+        // console.error(`Container not found for ${filesetKey}. Selector: ${containerSelector}`);
         return;
     }
 
@@ -205,6 +223,8 @@ export function visualizeData(sliceData, dimensions, sliceConfig, variableName, 
 
     chartDiv.style.width = `${scaledWidth}px`;
     chartDiv.style.height = `${scaledHeight}px`;
+
+    console.log(`Chart ${viewType} visualized with dimensions: ${scaledWidth}px x ${scaledHeight}px`);
 
     if (!chartDiv.hasAttribute('data-original-width')) {
         chartDiv.setAttribute('data-original-width', scaledWidth);
@@ -275,7 +295,7 @@ export function visualizeData(sliceData, dimensions, sliceConfig, variableName, 
     }
 
     if (data.length === 0) {
-        console.warn('No valid data to display for', filesetKey, viewType);
+        // console.warn('No valid data to display for', filesetKey, viewType);
         return;
     }
 
@@ -292,7 +312,7 @@ export function visualizeData(sliceData, dimensions, sliceConfig, variableName, 
     }
 
     if (!isFinite(minValue) || !isFinite(maxValue)) {
-        console.error('Invalid min/max values:', minValue, maxValue);
+        // console.error('Invalid min/max values:', minValue, maxValue);
         return;
     }
 
@@ -300,11 +320,24 @@ export function visualizeData(sliceData, dimensions, sliceConfig, variableName, 
         tooltip: {
             trigger: 'item',
             formatter: function (params) {
-                const xValue = params.value[0].toFixed(0);
-                const yValue = params.value[1].toFixed(0);
-                const actualValue = params.value[2].toFixed(2);
+                // Se è un triangolo del vento
+                if (params.seriesName === 'wind') {
+                    const speed = windData.speed[params.dataIndex];
+                    const direction = windData.direction[params.dataIndex];
+                    return `Wind:<br />` +
+                           `Speed: ${speed.toFixed(2)} m/s<br />` +
+                           `Direction: ${direction.toFixed(1)}°`;
+                }
                 
-                return `X: ${xValue}<br />Y: ${yValue}<br />Valore: ${actualValue}`;
+                // Per i dati normali
+                if (params.value && params.value.length >= 3) {
+                    const xValue = params.value[0].toFixed(0);
+                    const yValue = params.value[1].toFixed(0);
+                    const actualValue = params.value[2].toFixed(2);
+                    return `X: ${xValue}<br />Y: ${yValue}<br />Valore: ${actualValue}`;
+                }
+                
+                return '';
             }
         },
         xAxis: {
@@ -388,6 +421,101 @@ export function visualizeData(sliceData, dimensions, sliceConfig, variableName, 
                 },
                 data: data
             },
+            ...(windData ? [{
+                name: 'wind',
+                type: 'custom',
+                renderItem: function (params, api) {
+                    const index = params.dataIndex;
+                    const speed = windData.speed[index];
+                    const direction = windData.direction[index];
+                    
+                    if (!isFinite(speed) || isNaN(speed) || speed === -999 || 
+                        !isFinite(direction) || isNaN(direction) || direction === -999) {
+                        return null;
+                    }
+
+                    // Ottieni i valori degli slider
+                    const opacityValue = parseFloat(DOM.windOpacitySlider.value) / 100;
+                    const densityValue = parseFloat(DOM.windDensitySlider.value) / 100; // Converti in 0-1
+                    const sizeValue = parseFloat(DOM.windSizeSlider.value) / 50;
+
+                    // Usa il densityValue come probabilità di mostrare il triangolo
+                    // Genera un numero casuale tra 0 e 1
+                    if (Math.random() > densityValue) {
+                        return null; // Non disegnare questo triangolo
+                    }
+                    
+                    // Calcola la posizione del triangolo
+                    let x, y;
+                    const dataIndex = windData.indices[index];
+                    
+                    if (viewType === 'level') {
+                        x = dataIndex % dimensions.x;
+                        y = Math.floor(dataIndex / dimensions.x);
+                    } else if (viewType === 'section-x') {
+                        x = dataIndex % dimensions.y;
+                        y = Math.floor(dataIndex / dimensions.y);
+                    } else if (viewType === 'section-y') {
+                        x = dataIndex % dimensions.x;
+                        y = Math.floor(dataIndex / dimensions.x);
+                    }
+
+                    // Converti le coordinate in posizioni sulla griglia
+                    const startX = columnWidths.slice(0, x).reduce((a, b) => a + b, 0);
+                    const startY = rowHeights.slice(0, y).reduce((a, b) => a + b, 0);
+                    
+                    // Converti la direzione in radianti e ruota di 90 gradi (per allineare con il nord)
+                    let dirRad;
+                    if (viewType === 'level') {
+                        dirRad = (direction - 90) * Math.PI / 180;
+                    } else if (viewType === 'section-x' || viewType === 'section-y') {
+                        // Per le sezioni, usiamo un angolo che mostri la componente verticale
+                        // La direzione del vento nelle sezioni è relativa all'asse verticale
+                        dirRad = (direction + 180) * Math.PI / 180;
+                    }
+                    
+                    // Adatta la dimensione del vettore in base alla vista
+                    const baseSize = viewType === 'level' ? 20 : 15; // Dimensione base più piccola per le sezioni
+                    
+                    // Calcola il fattore di scala totale
+                    const totalScale = baseSize * 
+                                      Math.min(speed / 10, 1) * // Scala per velocità del vento
+                                      sizeValue * // Scala dallo slider
+                                      state.scaleFactor; // Scala globale
+                    
+                    // Calcola i vertici del triangolo usando la dimensione scalata
+                    const points = [
+                        [startX + totalScale * Math.cos(dirRad), 
+                         startY + totalScale * Math.sin(dirRad)], // Punta
+                        [startX + totalScale * 0.4 * Math.cos(dirRad + Math.PI * 2/3), 
+                         startY + totalScale * 0.4 * Math.sin(dirRad + Math.PI * 2/3)], // Base sinistra
+                        [startX + totalScale * 0.4 * Math.cos(dirRad - Math.PI * 2/3), 
+                         startY + totalScale * 0.4 * Math.sin(dirRad - Math.PI * 2/3)]  // Base destra
+                    ];
+
+                    // console.log('Triangolo calcolato:', {
+                    //     position: { x: startX, y: startY },
+                    //     speed,
+                    //     direction,
+                    //     points
+                    // });
+
+                    return {
+                        type: 'polygon',
+                        shape: {
+                            points: points.map(p => [p[0] * scale, (totalHeight - p[1]) * scale])
+                        },
+                        style: {
+                            fill: '#000',
+                            stroke: '#fff',
+                            lineWidth: 1,
+                            opacity: opacityValue // Applica l'opacità dallo slider
+                        }
+                    };
+                },
+                // Mantieni tutti i punti nel dataset, la riduzione avviene nel renderItem
+                data: windData ? Array.from({ length: windData.indices.length }, (_, i) => i) : []
+            }] : []),
             {
                 name: 'cross',
                 type: 'custom',
@@ -517,7 +645,7 @@ export function visualizeTimeSeries(data, variableName) {
     const chartDiv = document.getElementById('timeSeriesChart');
     
     if (!chartDiv) {
-        console.error('Element timeSeriesChart not found');
+        // console.error('Element timeSeriesChart not found');
         return;
     }
 

@@ -20,11 +20,11 @@ export function debounce(func, wait) {
 
 // Controlla se il browser supporta l'API File System Access
 if (!('showDirectoryPicker' in window)) {
-    //console.warn('Questo browser non supporta l\'API File System Access. Alcune funzionalitÃ  potrebbero non funzionare correttamente.');
+    //console.warn('Questo browser non supporta l\'API File System Access. Alcune funzionalità potrebbero non funzionare correttamente.');
     // Qui potresti implementare un fallback o mostrare un messaggio all'utente
 }
 
-// Funzione di utilitÃ  per selezionare elementi DOM in modo sicuro
+// Funzione di utilità per selezionare elementi DOM in modo sicuro
 export function safeQuerySelector(selector) {
     const element = document.querySelector(selector);
     if (!element) {
@@ -74,7 +74,7 @@ export function changeSliderValue(slider, increment = true) {
     }
 }
 
-// Verifica se il toggle "Follow Terrain" Ã¨ abilitato
+// Verifica se il toggle "Follow Terrain" è abilitato
 export function isFollowTerrainEnabled() {
     return DOM.followTerrainToggle && DOM.followTerrainToggle.getAttribute('aria-pressed') === 'true';
 }
@@ -140,7 +140,7 @@ const SELECTORS = {
     sectionYSlider: '#sectionYSlider',
     followTerrain: '#followTerrainToggle',
     windOpacitySlider: '#windOpacitySlider',
-    windAnimationSlider: '#windAnimationSlider',
+    windSizeSlider: '#windSizeSlider',
     windDensitySlider: '#windDensitySlider',
     savePresetButton: '#savePreset',
     visualizationContainerA: '#visualizationContainerA',
@@ -186,8 +186,8 @@ const SELECTORS = {
     DOM.followTerrainCheckbox = safeQuerySelector(SELECTORS.followTerrain);
     DOM.windOpacitySlider = safeQuerySelector(SELECTORS.windOpacitySlider);
     DOM.windOpacityLabel = safeQuerySelector('#windOpacityLabel');
-    DOM.windAnimationSlider = safeQuerySelector(SELECTORS.windAnimationSlider);
-    DOM.windAnimationLabel = safeQuerySelector('#windAnimationLabel');
+    DOM.windSizeSlider = safeQuerySelector(SELECTORS.windSizeSlider);
+    DOM.windSizeLabel = safeQuerySelector('#windSizeLabel');
     DOM.windDensitySlider = safeQuerySelector(SELECTORS.windDensitySlider);
     DOM.windDensityLabel = safeQuerySelector('#windDensityLabel');
     DOM.savePresetButton = safeQuerySelector(SELECTORS.savePresetButton);
@@ -203,7 +203,7 @@ const SELECTORS = {
     DOM.differenceOrderToggle = safeQuerySelector('#differenceOrderToggle');
     DOM.differenceOrderValue = safeQuerySelector('#differenceOrderValue');
     if (!DOM.followTerrainToggle) {
-        //console.warn("Elemento 'followTerrainToggle' non trovato nel DOM. Alcune funzionalitÃ  potrebbero non funzionare correttamente.");
+        //console.warn("Elemento 'followTerrainToggle' non trovato nel DOM. Alcune funzionalità potrebbero non funzionare correttamente.");
     }
 }
 
@@ -329,5 +329,13 @@ function updateChartContainer(chartDiv, dimensions, viewType) {
     chartDiv.setAttribute('data-original-height', optimalSize.height);
     
     return optimalSize;
+}
+
+export function suspendEventListener(element, eventName, callback) {
+    const originalCallback = element[`on${eventName}`];
+    element[`on${eventName}`] = null;
+    return () => {
+        element[`on${eventName}`] = originalCallback;
+    };
 }
 

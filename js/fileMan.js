@@ -88,44 +88,51 @@ export function getFilesInFolder(structure, path) {
 
 
 // Legge un file EDT
-export async function readEDTFile(file, edxInfo, selectedVariable, sliceConfig) {
-    const cacheKey = `${file.name}-${selectedVariable}-${JSON.stringify(sliceConfig)}`;
-
-    if (dataCache.has(cacheKey)) {
-        return dataCache.get(cacheKey);
+export async function readEDTFile(file, edxInfo, selectedVariable, sliceConfig, variableIndex = null) {
+    if (!file || !edxInfo || !sliceConfig) {
+        console.error('Parametri mancanti in readEDTFile:', { file, edxInfo, sliceConfig });
+        return null;
     }
 
-    const buffer = await file.arrayBuffer();
-    const dataView = new DataView(buffer);
+    try {
+        const buffer = await file.arrayBuffer();
+        const dataView = new DataView(buffer);
+        const { dimensions, nrVariables, variableNames } = edxInfo;
 
-    const { dimensions, nrVariables, variableNames } = edxInfo;
-    const variableIndex = variableNames.indexOf(selectedVariable);
-
-    if (variableIndex === -1) {
-        throw new Error("Selected variable not found in EDX file");
-    }
-
-    const sliceData = extractSlice(dataView, dimensions, nrVariables, variableIndex, sliceConfig);
-
-    // Ottimizzazione: convertire l'array in Float32Array e arrotondare a 2 decimali
-    const optimizedSliceData = new Float32Array(sliceData.length);
-    for (let i = 0; i < sliceData.length; i++) {
-        if (sliceData[i] === null) {
-            optimizedSliceData[i] = NaN;
+        // Se viene fornito variableIndex, usalo direttamente
+        let actualVariableIndex;
+        if (variableIndex !== null) {
+            actualVariableIndex = variableIndex;
+            console.log(`Usando indice variabile diretto: ${variableIndex}`);
         } else {
-            optimizedSliceData[i] = Number(sliceData[i].toFixed(2));
+            // Altrimenti cerca l'indice per nome
+            if (!selectedVariable) {
+                throw new Error('È necessario fornire selectedVariable o variableIndex');
+            }
+            actualVariableIndex = variableNames.indexOf(selectedVariable);
+            if (actualVariableIndex === -1) {
+                throw new Error('Selected variable not found in EDX file');
+            }
         }
+
+        console.log('Lettura dati:', {
+            variabile: selectedVariable || `Indice ${variableIndex}`,
+            indice: actualVariableIndex,
+            dimensioni: dimensions
+        });
+
+        const sliceData = extractSlice(dataView, dimensions, nrVariables, actualVariableIndex, sliceConfig);
+        
+        if (!sliceData || !Array.isArray(sliceData)) {
+            console.error('Dati slice non validi:', sliceData);
+            return null;
+        }
+
+        return sliceData;
+    } catch (error) {
+        console.error('Errore in readEDTFile:', error);
+        throw error; // Rilancia l'errore per gestirlo a livello superiore
     }
-
-    dataCache.set(cacheKey, optimizedSliceData);
-
-    // Limita la dimensione della cache (ad esempio, a 50 elementi)
-    if (dataCache.size > 50) {
-        const oldestKey = dataCache.keys().next().value;
-        dataCache.delete(oldestKey);
-    }
-
-    return optimizedSliceData;
 }
 
 // Caricamento dei dati del terreno
@@ -167,7 +174,7 @@ export async function loadTerrainData(filesetKey) {
 
         return terrainData;
     } catch (error) {
-        //console.error(`Errore nella lettura del file EDT per ${filesetKey}:`, error);
+        //console.error(`Error reading the EDT file for ${filesetKey}:`, error);
         return null;
     }
 }
@@ -185,9 +192,9 @@ export async function reloadEDXFiles(selectedPath) {
                 const edxFile = fileSeries[0].EDX;
                 const edxInfo = await processEDXFile(edxFile, filesetKey);
                 state.edxVariables = edxInfo.variableNames;
-                //console.log(`File EDX ricaricato per ${filesetKey}`);
+                //console.log(`EDX file reloaded for ${filesetKey}`);
             } else {
-                //console.warn(`Nessun file EDX trovato per ${filesetKey} nel percorso: ${selectedPath}`);
+                //console.warn(`No EDX file found for ${filesetKey} in the path: ${selectedPath}`);
             }
         }
     };
@@ -361,7 +368,7 @@ export async function updateFileset(filesetKey) {
 
     const edxFile = findEDXFile(result.structure);
     if (!edxFile) {
-        console.warn(`Nessun file EDX trovato per ${filesetKey}`);
+        console.warn(`No EDX file found for ${filesetKey}`);
         return;
     }
 
@@ -463,12 +470,12 @@ export async function updateDataMenu(selectedPath) {
             const edxInfo = await readEDXFile(edxFile);
             populateVariableDropdown(edxInfo.variableNames);
         } catch (error) {
-            //console.error(`Errore nella lettura del file EDX: ${error}`);
+            //console.error(`Error reading the EDX file: ${error}`);
             DOM.selectData.innerHTML = '<option value="">Errore nella lettura dei dati</option>';
         }
     } else {
-        //console.warn(`Nessuna coppia di file EDT/EDX valida trovata per il percorso selezionato: ${selectedPath}`);
-        DOM.selectData.innerHTML = '<option value="">Nessun dato disponibile</option>';
+        //console.warn(`No valid EDT/EDX file pair found for the selected path: ${selectedPath}`);
+        DOM.selectData.innerHTML = '<option value="">No data available</option>';
     }
 }
 // Aggiorna i range degli slider
@@ -523,17 +530,17 @@ export function updateSectionYLabel() {
         return `${value} (${metersValue.toFixed(2)}m)`;
     });
 }
-// Aggiorna l'etichetta dell'opacitÃ  del vento
+// Aggiorna l'etichetta dell'opacità del vento
 export function updateWindOpacityLabel() {
     updateSliderLabel('windOpacitySlider', 'windOpacityLabel', (value) => `${value}%`);
 }
 
-// Aggiorna l'etichetta dell'animazione del vento
-export function updateWindAnimationLabel() {
-    updateSliderLabel('windAnimationSlider', 'windAnimationLabel', (value) => `${value}%`);
+// Aggiorna l'etichetta della dimensione del vento
+export function updateWindSizeLabel() {
+    updateSliderLabel('windSizeSlider', 'windSizeLabel', (value) => `${value}%`);
 }
 
-// Aggiorna l'etichetta della densitÃ  del vento
+// Aggiorna l'etichetta della densità del vento
 export function updateWindDensityLabel() {
     updateSliderLabel('windDensitySlider', 'windDensityLabel', (value) => `${value}%`);
 }
@@ -543,7 +550,7 @@ export function updateAllLabels() {
     updateSectionXLabel();
     updateSectionYLabel();
     updateWindOpacityLabel();
-    updateWindAnimationLabel();
+    updateWindSizeLabel();
     updateWindDensityLabel();
 }
 
@@ -701,3 +708,28 @@ document.getElementById('reverseDifferencePaletteButton').addEventListener('clic
     updateVisualization('filesetB');
     console.log('Palette differenze ribaltata:', selectedDifferencePalette);
 });
+
+export function setPalette(category, paletteNumber, isDifference = false) {
+    const newPalette = COLOR_PALETTES[category][paletteNumber];
+    const selector = isDifference ? 
+        '.difference-palette-selector' : 
+        '.color-palette-selector:not(.difference-palette-selector)';
+    
+    const selectedPaletteName = document.querySelector(`${selector} .selected-palette-name`);
+    
+    if (selectedPaletteName) {
+        selectedPaletteName.textContent = `${category} - Palette ${paletteNumber}`;
+    }
+
+    if (isDifference) {
+        selectedDifferencePalette = newPalette;
+    } else {
+        selectedPalette = newPalette;
+    }
+
+    updateVisualization('filesetA');
+    updateVisualization('filesetB');
+    if (isDifference) {
+        updateVisualization('filesetDiff');
+    }
+}

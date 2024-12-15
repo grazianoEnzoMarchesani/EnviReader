@@ -1,0 +1,7 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+/Users/grazianoenzomarchesani/Documents/GitHub/EnviReader/Archivio.zip
+/Users/grazianoenzomarchesani/Documents/GitHub/EnviReader/Archivio 2.zip
+/Users/grazianoenzomarchesani/Documents/GitHub/EnviReader/Archivio 3.zip
+/Users/grazianoenzomarchesani/Documents/GitHub/EnviReader/test-streamlines.html
+/Users/grazianoenzomarchesani/Documents/GitHub/EnviReader/README.md
+/Users/grazianoenzomarchesani/Documents/GitHub/EnviReader/streamlines_test.html

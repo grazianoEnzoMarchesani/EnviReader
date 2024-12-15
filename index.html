@@ -104,14 +104,6 @@
                     </div>
                 </div>
             </div>
-            <div class="follow-terrain-container">
-                <div class="follow-terrain-wrapper">
-                    <span id="followTerrainLabel" class="slider-title">Follow terrain</span>
-                    <button id="followTerrainToggle" class="toggle-button" role="switch" aria-checked="false">
-                        <span class="toggle-slider"></span>
-                    </button>
-                </div>
-            </div>
             <div class="section slider-control">
                 <div class="slider-row">
                     <div class="slider-column">
@@ -135,22 +127,66 @@
                         </div>
                     </div>
                 </div>
-
-                <div class="section slider-control">
-                    <div class="slider-row">
-                        <div class="slider-column">
-                            <div id="scaleFactorLabel" class="slider-title">Scale Factor</div>
-                            <div class="slider-with-buttons">
-                                <button class="slider-btn" aria-label="Decrement scale factor">-</button>
-                                <input type="range" id="scaleFactorSlider" min="1" max="10" step="0.5" value="1">
-                                <button class="slider-btn" aria-label="Increment scale factor">+</button>
-                            </div>
-                            <div id="scaleFactorValue" class="slider-value"></div>
+            </div>
+            <div class="follow-terrain-container">
+                <div class="follow-terrain-wrapper">
+                    <span id="followTerrainLabel" class="slider-title">Follow terrain</span>
+                    <button id="followTerrainToggle" class="toggle-button" role="switch" aria-checked="false">
+                        <span class="toggle-slider"></span>
+                    </button>
+                </div>
+            </div>
+            <div class="section slider-control">
+                <div class="slider-row">
+                    <div class="slider-column">
+                        <div id="scaleFactorLabel" class="slider-title">Scale Factor</div>
+                        <div class="slider-with-buttons">
+                            <button class="slider-btn" aria-label="Decrement scale factor">-</button>
+                            <input type="range" id="scaleFactorSlider" min="1" max="10" step="0.5" value="1">
+                            <button class="slider-btn" aria-label="Increment scale factor">+</button>
                         </div>
                     </div>
                 </div>
-
-
+            </div>
+            <div class="section slider-control" id="windControls">
+                <div class="slider-row">
+                    <div class="slider-column">
+                        <div id="windOpacityLabel" class="slider-title">Wind opacity</div>
+                        <div class="slider-with-buttons">
+                            <button class="slider-btn" aria-label="Decrement wind opacity">-</button>
+                            <input type="range" id="windOpacitySlider" min="0" max="100" value="50">
+                            <button class="slider-btn" aria-label="Increment wind opacity">+</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="slider-row">
+                    <div class="slider-column">
+                        <div id="windSizeLabel" class="slider-title">Wind Size <span id="windSizeValue">50%</span></div>
+                        <div class="slider-with-buttons">
+                            <button class="slider-btn" aria-label="Decrement wind size">-</button>
+                            <input type="range" id="windSizeSlider" min="0" max="100" value="50">
+                            <button class="slider-btn" aria-label="Increment wind size">+</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="slider-row">
+                    <div class="slider-column">
+                        <div id="windDensityLabel" class="slider-title">Wind density</div>
+                        <div class="slider-with-buttons">
+                            <button class="slider-btn" aria-label="Decrement wind density">-</button>
+                            <input type="range" id="windDensitySlider" min="0" max="100" value="50">
+                            <button class="slider-btn" aria-label="Increment wind density">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="follow-terrain-container">
+                <div class="follow-terrain-wrapper">
+                    <span id="showWindFieldLabel" class="slider-title">Show Wind Field</span>
+                    <button id="showWindFieldToggle" class="toggle-button" role="switch" aria-checked="false">
+                        <span class="toggle-slider"></span>
+                    </button>
+                </div>
             </div>
             <div class="section control-group">
                 <select id="scaleType">
@@ -179,50 +215,7 @@
                 </div>
                 <button id="reverseDifferencePaletteButton">Reverse Difference Palette</button>
             </div>
-            <div class="section slider-control">
-                <div class="slider-row">
-                    <div class="slider-column">
-                        <div id="windOpacityLabel" class="slider-title">Wind opacity</div>
-                        <div class="slider-with-buttons">
-                            <button class="slider-btn" aria-label="Decrement wind opacity">-</button>
-                            <input type="range" id="windOpacitySlider" min="0" max="100" value="50">
-                            <button class="slider-btn" aria-label="Increment wind opacity">+</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="section slider-control">
-                <div class="slider-row">
-                    <div class="slider-column">
-                        <div id="windAnimationLabel" class="slider-title">Wind animation</div>
-                        <div class="slider-with-buttons">
-                            <button class="slider-btn" aria-label="Decrement wind animation">-</button>
-                            <input type="range" id="windAnimationSlider" min="0" max="100" value="50">
-                            <button class="slider-btn" aria-label="Increment wind animation">+</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="section slider-control">
-                <div class="slider-row">
-                    <div class="slider-column">
-                        <div id="windDensityLabel" class="slider-title">Wind density</div>
-                        <div class="slider-with-buttons">
-                            <button class="slider-btn" aria-label="Decrement wind density">-</button>
-                            <input type="range" id="windDensitySlider" min="0" max="100" value="50">
-                            <button class="slider-btn" aria-label="Increment wind density">+</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="section control-group">
-                <h2>Wind gradient</h2>
-                <div class="color-selector" role="group" aria-label="Wind gradient color selection">
-                    <div class="color-box" style="background-color: #ff0000;" aria-label="Red"></div>
-                    <div class="color-box" style="background-color: #00ff00;" aria-label="Green"></div>
-                    <div class="color-box" style="background-color: #0000ff;" aria-label="Blue"></div>
-                </div>
-            </div>
+
             <div class="difference-order-container">
                 <div class="difference-order-wrapper">
                     <span class="slider-title">
@@ -235,11 +228,9 @@
                 </div>
             </div>
             <div class="section preset-buttons">
-                <button>Preset 1</button>
-                <button>Preset 2</button>
-                <button>Preset 3</button>
-                <button>Preset 4</button>
+                <!-- I pulsanti verranno aggiunti qui dinamicamente -->
             </div>
+            <button id="loadPresetButton">Load Preset</button>
             <button id="savePreset">Save Preset</button>
 
 
@@ -266,26 +257,34 @@
 
         </div>
     </div>
-    <script type="module" src="js/options.js?v=<?= time() ?>"></script>
-    <script type="module" src="js/imageExport.js?v=<?= time() ?>"></script>
-    <script type="module" src="js/enviropment.js?v=<?= time() ?>"></script>
-    <script type="module" src="js/fileMan.js?v=<?= time() ?>"></script>
-    <script type="module" src="js/utils.js?v=<?= time() ?>"></script>
-    <script type="module" src="js/events.js?v=<?= time() ?>"></script>
-    <script type="module" src="js/viz.js?v=<?= time() ?>"></script>
-    <script type="module" src="js/viz2.js?v=<?= time() ?>"></script>
-    <script type="module" src="js/processing.js?v=<?= time() ?>"></script>
-    <script type="module" src="js/main.js?v=<?= time() ?>"></script>
+</div>
+<script type="module" src="js/options.js?v=<?= time() ?>"></script>
+<script type="module" src="js/imageExport.js?v=<?= time() ?>"></script>
+<script type="module" src="js/enviropment.js?v=<?= time() ?>"></script>
+<script type="module" src="js/fileMan.js?v=<?= time() ?>"></script>
+<script type="module" src="js/utils.js?v=<?= time() ?>"></script>
+<script type="module" src="js/events.js?v=<?= time() ?>"></script>
+<script type="module" src="js/viz.js?v=<?= time() ?>"></script>
+<script type="module" src="js/viz2.js?v=<?= time() ?>"></script>
+<script type="module" src="js/processing.js?v=<?= time() ?>"></script>
+<script type="module" src="js/main.js?v=<?= time() ?>"></script>
 
-    <!-- Popup per i crediti -->
-    <div id="creditsPopup" style="display: none;">
-        <h1>Information and Credits</h1>
-        <p>The EnviReader application, version 1.4, was developed by PhD Graziano Enzo Marchesani.</p>
-        <p>Researcher, RTD-A</p>
-        <p>University of Camerino</p>
-        <p>School of Architecture and Design “E. Vittoria”</p>
-        <button onclick="closeCredits()">Close</button>
-    </div>
+<!-- Popup per i crediti -->
+<div id="creditsPopup" class="popup">
+    <h1>Information and Credits</h1>
+    <p>The EnviReader application, version 1.5, was developed by PhD Graziano Enzo Marchesani.</p>
+    <p>Source code available on <a href="https://github.com/grazianoEnzoMarchesani/EnviReader" target="_blank">GitHub</a>.</p>
+    
+    <h2>Feedback and Contributions</h2>
+    <p>If you have ideas for improving this application, want to report issues, or wish to contribute to its development, please feel free to reach out through the <a href="https://github.com/grazianoEnzoMarchesani/EnviReader/issues" target="_blank">GitHub repository</a>.</p>
+    
+    <h2>Academic Citation</h2>
+    <p>If you find this tool useful for your academic work, please cite it as:</p>
+    <p style="font-style: italic; margin-left: 20px;">Marchesani, G.E. (2024) EnviReader: A visualization tool for ENVI-met output files. Available at: https://github.com/grazianoEnzoMarchesani/EnviReader (Accessed: [insert access date])</p>
+    
+    <button onclick="closeCredits()">Close</button>
+</div>
 </body>
 
 </html>
+

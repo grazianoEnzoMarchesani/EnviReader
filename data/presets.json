@@ -1,0 +1,257 @@
+{
+    "morningTemp": {
+        "Data group": "atmosphere",
+        "Data": "Potential Air Temperature (°C)",
+        "time": 3,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": false,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "61"
+        },
+        "colorDiffPalette": {
+            "category": "Palette", 
+            "number": "62"
+        }
+    },
+    "afternoonTemp": {
+        "Data group": "atmosphere",
+        "Data": "Potential Air Temperature (°C)", 
+        "time": 7,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": false,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "61"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "62"
+        }
+    },
+    "eveningTemp": {
+        "Data group": "atmosphere",
+        "Data": "Potential Air Temperature (°C)",
+        "time": 11,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": false,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "61"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "62"
+        }
+    },
+    "morningWindSpeed": {
+        "Data group": "atmosphere",
+        "Data": "Wind Speed (m/s)", 
+        "time": 3,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": true,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "53"
+        },
+        "colorDiffPalette": {
+            "category": "Palette", 
+            "number": "62"
+        }
+    },
+    "afternoonWindSpeed": {
+        "Data group": "atmosphere",
+        "Data": "Wind Speed (m/s)", 
+        "time": 7,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": true,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "53"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "62"
+        }
+    },
+    "eveningWindSpeed": {
+        "Data group": "atmosphere",
+        "Data": "Wind Speed (m/s)", 
+        "time": 11,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": true,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "53"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "62"
+        }
+    },   "morningRelativeHumidity": {
+        "Data group": "atmosphere",
+        "Data": "Relative Humidity (%)", 
+        "time": 3,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": false,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "25"
+        },
+        "colorDiffPalette": {
+            "category": "Palette", 
+            "number": "62"
+        }
+    },
+    "afternoonRelativeHumidity": {
+        "Data group": "atmosphere",
+        "Data": "Relative Humidity (%)", 
+        "time": 7,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": false,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "25"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "62"
+        }
+    },
+    "eveningRelativeHumidity": {
+        "Data group": "atmosphere",
+        "Data": "Relative Humidity (%)", 
+        "time": 11,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": false,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "25"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "62"
+        }
+    },
+    "morningMRT": {
+        "Data group": "atmosphere",
+        "Data": "Mean Radiant Temp. (°C)", 
+        "time": 3,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": false,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "29"
+        },
+        "colorDiffPalette": {
+            "category": "Palette", 
+            "number": "62"
+        }
+    },
+    "afternoonMRT": {
+        "Data group": "atmosphere",
+        "Data": "Mean Radiant Temp. (°C)", 
+        "time": 7,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": false,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "29"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "62"
+        }
+    },
+    "eveningMRT": {
+        "Data group": "atmosphere",
+        "Data": "Mean Radiant Temp. (°C)", 
+        "time": 11,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": false,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "29"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "62"
+        }
+    },
+    "morningUTCI": {
+        "Data group": "biomet/UTCI",
+        "Data": "UTCI (°C)", 
+        "time": 3,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": false,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "45"
+        },
+        "colorDiffPalette": {
+            "category": "Palette", 
+            "number": "62"
+        }
+    },
+    "afternoonUTCI": {
+        "Data group": "biomet/UTCI",
+        "Data": "UTCI (°C)", 
+        "time": 7,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": false,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "45"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "62"
+        }
+    },
+    "eveningUTCI": {
+        "Data group": "biomet/UTCI",
+        "Data": "UTCI (°C)", 
+        "time": 11,
+        "level": 1,
+        "followTerrain": true,
+        "Show Wind Field": false,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "45"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "62"
+        }
+    }
+}
+

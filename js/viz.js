@@ -6,6 +6,7 @@ import { getFileCoupleSeries } from './fileMan.js';
 import { getFilesInFolder } from './fileMan.js';
 import { readEDTFile } from './fileMan.js';
 import { readEDXFile } from './processing.js';
+import { logWindData } from './processing.js';
 import { changeSliderValue } from './utils.js';
 
 import { handleTimeSliderChange } from './events.js';
@@ -105,9 +106,7 @@ export async function updateVisualization(filesetKey, viewType = 'all') {
     }
 
     const { x: nrXData, y: nrYData, z: nrZData } = state.dimensions;
-    console.log(nrXData, nrYData, nrZData);
     const spacing = state[filesetKey].edxData.spacing;
-
     const terrainData = state[`terrainData${filesetKey.slice(-1)}`];
 
     const levelSliceConfig = { level, sectionX: null, sectionY: null, terrainData, spacing };
@@ -189,6 +188,46 @@ export async function updateVisualization(filesetKey, viewType = 'all') {
 
     const visualizeSlice = async (sliceConfig, sliceType) => {
         const sliceData = await readEDTFile(edtFile, edxInfo, selectedVariable, sliceConfig);
+        
+        // Carica i dati del vento se necessario
+        let windData = null;
+        if (state.showWindField && selectedPath === 'atmosphere') {
+            console.log('Caricamento dati del vento...');
+            const windSpeed = await readEDTFile(edtFile, edxInfo, null, sliceConfig, 4);
+            const windDirection = await readEDTFile(edtFile, edxInfo, null, sliceConfig, 6);
+            
+            if (windSpeed && windDirection) {
+                // Crea array degli indici validi
+                const validIndices = [];
+                const validSpeeds = [];
+                const validDirections = [];
+
+                for (let i = 0; i < windSpeed.length; i++) {
+                    const speed = windSpeed[i];
+                    const direction = windDirection[i];
+
+                    if (isFinite(speed) && isFinite(direction) && 
+                        speed !== -999 && direction !== -999 && 
+                        !isNaN(speed) && !isNaN(direction)) {
+                        validIndices.push(i);
+                        validSpeeds.push(speed);
+                        validDirections.push(direction);
+                    }
+                }
+
+                if (validIndices.length > 0) {
+                    windData = {
+                        indices: validIndices,
+                        speed: validSpeeds,
+                        direction: validDirections
+                    };
+                    
+                    logWindData(validSpeeds, validDirections, level, 
+                              state.followTerrain, state[filesetKey].terrainData);
+                }
+            }
+        }
+
         let minValue, maxValue;
         if (scaleType === 'syncedViews') {
             ({ minValue, maxValue } = await getSyncedMinMax(sliceType));
@@ -199,7 +238,9 @@ export async function updateVisualization(filesetKey, viewType = 'all') {
             minValue = globalMinValue;
             maxValue = globalMaxValue;
         }
-        visualizeData(sliceData, state.dimensions, sliceConfig, selectedVariable, sliceType, filesetKey, null, scaleType, minValue, maxValue);
+
+        visualizeData(sliceData, state.dimensions, sliceConfig, selectedVariable, 
+                     sliceType, filesetKey, null, scaleType, minValue, maxValue, windData);
     };
 
     if (viewType === 'all' || viewType === 'level') {
@@ -215,7 +256,6 @@ export async function updateVisualization(filesetKey, viewType = 'all') {
     }
 
     if (state.filesetA && state.filesetB && filesetKey === 'filesetB') {
-        // Verifica che entrambi i fileset abbiano i dati EDX
         if (state.filesetA.edxData && state.filesetB.edxData) {
             await calculateAndVisualizeDifference(selectedVariable, levelSliceConfig, sectionXSliceConfig, sectionYSliceConfig, viewType);
         }
