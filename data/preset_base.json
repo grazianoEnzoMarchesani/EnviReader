@@ -1,0 +1,95 @@
+{
+    "preset1": {
+        "Data group": "atmosphere",
+        "Data": "Potential Air Temperature (°C)",
+        "time": 0,
+        "level": 0,
+        "sectionX": 9,
+        "sectionY": 5,
+        "followTerrain": true,
+        "scaleFactor": 3.0,
+        "windOpacity": 60,
+        "windDensity": 30,
+        "windSize": 20,
+        "Show Wind Field": true,
+        "Legend bounds": "individual",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "1"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "2"
+        }
+    },
+    "preset2": {
+        "Data group": "atmosphere",
+        "Data": "Potential Air Temperature (°C)",
+        "time": 1,
+        "level": 12,
+        "sectionX": 15,
+        "sectionY": 10,
+        "followTerrain": false,
+        "scaleFactor": 1.5,
+        "windOpacity": 60,
+        "windDensity": 25,
+        "windSize": 25,
+        "Show Wind Field": false,
+        "Legend bounds": "syncedViews",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "3"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "4"
+        }
+    },
+    "preset3": {
+        "Data group": "atmosphere",
+        "Data": "Potential Air Temperature (°C)",
+        "time": 2,
+        "level": 10,
+        "sectionX": 20,
+        "sectionY": 15,
+        "followTerrain": true,
+        "scaleFactor": 2.0,
+        "windOpacity": 40,
+        "windDensity": 20,
+        "windSize": 30,
+        "Show Wind Field": true,
+        "Legend bounds": "filesetGlobal",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "5"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "6"
+        }
+
+    },
+    "preset4": {
+        "Data group": "atmosphere",
+        "Data": "Potential Air Temperature (°C)",
+        "time": 3,
+        "level": 9,
+        "sectionX": 25,
+        "sectionY": 20,
+        "followTerrain": false,
+        "scaleFactor": 1.0,
+        "windOpacity": 70,
+        "windDensity": 35,
+        "windSize": 15,
+        "Show Wind Field": true,
+        "Legend bounds": "allFilesets",
+        "colorPalette": {
+            "category": "Palette",
+            "number": "7"
+        },
+        "colorDiffPalette": {
+            "category": "Palette",
+            "number": "2"
+        }
+        }
+}
