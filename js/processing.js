@@ -168,24 +168,78 @@ export function extractSlice(dataView, dimensions, nrVariables, variableIndex, s
 
 
 // Legge il contenuto di un file
-export function   readFileContent(file) {
+export function readFileContent(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
             const arrayBuffer = event.target.result;
+            const bytes = new Uint8Array(arrayBuffer);
+            
+            // Verifica la presenza del BOM UTF-8
+            const hasUTF8BOM = bytes.length >= 3 && 
+                              bytes[0] === 0xEF && 
+                              bytes[1] === 0xBB && 
+                              bytes[2] === 0xBF;
+
+            // Verifica se il contenuto sembra essere UTF-8 valido
+            function isValidUTF8(bytes) {
+                let i = hasUTF8BOM ? 3 : 0;
+                while (i < bytes.length) {
+                    if (bytes[i] <= 0x7F) { // ASCII
+                        i++;
+                        continue;
+                    }
+                    
+                    // Caratteri multi-byte UTF-8
+                    let bytesCount;
+                    if ((bytes[i] & 0xE0) === 0xC0) bytesCount = 2;
+                    else if ((bytes[i] & 0xF0) === 0xE0) bytesCount = 3;
+                    else if ((bytes[i] & 0xF8) === 0xF0) bytesCount = 4;
+                    else return false;
+
+                    // Verifica che ci siano abbastanza bytes rimanenti
+                    if (i + bytesCount > bytes.length) return false;
+
+                    // Verifica che i bytes seguenti siano validi (devono iniziare con 10xxxxxx)
+                    for (let j = 1; j < bytesCount; j++) {
+                        if ((bytes[i + j] & 0xC0) !== 0x80) return false;
+                    }
+
+                    i += bytesCount;
+                }
+                return true;
+            }
+
+            // Determina la codifica e decodifica
+            let content;
+            if (hasUTF8BOM || isValidUTF8(bytes)) {
+                try {
+                    content = new TextDecoder('UTF-8').decode(arrayBuffer);
+                    if (content.includes('<name_variables>')) {
+                        console.log('File decodificato correttamente come UTF-8');
+                        resolve(content);
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('Errore nella decodifica UTF-8:', e);
+                }
+            }
+
+            // Prova con ISO-8859-1 se UTF-8 fallisce o non è valido
             try {
-                const content = new TextDecoder('ISO-8859-1').decode(arrayBuffer);
+                content = new TextDecoder('ISO-8859-1').decode(arrayBuffer);
                 if (content.includes('<name_variables>')) {
-                    //console.log('Codifica utilizzata: ISO-8859-1');
+                    console.log('File decodificato correttamente come ISO-8859-1');
                     resolve(content);
-                } else {
-                    reject(new Error("Il contenuto del file non sembra essere nel formato atteso"));
+                    return;
                 }
             } catch (e) {
-                //console.error('Errore nella decodifica del file:', e);
-                reject(e);
+                console.error('Errore nella decodifica ISO-8859-1:', e);
             }
+
+            reject(new Error("Impossibile determinare la codifica corretta del file o file non valido"));
         };
+        
         reader.onerror = (error) => reject(error);
         reader.readAsArrayBuffer(file);
     });
