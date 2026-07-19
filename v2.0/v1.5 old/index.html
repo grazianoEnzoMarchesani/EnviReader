@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENVI-met webReader - Environmental Analysis</title>
+    <meta name="description" content="ENVI-met webReader is a web application designed to facilitate environmental analysis. This platform allows users to upload and visualize environmental data, providing tools for analysis and result visualization. With interactive charts and detailed reports, users can intuitively explore the data, enhancing their understanding and supporting scientific research.">
+    <meta name="keywords" content="ENVI-met, environmental analysis, data, research">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="preload" as="script" href="https://cdn.iubenda.com/cs/iubenda_cs.js" />
+    <link rel="preload" as="script" href="https://cdn.iubenda.com/cs/tcf/stub-v2.js" />
+    <script src="https://cdn.iubenda.com/cs/tcf/stub-v2.js"></script>
+    <script>
+        (_iub = self._iub || []).csConfiguration = {
+            cookiePolicyId: 17898234,
+            siteId: 3748102,
+            localConsentDomain: 'envireader.altervista.org',
+            timeoutLoadConfiguration: 30000,
+            lang: 'it',
+            enableTcf: true,
+            tcfVersion: 2,
+            tcfPurposes: {
+                "2": "consent_only",
+                "3": "consent_only",
+                "4": "consent_only",
+                "5": "consent_only",
+                "6": "consent_only",
+                "7": "consent_only",
+                "8": "consent_only",
+                "9": "consent_only",
+                "10": "consent_only"
+            },
+            invalidateConsentWithoutLog: true,
+            googleAdditionalConsentMode: true,
+            consentOnContinuedBrowsing: false,
+            banner: {
+                position: "top",
+                acceptButtonDisplay: true,
+                customizeButtonDisplay: true,
+                closeButtonDisplay: true,
+                closeButtonRejects: true,
+                fontSizeBody: "14px",
+            },
+        }
+
+        // Funzione per mostrare il popup
+        function showCredits() {
+            const popup = document.getElementById('creditsPopup');
+            popup.style.display = 'block';
+        }
+
+        // Funzione per chiudere il popup
+        function closeCredits() {
+            const popup = document.getElementById('creditsPopup');
+            popup.style.display = 'none';
+        }
+    </script>
+    <script async src="https://cdn.iubenda.com/cs/iubenda_cs.js"></script>
+
+</head>
+
+<body class="light-mode">
+
+    <div class="container">
+        <nav class="sidebar scrollable-container" aria-label="Main navigation">
+            <h1 onclick="showCredits()" style="cursor: pointer;">ENVI-met webReader</h1>
+            <button id="openFilesetA">Open fileset A</button>
+            <button id="openFilesetB" class="hidden">Open fileset B</button>
+            <button id="saveAllChartsButton" class="save-charts-button">Save All Charts</button>
+            <div class="section control-group">
+                <h2>Data group</h2>
+                <select id="dataGroupSelector"></select>
+            </div>
+            <div class="section control-group">
+                <h2>Data</h2>
+                <select id="dataSelector"></select>
+            </div>
+            <div class="section slider-control">
+                <div class="slider-row">
+                    <div class="slider-column">
+                        <div id="timeLabel" class="slider-title">Time</div>
+                        <div class="slider-with-buttons">
+                            <button class="slider-btn" aria-label="Decrement time">-</button>
+                            <input type="range" id="timeSlider" min="0" max="100" value="0">
+                            <button class="slider-btn" aria-label="Increment time">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section slider-control">
+                <div class="slider-row">
+                    <div class="slider-column">
+                        <div id="levelLabel" class="slider-title">Plan Level</div>
+                        <div class="slider-with-buttons">
+                            <button class="slider-btn" aria-label="Decrement plan level">-</button>
+                            <input type="range" id="levelSlider" min="0" max="100" value="0">
+                            <button class="slider-btn" aria-label="Increment plan level">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="section slider-control">
+                <div class="slider-row">
+                    <div class="slider-column">
+                        <div id="sectionXLabel" class="slider-title">Longitudinal Position</div>
+                        <div class="slider-with-buttons">
+                            <button class="slider-btn" aria-label="Decrement section X">-</button>
+                            <input type="range" id="sectionXSlider" min="0" max="100" value="0">
+                            <button class="slider-btn" aria-label="Increment section X">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="section slider-control">
+                <div class="slider-row">
+                    <div class="slider-column">
+                        <div id="sectionYLabel" class="slider-title">Transverse Position</div>
+                        <div class="slider-with-buttons">
+                            <button class="slider-btn" aria-label="Decrement section Y">-</button>
+                            <input type="range" id="sectionYSlider" min="0" max="100" value="0">
+                            <button class="slider-btn" aria-label="Increment section Y">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="follow-terrain-container">
+                <div class="follow-terrain-wrapper">
+                    <span id="followTerrainLabel" class="slider-title">Follow terrain</span>
+                    <button id="followTerrainToggle" class="toggle-button" role="switch" aria-checked="false">
+                        <span class="toggle-slider"></span>
+                    </button>
+                </div>
+            </div>
+            <div class="section slider-control">
+                <div class="slider-row">
+                    <div class="slider-column">
+                        <div id="scaleFactorLabel" class="slider-title">Scale Factor</div>
+                        <div class="slider-with-buttons">
+                            <button class="slider-btn" aria-label="Decrement scale factor">-</button>
+                            <input type="range" id="scaleFactorSlider" min="1" max="10" step="0.5" value="1">
+                            <button class="slider-btn" aria-label="Increment scale factor">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="section slider-control" id="windControls">
+                <div class="slider-row">
+                    <div class="slider-column">
+                        <div id="windOpacityLabel" class="slider-title">Wind opacity</div>
+                        <div class="slider-with-buttons">
+                            <button class="slider-btn" aria-label="Decrement wind opacity">-</button>
+                            <input type="range" id="windOpacitySlider" min="0" max="100" value="50">
+                            <button class="slider-btn" aria-label="Increment wind opacity">+</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="slider-row">
+                    <div class="slider-column">
+                        <div id="windSizeLabel" class="slider-title">Wind Size <span id="windSizeValue">50%</span></div>
+                        <div class="slider-with-buttons">
+                            <button class="slider-btn" aria-label="Decrement wind size">-</button>
+                            <input type="range" id="windSizeSlider" min="0" max="100" value="50">
+                            <button class="slider-btn" aria-label="Increment wind size">+</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="slider-row">
+                    <div class="slider-column">
+                        <div id="windDensityLabel" class="slider-title">Wind density</div>
+                        <div class="slider-with-buttons">
+                            <button class="slider-btn" aria-label="Decrement wind density">-</button>
+                            <input type="range" id="windDensitySlider" min="0" max="100" value="50">
+                            <button class="slider-btn" aria-label="Increment wind density">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="follow-terrain-container">
+                <div class="follow-terrain-wrapper">
+                    <span id="showWindFieldLabel" class="slider-title">Show Wind Field</span>
+                    <button id="showWindFieldToggle" class="toggle-button" role="switch" aria-checked="false">
+                        <span class="toggle-slider"></span>
+                    </button>
+                </div>
+            </div>
+            <div class="section control-group">
+                <select id="scaleType">
+                    <option value="individual">Legend bounds: Single chart</option>
+                    <option value="syncedViews">Legend bounds: Cross View</option>
+                    <option value="filesetGlobal">Legend bounds: Cross fileset </option>
+                    <option value="allFilesets">Legend bounds: All filesets</option>
+                </select>
+            </div>
+            <div class="color-palette-selector">
+                <div class="selected-palette">
+                    <span class="selected-palette-name">Select a palette</span>
+                    <span class="arrow-down"></span>
+                </div>
+                <div class="palette-options">
+                    <!-- Le opzioni della palette verranno generate dinamicamente qui -->
+                </div>
+                <button id="reversePaletteButton">Reverse Palette</button>
+            </div>
+            <div class="color-palette-selector difference-palette-selector">
+                <div class="selected-palette">
+                    <span class="selected-palette-name">Select Difference palette</span>
+                    <span class="arrow-down"></span>
+                </div>
+                <div class="palette-options difference-palette-options">
+                </div>
+                <button id="reverseDifferencePaletteButton">Reverse Difference Palette</button>
+            </div>
+
+            <div class="difference-order-container">
+                <div class="difference-order-wrapper">
+                    <span class="slider-title">
+                        <span class="title-fixed">Difference Order</span>
+                        <span id="differenceOrderValue" class="title-variable">A-B</span>
+                    </span>
+                    <button id="differenceOrderToggle" class="toggle-button" aria-checked="true">
+                        <span class="toggle-slider"></span>
+                    </button>
+                </div>
+            </div>
+            <div class="section preset-buttons">
+                <!-- I pulsanti verranno aggiunti qui dinamicamente -->
+            </div>
+            <button id="loadPresetButton">Load Preset</button>
+            <button id="savePreset">Save Preset</button>
+
+
+        </nav>
+        <div class="main-content scrollable-container">
+            <div class="section scale-charts">
+            </div>
+            <div class="fileset-container">
+                <div class="fileset-column fileset-a">
+                    <div id="visualizationContainerA"></div>
+                </div>
+                <div class="fileset-column fileset-b">
+                    <div id="visualizationContainerB"></div>
+                </div>
+                <div class="fileset-column fileset-diff">
+                    <div id="visualizationContainerDiff"></div>
+                </div>
+            </div>
+            <div class="time-series-container">
+                <div id="timeSeriesChart" class="echarts-container"></div>
+            </div>
+        </div>
+        <div class="save-buttons">
+
+        </div>
+    </div>
+</div>
+<script type="module" src="js/options.js?v=<?= time() ?>"></script>
+<script type="module" src="js/imageExport.js?v=<?= time() ?>"></script>
+<script type="module" src="js/enviropment.js?v=<?= time() ?>"></script>
+<script type="module" src="js/fileMan.js?v=<?= time() ?>"></script>
+<script type="module" src="js/utils.js?v=<?= time() ?>"></script>
+<script type="module" src="js/events.js?v=<?= time() ?>"></script>
+<script type="module" src="js/viz.js?v=<?= time() ?>"></script>
+<script type="module" src="js/viz2.js?v=<?= time() ?>"></script>
+<script type="module" src="js/processing.js?v=<?= time() ?>"></script>
+<script type="module" src="js/main.js?v=<?= time() ?>"></script>
+
+<!-- Popup per i crediti -->
+<div id="creditsPopup" class="popup">
+    <h1>Information and Credits</h1>
+    <p>The EnviReader application, version 1.5, was developed by PhD Graziano Enzo Marchesani.</p>
+    <p>Source code available on <a href="https://github.com/grazianoEnzoMarchesani/EnviReader" target="_blank">GitHub</a>.</p>
+    
+    <h2>Feedback and Contributions</h2>
+    <p>If you have ideas for improving this application, want to report issues, or wish to contribute to its development, please feel free to reach out through the <a href="https://github.com/grazianoEnzoMarchesani/EnviReader/issues" target="_blank">GitHub repository</a>.</p>
+    
+    <h2>Academic Citation</h2>
+    <p>If you find this tool useful for your academic work, please cite it as:</p>
+    <p style="font-style: italic; margin-left: 20px;">Marchesani, G.E. (2024) EnviReader: A visualization tool for ENVI-met output files. Available at: https://github.com/grazianoEnzoMarchesani/EnviReader (Accessed: [insert access date])</p>
+    
+    <button onclick="closeCredits()">Close</button>
+</div>
+</body>
+
+</html>
+

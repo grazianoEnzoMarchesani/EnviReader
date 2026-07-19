@@ -1,0 +1,597 @@
+import { useMemo, useEffect } from 'react';
+import { VIEW_TYPES, SCALE_TYPES } from '../../data/constants';
+import { findPalette } from '../../data/palettes';
+import { useAppState } from '../../state/AppStateContext';
+import { useI18n } from '../../i18n/I18nContext';
+import Segmented from '../controls/Segmented';
+import Slider from '../controls/Slider';
+import Select from '../controls/Select';
+import Toggle from '../controls/Toggle';
+import { paletteLabel } from '../controls/PaletteSelector';
+import MapChart, { MapThumb, niceCeil } from '../MapChart';
+import TimeSeriesChart from '../TimeSeriesChart';
+import { useSlice, usePointSeries, useInxRotation, useWindField } from '../../lib/useSlice';
+import { terrainCut, terrainCutProfile } from '../../lib/envimet';
+import { useFlip } from '../../lib/useFlip';
+import { formatValue } from '../../lib/colormap';
+
+function formatTime(time) {
+  const h = String(Math.floor(time / 4)).padStart(2, '0');
+  const m = String((time % 4) * 15).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+// Tutte e tre le viste di un fileset: la principale a piena risoluzione,
+// le altre due alimentano le anteprime di cambio vista
+function useSlices(fileset, group, dataset, time, level, sectionX, sectionY, sectionAngle, terrain) {
+  return {
+    plan: useSlice(fileset, group, dataset, time, 'plan', level, sectionX, sectionY, sectionAngle, terrain),
+    sectionX: useSlice(fileset, group, dataset, time, 'sectionX', level, sectionX, sectionY, sectionAngle, terrain),
+    sectionY: useSlice(fileset, group, dataset, time, 'sectionY', level, sectionX, sectionY, sectionAngle, terrain),
+  };
+}
+
+function useWindFields(enabled, fileset, group, time, level, sectionX, sectionY, sectionAngle, terrain) {
+  return {
+    plan: useWindField(enabled, fileset, group, time, 'plan', level, sectionX, sectionY, sectionAngle, terrain),
+    sectionX: useWindField(enabled, fileset, group, time, 'sectionX', level, sectionX, sectionY, sectionAngle, terrain),
+    sectionY: useWindField(enabled, fileset, group, time, 'sectionY', level, sectionX, sectionY, sectionAngle, terrain),
+  };
+}
+
+// Quota di taglio "segui il terreno" (con l'eventuale "livella salendo") di un
+// fileset: memoizzata così i suoi coefficienti si calcolano una volta sola e
+// gli hook a valle ricaricano solo quando cambia davvero qualcosa
+function useTerrainCut(terrain, state) {
+  const { followTerrain, level, levelOut, levelOutHeight } = state;
+  return useMemo(
+    () => (followTerrain ? terrainCut(terrain, level, levelOut, levelOutHeight) : null),
+    [terrain, followTerrain, level, levelOut, levelOutHeight],
+  );
+}
+
+// Differenza cella per cella tra due slice della stessa griglia, con range
+// simmetrico attorno allo zero (il punto neutro della palette divergente)
+function computeDiff(a, b, orderAB) {
+  if (!a || !b || a.w !== b.w || a.h !== b.h) return null;
+  const data = new Float32Array(a.data.length);
+  let maxAbs = 0;
+  for (let i = 0; i < data.length; i++) {
+    const v = orderAB ? a.data[i] - b.data[i] : b.data[i] - a.data[i];
+    data[i] = v;
+    if (!Number.isNaN(v) && Math.abs(v) > maxAbs) maxAbs = Math.abs(v);
+  }
+  return { ...a, data, min: -maxAbs || 0, max: maxAbs || 0 };
+}
+
+function ChartCard({ flipKey, title, stats, body, stripe, caption, thumbs, objectsThumbs, objectsOpts, thumbRanges, thumbShowLegend, thumbWinds, colors, reversed, currentViewType, onSelectViewType, onThumbLegendClick }) {
+  const { tr } = useI18n();
+  const otherViews = VIEW_TYPES.filter((v) => v.key !== currentViewType);
+  return (
+    <div className="chart-card" data-flip-key={flipKey}>
+      <div className="chart-header">
+        <div className="chart-title">{title}</div>
+        <div className="chart-stats">{stats}</div>
+      </div>
+      {body ?? (
+        <div className={`chart-body stripe-${stripe}`}>
+          <span className="chart-caption">{caption}</span>
+        </div>
+      )}
+      <div className="thumb-row">
+        {otherViews.map((v) => (
+          <div key={v.key} className="thumb" onClick={() => onSelectViewType(v.key)}>
+            {thumbs?.[v.key] ? (
+              <MapThumb
+                slice={thumbs[v.key]}
+                objectsSlice={objectsThumbs?.[v.key]}
+                objectsOpts={objectsOpts}
+                wind={thumbWinds?.[v.key]}
+                colors={colors}
+                reversed={reversed}
+                min={thumbRanges?.[v.key]?.min}
+                max={thumbRanges?.[v.key]?.max}
+                showLegend={thumbShowLegend}
+                onLegendClick={(e) => {
+                  e.stopPropagation();
+                  onThumbLegendClick?.(v.key, thumbRanges?.[v.key] ?? thumbs[v.key]);
+                }}
+              />
+            ) : (
+              <span className={`thumb-body stripe-${stripe}`} />
+            )}
+            <span className="thumb-label">{tr(v.labelKey)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function AnalysisView() {
+  const { state, set, toggle, setCompareMode } = useAppState();
+  const { tr } = useI18n();
+
+  // Con l'editor palette aperto le mappe mostrano il draft in tempo reale;
+  // i colori del draft sono già orientati, quindi l'inversione non si riapplica.
+  const draft = state.paletteDraft;
+  const draftPalette = draft && { id: '__draft', name: draft.name.trim() || tr('custom_default_name'), colors: draft.colors };
+  const activePalette = draft?.target === 'main' ? draftPalette : findPalette(state.palette, 'main', state.customPalettes);
+  const mainReversed = draft?.target === 'main' ? false : state.paletteReversed;
+  const activeDiffPalette = draft?.target === 'diff' ? draftPalette : findPalette(state.diffPalette, 'diff', state.customPalettes);
+  const diffReversed = draft?.target === 'diff' ? false : state.diffPaletteReversed;
+  const activeViewType = VIEW_TYPES.find((v) => v.key === state.viewType) || VIEW_TYPES[0];
+
+  const loaded = !!state.edxMeta;
+  const datasetLabel = loaded ? state.dataset : tr(state.dataset);
+  const timeLabel = state.seriesLabels[state.time] ?? `t · ${formatTime(state.time)}`;
+  const diffOrderLabel = state.diffOrderAB ? tr('diff_order_ab') : tr('diff_order_ba');
+
+  const terrainCutA = useTerrainCut(state.terrainA, state);
+  const terrainCutB = useTerrainCut(state.terrainB, state);
+
+  const sliceArgs = [state.dataGroup, state.dataset, state.time, state.level, state.sectionX, state.sectionY, state.sectionAngle];
+  const slicesA = useSlices(state.filesetA, ...sliceArgs, terrainCutA);
+  const slicesB = useSlices(state.filesetB, ...sliceArgs, terrainCutB);
+  const slicesDiff = useMemo(() => {
+    if (state.compareMode !== 'abdiff') return { plan: null, sectionX: null, sectionY: null };
+    return {
+      plan: computeDiff(slicesA.plan, slicesB.plan, state.diffOrderAB),
+      sectionX: computeDiff(slicesA.sectionX, slicesB.sectionX, state.diffOrderAB),
+      sectionY: computeDiff(slicesA.sectionY, slicesB.sectionY, state.diffOrderAB),
+    };
+  }, [slicesA.plan, slicesA.sectionX, slicesA.sectionY, slicesB.plan, slicesB.sectionX, slicesB.sectionY, state.compareMode, state.diffOrderAB]);
+
+  const objDatasetName = useMemo(() => {
+    return state.edxMeta?.variableNames?.find(n => n.toLowerCase().includes('objects')) || 'Objects ( )';
+  }, [state.edxMeta]);
+  
+  const objectsArgs = [state.dataGroup, objDatasetName, state.time, state.level, state.sectionX, state.sectionY, state.sectionAngle];
+  const objectsSlicesA = useSlices(state.showObjectsOverlay ? state.filesetA : null, ...objectsArgs, terrainCutA);
+  const objectsSlicesB = useSlices(state.showObjectsOverlay ? state.filesetB : null, ...objectsArgs, terrainCutB);
+
+  const objectsOpts = useMemo(() => ({
+    opacity: state.objOverlayOpacity,
+    showBuildings: state.objOverlayBuildings,
+    showTerrain: state.objOverlayTerrain,
+    showVegetation: state.objOverlayVegetation,
+  }), [state.objOverlayOpacity, state.objOverlayBuildings, state.objOverlayTerrain, state.objOverlayVegetation]);
+
+  const objectsThumbsDiff = useMemo(() => ({
+    plan: objectsSlicesA.plan || objectsSlicesB.plan,
+    sectionX: objectsSlicesA.sectionX || objectsSlicesB.sectionX,
+    sectionY: objectsSlicesA.sectionY || objectsSlicesB.sectionY,
+  }), [objectsSlicesA.plan, objectsSlicesA.sectionX, objectsSlicesA.sectionY, objectsSlicesB.plan, objectsSlicesB.sectionX, objectsSlicesB.sectionY]);
+
+  // Campo di vento a frecce sulla vista corrente e per le miniature.
+  // Il valore di riferimento della legenda è condiviso tra A e B e tra tutte
+  // le viste, così le lunghezze delle frecce sono confrontabili ovunque.
+  const windArgs = [state.dataGroup, state.time, state.level, state.sectionX, state.sectionY, state.sectionAngle];
+  const windFieldsA = useWindFields(state.showWindField, state.filesetA, ...windArgs, terrainCutA);
+  const windFieldsB = useWindFields(state.showWindField && state.compareMode !== 'single', state.filesetB, ...windArgs, terrainCutB);
+  
+  let maxMag = 0;
+  for (const k of ['plan', 'sectionX', 'sectionY']) {
+    if (windFieldsA[k] && windFieldsA[k].maxMag > maxMag) maxMag = windFieldsA[k].maxMag;
+    if (windFieldsB[k] && windFieldsB[k].maxMag > maxMag) maxMag = windFieldsB[k].maxMag;
+  }
+  const windRef = niceCeil(maxMag);
+
+  const windFor = (field, isThumb = false) =>
+    field && windRef > 0
+      ? {
+          field,
+          refValue: windRef,
+          style: state.windStyle,
+          opacity: state.windOpacity,
+          size: isThumb ? Math.min(state.windSize, 50) : state.windSize,
+          density: isThumb ? Math.min(state.windDensity, 20) : state.windDensity,
+        }
+      : null;
+
+  const thumbWindsA = {
+    plan: windFor(windFieldsA.plan, true),
+    sectionX: windFor(windFieldsA.sectionX, true),
+    sectionY: windFor(windFieldsA.sectionY, true),
+  };
+  const thumbWindsB = {
+    plan: windFor(windFieldsB.plan, true),
+    sectionX: windFor(windFieldsB.sectionX, true),
+    sectionY: windFor(windFieldsB.sectionY, true),
+  };
+
+  // Serie temporale nel punto selezionato (incrocio delle sezioni, livello corrente)
+  const pointArgs = [state.dataGroup, state.dataset, state.sectionX, state.sectionY, state.level];
+  const pointSeriesA = usePointSeries(state.filesetA, ...pointArgs, terrainCutA);
+  const pointSeriesB = usePointSeries(state.filesetB, ...pointArgs, terrainCutB);
+
+  const sliceA = slicesA[state.viewType];
+  const sliceB = slicesB[state.viewType];
+  const sliceDiff = slicesDiff[state.viewType];
+
+  useEffect(() => {
+    window.__currentSlices = {
+      A: sliceA,
+      B: sliceB,
+      Diff: sliceDiff
+    };
+  }, [sliceA, sliceB, sliceDiff]);
+
+  const objectsSliceA = objectsSlicesA[state.viewType];
+  const objectsSliceB = objectsSlicesB[state.viewType];
+
+  // Simbolo del nord solo sulle piante, orientato con modelRotation dell'INX
+  const rotationA = useInxRotation(state.filesetA);
+  const rotationB = useInxRotation(state.filesetB);
+  const isPlan = state.viewType === 'plan';
+  const compassA = state.showNorthArrow ? { type: state.viewType, rotation: rotationA, sectionAngle: state.sectionAngle } : null;
+  const compassB = state.showNorthArrow ? { type: state.viewType, rotation: rotationB, sectionAngle: state.sectionAngle } : null;
+  const compassDiff = state.showNorthArrow ? { type: state.viewType, rotation: (rotationA ?? rotationB), sectionAngle: state.sectionAngle } : null;
+
+  // Calcolo dei range (min/max) per ciascuna vista in base allo scaleType
+  const minOf = (...slices) => {
+    let m = Infinity;
+    for (const s of slices) if (s && s.min < m) m = s.min;
+    return m === Infinity ? 0 : m;
+  };
+  const maxOf = (...slices) => {
+    let m = -Infinity;
+    for (const s of slices) if (s && s.max > m) m = s.max;
+    return m === -Infinity ? 0 : m;
+  };
+
+  const rangesA = {};
+  const rangesB = {};
+  const rangesDiff = {};
+  let thumbShowLegendA = false;
+  let thumbShowLegendB = false;
+  const thumbShowLegendDiff = true; // Diff è sempre individuale
+
+  for (const k of ['plan', 'sectionX', 'sectionY']) {
+    if (state.scaleType === 'custom' && state.customRanges[`Diff-${k}`]) {
+      rangesDiff[k] = state.customRanges[`Diff-${k}`];
+    } else {
+      rangesDiff[k] = slicesDiff[k] ? { min: slicesDiff[k].min, max: slicesDiff[k].max } : null;
+    }
+  }
+
+  if (state.scaleType === 'individual') {
+    for (const k of ['plan', 'sectionX', 'sectionY']) {
+      rangesA[k] = slicesA[k] ? { min: slicesA[k].min, max: slicesA[k].max } : null;
+      rangesB[k] = slicesB[k] ? { min: slicesB[k].min, max: slicesB[k].max } : null;
+    }
+    thumbShowLegendA = true;
+    thumbShowLegendB = true;
+  } else if (state.scaleType === 'syncedViews') {
+    for (const k of ['plan', 'sectionX', 'sectionY']) {
+      const mn = minOf(slicesA[k], slicesB[k]);
+      const mx = maxOf(slicesA[k], slicesB[k]);
+      const r = (slicesA[k] || slicesB[k]) ? { min: mn, max: mx } : null;
+      rangesA[k] = r;
+      rangesB[k] = r;
+    }
+    thumbShowLegendA = true; // Perché ogni vista ha il suo range
+    thumbShowLegendB = true;
+  } else if (state.scaleType === 'filesetGlobal') {
+    const minA = minOf(slicesA.plan, slicesA.sectionX, slicesA.sectionY);
+    const maxA = maxOf(slicesA.plan, slicesA.sectionX, slicesA.sectionY);
+    const rA = (slicesA.plan || slicesA.sectionX || slicesA.sectionY) ? { min: minA, max: maxA } : null;
+    
+    const minB = minOf(slicesB.plan, slicesB.sectionX, slicesB.sectionY);
+    const maxB = maxOf(slicesB.plan, slicesB.sectionX, slicesB.sectionY);
+    const rB = (slicesB.plan || slicesB.sectionX || slicesB.sectionY) ? { min: minB, max: maxB } : null;
+    
+    for (const k of ['plan', 'sectionX', 'sectionY']) {
+      rangesA[k] = rA;
+      rangesB[k] = rB;
+    }
+    thumbShowLegendA = false; // La legenda principale basta per tutti i grafici di quel fileset
+    thumbShowLegendB = false;
+  } else if (state.scaleType === 'allFilesets') {
+    const mn = minOf(slicesA.plan, slicesA.sectionX, slicesA.sectionY, slicesB.plan, slicesB.sectionX, slicesB.sectionY);
+    const mx = maxOf(slicesA.plan, slicesA.sectionX, slicesA.sectionY, slicesB.plan, slicesB.sectionX, slicesB.sectionY);
+    const r = (slicesA.plan || slicesA.sectionX || slicesA.sectionY || slicesB.plan || slicesB.sectionX || slicesB.sectionY) ? { min: mn, max: mx } : null;
+    
+    for (const k of ['plan', 'sectionX', 'sectionY']) {
+      rangesA[k] = r;
+      rangesB[k] = r;
+    }
+    thumbShowLegendA = false;
+    thumbShowLegendB = false;
+  } else if (state.scaleType === 'custom') {
+    // In custom mode, use the values from state.customRanges if defined, otherwise fallback to individual slice limits
+    for (const k of ['plan', 'sectionX', 'sectionY']) {
+      rangesA[k] = state.customRanges[`A-${k}`] ?? (slicesA[k] ? { min: slicesA[k].min, max: slicesA[k].max } : null);
+      rangesB[k] = state.customRanges[`B-${k}`] ?? (slicesB[k] ? { min: slicesB[k].min, max: slicesB[k].max } : null);
+    }
+    thumbShowLegendA = true;
+    thumbShowLegendB = true;
+  }
+
+  const rangeA = rangesA[state.viewType];
+  const rangeB = rangesB[state.viewType];
+  const rangeDiff = rangesDiff[state.viewType];
+
+  const handleLegendClick = (filesetKey, vType, currentRange) => {
+    const key = `${filesetKey}-${vType}`;
+    const fsName = filesetLabel(filesetKey);
+    const viewLabel = tr(VIEW_TYPES.find(v => v.key === vType).labelKey);
+    set({
+      customRangeModal: {
+        key,
+        title: `${fsName} · ${viewLabel}`,
+        min: currentRange?.min,
+        max: currentRange?.max,
+      }
+    });
+  };
+
+  // Click sulla mappa: il punto cliccato diventa l'incrocio delle sezioni.
+  // Dalla pianta imposta sezione X e Y; da una sezione imposta l'altra sezione
+  // e il livello (con sezioni ruotate il perno si sposta lungo la traccia,
+  // l'angolo resta). sectionX/sectionY/level sono stato condiviso, quindi le
+  // card di A, B e Diff si aggiornano tutte insieme.
+  const dims = state.edxMeta?.dimensions;
+  const handleCellClick = (col, row, slice) => {
+    if (state.viewType === 'plan') set({ sectionX: col, sectionY: row });
+    else if (slice?.line) {
+      const nx = Math.round(slice.line.x0 + slice.line.dx * col);
+      const ny = Math.round(slice.line.y0 + slice.line.dy * col);
+      set({
+        sectionX: Math.min(Math.max(0, nx), Math.max(0, (dims?.x ?? nx + 1) - 1)),
+        sectionY: Math.min(Math.max(0, ny), Math.max(0, (dims?.y ?? ny + 1) - 1)),
+        level: row,
+      });
+    } else if (state.viewType === 'sectionX') set({ sectionY: col, level: row });
+    else set({ sectionX: col, level: row });
+  };
+  // Linee-mirino sulle sezioni: l'altra sezione (con angolo ≠ 0 passa per la
+  // colonna del perno, che dipende dallo slice della card) e il livello — che
+  // con "segui il terreno" diventa il profilo reale del taglio (terrainCutProfile).
+  // In pianta il mirino è disegnato da MapChart via sectionControl.
+  const marksFor = (slice, cut) =>
+    state.viewType === 'plan'
+      ? null
+      : {
+          x: state.sectionAngle ? slice?.pivotIndex : state.viewType === 'sectionX' ? state.sectionY : state.sectionX,
+          y: state.level,
+          profile: terrainCutProfile(cut, dims, slice, state.viewType, state.sectionX, state.sectionY),
+        };
+  // Widget in pianta: linee di sezione ruotabili attorno al perno, con reset
+  const sectionControl =
+    state.viewType === 'plan'
+      ? {
+          x: state.sectionX,
+          y: state.sectionY,
+          angle: state.sectionAngle,
+          onRotate: (angle) => set({ sectionAngle: angle }),
+          onReset: () => set({ sectionAngle: 0 }),
+          resetTitle: tr('section_angle_reset'),
+        }
+      : null;
+
+  const emptyCaption = (key) =>
+    state[`fileset${key}Open`] ? tr('map_no_data') : tr('map_open_hint');
+  const rangeStats = (range) =>
+    range ? `${datasetLabel} · ${formatValue(range.min, range.max - range.min)} – ${formatValue(range.max, range.max - range.min)}` : datasetLabel;
+
+  // "Fileset A · nomeSimulazione": il prefisso A/B resta per leggere A − B / B − A
+  const filesetLabel = (key) => {
+    const fs = state[`fileset${key}`];
+    const name = fs?.name ?? fs?.rootDir;
+    const base = tr(key === 'A' ? 'chart_fileset_a' : 'chart_fileset_b');
+    return name ? `${base} · ${name}` : base;
+  };
+
+  const allCharts = [
+    {
+      key: 'A',
+      title: filesetLabel('A'),
+      stats: rangeStats(rangeA),
+      stripe: 'a',
+      caption: emptyCaption('A'),
+      thumbs: slicesA,
+      objectsThumbs: objectsSlicesA,
+      objectsOpts: objectsOpts,
+      thumbRanges: rangesA,
+      thumbShowLegend: thumbShowLegendA,
+      thumbWinds: thumbWindsA,
+      colors: activePalette.colors,
+      reversed: mainReversed,
+      onThumbLegendClick: (vType, range) => handleLegendClick('A', vType, range),
+      body: sliceA ? (
+        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} timeLabel={timeLabel} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} />
+      ) : null,
+    },
+    {
+      key: 'B',
+      title: filesetLabel('B'),
+      stats: rangeStats(rangeB),
+      stripe: 'b',
+      caption: emptyCaption('B'),
+      thumbs: slicesB,
+      objectsThumbs: objectsSlicesB,
+      objectsOpts: objectsOpts,
+      thumbRanges: rangesB,
+      thumbShowLegend: thumbShowLegendB,
+      thumbWinds: thumbWindsB,
+      colors: activePalette.colors,
+      reversed: mainReversed,
+      onThumbLegendClick: (vType, range) => handleLegendClick('B', vType, range),
+      body: sliceB ? (
+        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} timeLabel={timeLabel} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} />
+      ) : null,
+    },
+    {
+      key: 'Diff',
+      title: `${tr('chart_diff_title')} ${diffOrderLabel}`,
+      stats: sliceDiff ? `Δ ${rangeStats(rangeDiff).replace(`${datasetLabel} · `, '')}` : 'Δ',
+      stripe: 'diff',
+      caption: tr('map_open_hint'),
+      thumbs: slicesDiff,
+      objectsThumbs: objectsThumbsDiff,
+      objectsOpts: objectsOpts,
+      thumbRanges: rangesDiff,
+      thumbShowLegend: thumbShowLegendDiff,
+      colors: activeDiffPalette.colors,
+      reversed: diffReversed,
+      onThumbLegendClick: (vType, range) => handleLegendClick('Diff', vType, range),
+      body: sliceDiff ? (
+        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={activeDiffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} timeLabel={timeLabel} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} />
+      ) : null,
+    },
+  ];
+  const chartsToShow =
+    state.compareMode === 'single' ? allCharts.slice(0, 1) : state.compareMode === 'b' ? allCharts.slice(1, 2) : state.compareMode === 'ab' ? allCharts.slice(0, 2) : allCharts;
+
+  // Zoom viste: a 1x le card riempiono una riga; crescendo si allargano fino a
+  // occupare tutta la larghezza (mai oltre: niente scroll laterale, vanno a capo).
+  // Il termine (z-1)*gap ridà lo spazio dei gap che spariscono andando a capo,
+  // così a zoom N la card copre esattamente il 100%; il -0.5px assorbe gli
+  // arrotondamenti subpixel ed evita capi a riga spuri sulle soglie esatte.
+  const n = chartsToShow.length;
+  const z = state.scaleFactor;
+  const effN = n === 1 ? 3 : n;
+  const gapBack = ((z - 1) * 18).toFixed(2);
+  const cardWidth = `min(100%, calc(${z} * (100% - ${(effN - 1) * 18}px) / ${effN} + ${gapBack}px - 0.5px))`;
+  const flipRef = useFlip();
+
+  const compareOptions = [
+    { key: 'single', label: tr('compare_single') },
+    { key: 'b', label: tr('compare_b'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined },
+    { key: 'ab', label: tr('compare_ab'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined },
+    { key: 'abdiff', label: tr('compare_abdiff'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined },
+  ];
+  const viewTypeOptions = VIEW_TYPES.map((v) => ({ key: v.key, label: tr(v.labelKey) }));
+
+  return (
+    <>
+      <div className="view-bar">
+        <div className="view-bar-top">
+          <div className="view-bar-context">
+            <div className="chip"><span className="chip-dot" />{datasetLabel}</div>
+            <div className="chip">{timeLabel}</div>
+            <div className="chip">{tr('chip_level_prefix')} {state.level}</div>
+            <div className="chip">
+              <span
+                className="chip-palette-swatch"
+                style={{ background: `linear-gradient(90deg, ${activePalette.colors.join(',')})` }}
+              />
+              {paletteLabel(activePalette, tr)}
+            </div>
+          </div>
+          <div className="view-bar-modes">
+            <Segmented options={compareOptions} value={state.compareMode} onSelect={setCompareMode} variant="accent" />
+            <Segmented options={viewTypeOptions} value={state.viewType} onSelect={(v) => set({ viewType: v })} variant="dark" />
+          </div>
+        </div>
+
+        <div className="view-bar-bottom">
+          <div className="view-bar-panel">
+            <div className="view-bar-group">
+              <Slider label={tr('slider_scale')} value={state.scaleFactor} min={1} max={3} step={0.25} unit="x" onChange={(v) => set({ scaleFactor: v })} />
+            </div>
+            <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border-subtle)' }} />
+            <div className="view-bar-group">
+              <span className="control-label" style={{ marginBottom: 0 }}>{tr('group_legend')}</span>
+              <select className="select" value={state.scaleType} onChange={(e) => set({ scaleType: e.target.value })}>
+                {SCALE_TYPES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {tr(s.labelKey)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="view-bar-bottom">
+          <div className="view-bar-panel">
+            <div className="view-bar-group">
+              <Toggle 
+                label={tr('toggle_objects_overlay')} 
+                on={state.showObjectsOverlay} 
+                onToggle={() => toggle('showObjectsOverlay')} 
+              />
+            </div>
+            
+            {state.showObjectsOverlay && (
+              <>
+                <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border-subtle)' }} />
+                <div className="view-bar-group">
+                  <Slider label={tr('slider_objects_opacity')} value={state.objOverlayOpacity} min={0} max={100} unit="%" onChange={(v) => set({ objOverlayOpacity: v })} />
+                </div>
+                <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border-subtle)' }} />
+                <div className="view-bar-group">
+                  <Toggle label={tr('toggle_obj_buildings')} on={state.objOverlayBuildings} onToggle={() => toggle('objOverlayBuildings')} />
+                  <Toggle label={tr('toggle_obj_terrain')} on={state.objOverlayTerrain} onToggle={() => toggle('objOverlayTerrain')} />
+                  <Toggle label={tr('toggle_obj_vegetation')} on={state.objOverlayVegetation} onToggle={() => toggle('objOverlayVegetation')} />
+                </div>
+              </>
+            )}
+            
+            <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border-subtle)' }} />
+            <div className="view-bar-group">
+              <Toggle label={tr('toggle_compass')} on={state.showNorthArrow} onToggle={() => toggle('showNorthArrow')} />
+              <Toggle label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} />
+              <Toggle label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="chart-grid" ref={flipRef} style={{ '--chart-w': cardWidth }}>
+        {chartsToShow.map((c) => (
+          <ChartCard
+            key={c.key}
+            flipKey={c.key}
+            title={`${c.title} · ${tr(activeViewType.labelKey)}`}
+            stats={c.stats}
+            body={c.body}
+            stripe={c.stripe}
+            caption={c.caption}
+            thumbs={c.thumbs}
+            objectsThumbs={c.objectsThumbs}
+            objectsOpts={c.objectsOpts}
+            thumbRanges={c.thumbRanges}
+            thumbShowLegend={c.thumbShowLegend}
+            thumbWinds={c.thumbWinds}
+            colors={c.colors}
+            reversed={c.reversed}
+            currentViewType={state.viewType}
+            onSelectViewType={(v) => set({ viewType: v })}
+            onThumbLegendClick={c.onThumbLegendClick}
+          />
+        ))}
+      </div>
+
+      <div className="timeseries-card">
+        <div className="timeseries-header" onClick={() => toggle('timeSeriesOpen')}>
+          <span className="chart-title">{tr('group_time_series')}</span>
+          {pointSeriesA && (
+            <span className="chart-stats">
+              {datasetLabel} · {state.sectionX}, {state.sectionY} · {tr('chip_level_prefix')} {state.level}
+            </span>
+          )}
+          <span className={`chevron${state.timeSeriesOpen ? ' open' : ''}`} />
+        </div>
+        {state.timeSeriesOpen &&
+          (pointSeriesA ? (
+            <TimeSeriesChart
+              series={[
+                { name: filesetLabel('A'), color: 'var(--series-a)', values: pointSeriesA },
+                { name: filesetLabel('B'), color: 'var(--series-b)', values: state.compareMode !== 'single' ? pointSeriesB : null },
+              ]}
+              labels={state.seriesLabels}
+              time={state.time}
+              onSelectTime={(t) => set({ time: t })}
+            />
+          ) : (
+            <div className="timeseries-body">
+              <span className="chart-caption">{tr('ts_caption')}</span>
+            </div>
+          ))}
+      </div>
+    </>
+  );
+}
