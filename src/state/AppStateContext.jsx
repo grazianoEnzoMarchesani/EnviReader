@@ -28,6 +28,9 @@ const initialState = {
   sectionX: 0,
   sectionY: 0,
   sectionAngle: 0, // rotazione (°, antioraria) della croce di sezioni in pianta; 0 = ortogonale
+  sectionLineWidth: 1, // spessore (px) della croce di sezioni in pianta
+  sectionLineGap: 3, // distanza (px) tra i tratti del tratteggio; il trattino resta fisso a 4px
+  sectionLineColor: null, // colore custom della croce; null = colore di tema (testo, 65%)
   scaleFactor: 3,
   followTerrain: true,
   levelOut: true, // "livella salendo": smorza il rilievo con la quota, vedi terrainCut

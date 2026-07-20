@@ -411,7 +411,7 @@ function crossGeometry(control, slice, W, H) {
 
 // Mappa raster: il canvas ha la risoluzione della griglia ENVI-met e viene
 // ingrandito via CSS (image-rendering: pixelated), come le celle di Leonardo.
-export default function MapChart({ slice, objectsSlice, objectsOpts, colors, reversed, min, max, onCellClick, marks, sectionControl, compass, showCalendar, showClock, timeLabel, wind, onLegendClick }) {
+export default function MapChart({ slice, objectsSlice, objectsOpts, colors, reversed, min, max, onCellClick, marks, sectionControl, sectionLineStyle, compass, showCalendar, showClock, timeLabel, wind, onLegendClick }) {
   const canvasRef = useRef(null);
   const objectsCanvasRef = useRef(null);
   const frameRef = useRef(null);
@@ -641,7 +641,12 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
       <div
         className="map-frame"
         ref={frameRef}
-        style={{ aspectRatio: `${slice.extentW} / ${slice.extentH}` }}
+        style={{
+          aspectRatio: `${slice.extentW} / ${slice.extentH}`,
+          '--section-line-width': `${sectionLineStyle?.width ?? 1}px`,
+          '--section-line-dash': `4 ${sectionLineStyle?.gap ?? 3}`,
+          ...(sectionLineStyle?.color ? { '--section-line-color': sectionLineStyle.color } : {}),
+        }}
         onMouseMove={sectionControl ? handleFrameMove : undefined}
         onMouseLeave={sectionControl ? () => { if (!rotDragging) setRotHandle(null); } : undefined}
       >
@@ -649,19 +654,23 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
         {objectsSlice && <canvas ref={objectsCanvasRef} className="map-objects-canvas" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', imageRendering: 'pixelated' }} />}
         {wind && <canvas ref={windCanvasRef} className="map-wind-canvas" />}
         {!sectionControl && marks?.x != null && marks.x >= 0 && marks.x < slice.w && (
-          <span className="map-mark map-mark-v" style={{ left: `${getMarkPctX(marks.x)}%` }} />
+          <svg className="map-mark-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <line x1={getMarkPctX(marks.x)} y1={0} x2={getMarkPctX(marks.x)} y2={100} vectorEffect="non-scaling-stroke" />
+          </svg>
         )}
         {!sectionControl && marks?.y != null && marks.y >= 0 && marks.y < slice.h && (
           marks.profile ? (
-            <svg className="map-mark-svg" viewBox="0 0 100 100" preserveAspectRatio="none" stroke="currentColor" fill="none">
+            <svg className="map-mark-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
               <polyline points={profilePoints(marks.profile)} vectorEffect="non-scaling-stroke" />
             </svg>
           ) : (
-            <span className="map-mark map-mark-h" style={{ top: `${getMarkPctY(marks.y)}%` }} />
+            <svg className="map-mark-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <line x1={0} y1={getMarkPctY(marks.y)} x2={100} y2={getMarkPctY(marks.y)} vectorEffect="non-scaling-stroke" />
+            </svg>
           )
         )}
         {cross && (
-          <svg className="map-section-svg" width={frameSize.w} height={frameSize.h} stroke="currentColor" strokeWidth="1" strokeDasharray="4 3" opacity="0.6">
+          <svg className="map-section-svg" width={frameSize.w} height={frameSize.h} opacity="0.6">
             {['v', 'h'].map((which) => {
               const [ux, uy] = cross.dirs[which];
               return (

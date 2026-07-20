@@ -45,6 +45,14 @@ function DataTab() {
       <Slider label={tr('slider_level')} value={state.level} min={0} max={dims ? Math.max(0, dims.z - 1) : 20} onChange={(v) => set({ level: v })} />
       <Slider label={tr('slider_sectionx')} value={state.sectionX} min={0} max={dims ? Math.max(0, dims.x - 1) : 100} onChange={(v) => set({ sectionX: v })} />
       <Slider label={tr('slider_sectiony')} value={state.sectionY} min={0} max={dims ? Math.max(0, dims.y - 1) : 100} onChange={(v) => set({ sectionY: v })} />
+      <Slider
+        label={tr('slider_section_angle')}
+        value={state.sectionAngle}
+        min={-90}
+        max={90}
+        unit="°"
+        onChange={(v) => set({ sectionAngle: v === -90 ? 90 : v })}
+      />
       <Toggle label={tr('toggle_follow_terrain')} on={state.followTerrain} onToggle={() => toggle('followTerrain')} />
       {state.followTerrain && (
         <>

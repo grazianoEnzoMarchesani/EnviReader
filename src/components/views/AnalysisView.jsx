@@ -21,6 +21,10 @@ function formatTime(time) {
   return `${h}:${m}`;
 }
 
+// Valore mostrato dal color picker quando sectionLineColor è null (colore di
+// tema): un grigio neutro, dato che l'input nativo non sa rendere "auto"
+const DEFAULT_SECTION_LINE_COLOR = '#808080';
+
 // Tutte e tre le viste di un fileset: la principale a piena risoluzione,
 // le altre due alimentano le anteprime di cambio vista
 function useSlices(fileset, group, dataset, time, level, sectionX, sectionY, sectionAngle, terrain) {
@@ -369,6 +373,14 @@ export default function AnalysisView() {
           resetTitle: tr('section_angle_reset'),
         }
       : null;
+  // Aspetto (spessore/colore/tratteggio) della linea guida: la stessa croce
+  // ruotabile in pianta o il mirino/profilo nelle sezioni, quindi comune a
+  // tutte le viste.
+  const sectionLineStyle = {
+    width: state.sectionLineWidth,
+    gap: state.sectionLineGap,
+    color: state.sectionLineColor,
+  };
 
   const emptyCaption = (key) =>
     state[`fileset${key}Open`] ? tr('map_no_data') : tr('map_open_hint');
@@ -400,7 +412,7 @@ export default function AnalysisView() {
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('A', vType, range),
       body: sliceA ? (
-        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} timeLabel={timeLabel} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} />
+        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} timeLabel={timeLabel} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} />
       ) : null,
     },
     {
@@ -419,7 +431,7 @@ export default function AnalysisView() {
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('B', vType, range),
       body: sliceB ? (
-        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} timeLabel={timeLabel} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} />
+        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} timeLabel={timeLabel} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} />
       ) : null,
     },
     {
@@ -437,7 +449,7 @@ export default function AnalysisView() {
       reversed: diffReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('Diff', vType, range),
       body: sliceDiff ? (
-        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={activeDiffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} timeLabel={timeLabel} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} />
+        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={activeDiffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} timeLabel={timeLabel} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} />
       ) : null,
     },
   ];
@@ -501,6 +513,25 @@ export default function AnalysisView() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border)' }} />
+            <div className="view-bar-group">
+              <span className="control-label" style={{ marginBottom: 0 }}>{tr('group_section_line')}</span>
+              <Slider label={tr('slider_section_line_width')} value={state.sectionLineWidth} min={1} max={5} step={1} unit="px" onChange={(v) => set({ sectionLineWidth: v })} />
+              <Slider label={tr('slider_section_line_gap')} value={state.sectionLineGap} min={0} max={12} step={1} unit="px" onChange={(v) => set({ sectionLineGap: v })} />
+              <span className="line-color-row">
+                <input
+                  type="color"
+                  className="line-color-input"
+                  title={tr('label_section_line_color')}
+                  aria-label={tr('label_section_line_color')}
+                  value={state.sectionLineColor || DEFAULT_SECTION_LINE_COLOR}
+                  onChange={(e) => set({ sectionLineColor: e.target.value })}
+                />
+                {state.sectionLineColor && (
+                  <button type="button" className="step-btn" title={tr('btn_section_line_color_reset')} onClick={() => set({ sectionLineColor: null })}>↺</button>
+                )}
+              </span>
             </div>
           </div>
         </div>

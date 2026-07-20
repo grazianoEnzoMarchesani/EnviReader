@@ -75,14 +75,6 @@ async function generateHybridSvg(card) {
     return `<text x="${r.left - cardRect.left}" y="${baselineY}" fill="${color}" style="font: ${font};">${textContent}</text>`;
   };
 
-  const extractMarkSvg = (el, isV) => {
-    if (!el) return '';
-    const r = el.getBoundingClientRect();
-    const st = window.getComputedStyle(el);
-    const color = st.backgroundColor || st.borderLeftColor || st.borderTopColor;
-    return `<rect x="${r.left - cardRect.left}" y="${r.top - cardRect.top}" width="${r.width}" height="${r.height}" fill="${color}" />`;
-  };
-
   const extractWidgetNativeSvg = (el, isLegendBar = false) => {
     if (!el) return '';
     const r = el.getBoundingClientRect();
@@ -178,14 +170,11 @@ async function generateHybridSvg(card) {
   svgContent += canvasToImageSvg(card.querySelector('.map-canvas'));
   svgContent += canvasToImageSvg(card.querySelector('.map-wind-canvas'));
 
-  // 2. Marks (if any)
-  svgContent += extractMarkSvg(card.querySelector('.map-mark-v'), true);
-  svgContent += extractMarkSvg(card.querySelector('.map-mark-h'), false);
-
-  // 3. SVG Overlays
+  // 2. SVG Overlays: crosshair marks in section views (one per axis), the
+  // rotatable section cross in plan view
+  card.querySelectorAll('.map-mark-svg').forEach((el) => { svgContent += extractSvgElement(el); });
   svgContent += extractSvgElement(card.querySelector('.map-section-svg'));
-  svgContent += extractSvgElement(card.querySelector('.map-mark-svg'));
-  
+
   const northContainer = card.querySelector('.map-north');
   if (northContainer) svgContent += extractWidgetNativeSvg(northContainer);
 
@@ -215,12 +204,22 @@ async function generateHybridSvg(card) {
   const fontStr = computedBody.getPropertyValue('--font') || 'sans-serif';
   const textColor = computedBody.getPropertyValue('--text').trim() || '#111827';
   const textSecondary = computedBody.getPropertyValue('--text-secondary').trim() || '#6b7280';
-  
+
+  // Spessore/colore/tratteggio della linea di sezione sono configurabili
+  // dall'utente (CSS custom properties su .map-frame): li leggiamo dal primo
+  // elemento live così l'SVG esportato riflette le impostazioni correnti
+  // invece di un valore hardcoded.
+  const sampleLine = card.querySelector('.map-section-svg line, .map-mark-svg line, .map-mark-svg polyline');
+  const lineSt = sampleLine ? window.getComputedStyle(sampleLine) : null;
+  const lineStroke = lineSt?.stroke || textColor;
+  const lineWidth = lineSt?.strokeWidth || '1px';
+  const lineDash = lineSt?.strokeDasharray || '4 3';
+
   const styleBlock = `
     <style>
       text { font-family: ${fontStr}; }
-      .map-section-svg line { stroke: ${textColor}; stroke-width: 1; stroke-dasharray: 4 3; }
-      .map-mark-svg polyline { fill: none; stroke: ${textColor}; stroke-width: 1; stroke-dasharray: 4 3; }
+      .map-section-svg line { stroke: ${lineStroke}; stroke-width: ${lineWidth}; stroke-dasharray: ${lineDash}; }
+      .map-mark-svg polyline, .map-mark-svg line { fill: none; stroke: ${lineStroke}; stroke-width: ${lineWidth}; stroke-dasharray: ${lineDash}; }
       .map-wind-legend svg { stroke: ${textSecondary}; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; fill: none; }
       .map-wind-legend .wind-wedge { fill: ${textSecondary}; stroke: none; }
       .map-north text { font-size: 8.5px; font-weight: 700; }

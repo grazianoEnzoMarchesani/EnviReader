@@ -440,6 +440,20 @@ button { font-family: inherit; }
 }
 .gradient-stop::-webkit-color-swatch-wrapper { padding: 2px; }
 .gradient-stop::-webkit-color-swatch { border: none; border-radius: 4px; }
+
+/* ---------- colore linea di sezione (view bar) ---------- */
+.line-color-row { display: flex; align-items: center; gap: 6px; }
+.line-color-input {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+.line-color-input::-webkit-color-swatch-wrapper { padding: 2px; }
+.line-color-input::-webkit-color-swatch { border: none; border-radius: 4px; }
 .gradient-toolbar { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
 .gradient-count { flex: 1; font-size: 12px; color: var(--text-secondary); }
 .gradient-hint { font-size: 11.5px; color: var(--text-faint); margin-bottom: 8px; line-height: 1.4; }
@@ -683,23 +697,8 @@ button { font-family: inherit; }
   image-rendering: pixelated;
   cursor: crosshair;
 }
-/* Linee-mirino: mostrano dove passano le sezioni correnti sulla mappa */
-.map-mark {
-  position: absolute;
-  pointer-events: none;
-  z-index: 1;
-}
-.map-mark-v {
-  top: 0;
-  bottom: 0;
-  border-left: 1px dashed color-mix(in srgb, var(--text) 65%, transparent);
-}
-.map-mark-h {
-  left: 0;
-  right: 0;
-  border-top: 1px dashed color-mix(in srgb, var(--text) 65%, transparent);
-}
-/* Profilo reale del taglio (segui il terreno / livella salendo) nelle sezioni */
+/* Linee-mirino: mostrano dove passano le sezioni correnti sulla mappa (o il
+   profilo reale del taglio con "segui il terreno"/"livella salendo") */
 .map-mark-svg {
   position: absolute;
   inset: 0;
@@ -708,11 +707,12 @@ button { font-family: inherit; }
   pointer-events: none;
   z-index: 1;
 }
-.map-mark-svg polyline {
+.map-mark-svg polyline,
+.map-mark-svg line {
   fill: none;
-  stroke: color-mix(in srgb, var(--text) 65%, transparent);
-  stroke-width: 1;
-  stroke-dasharray: 4 3;
+  stroke: var(--section-line-color, color-mix(in srgb, var(--text) 65%, transparent));
+  stroke-width: var(--section-line-width, 1px);
+  stroke-dasharray: var(--section-line-dash, 4 3);
 }
 /* Croce di sezioni ruotabile (solo pianta): linee SVG oblique + widget */
 .map-section-svg {
@@ -724,9 +724,9 @@ button { font-family: inherit; }
   z-index: 1;
 }
 .map-section-svg line {
-  stroke: color-mix(in srgb, var(--text) 65%, transparent);
-  stroke-width: 1;
-  stroke-dasharray: 4 3;
+  stroke: var(--section-line-color, color-mix(in srgb, var(--text) 65%, transparent));
+  stroke-width: var(--section-line-width, 1px);
+  stroke-dasharray: var(--section-line-dash, 4 3);
 }
 /* Maniglia di rotazione: appare quando il cursore passa vicino a una linea */
 .map-rot-handle {
