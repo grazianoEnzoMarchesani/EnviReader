@@ -4,9 +4,9 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig(({ command }) => ({
   plugins: [react()],
-  base: command === 'build' ? '/2.0_beta/' : '/',
+  base: './', // Permette all'app di funzionare in qualsiasi cartella (root o sottocartella)
   build: {
-    outDir: '2.0_beta',
+    outDir: 'dist',
     emptyOutDir: true
   }
 }))
