@@ -1,128 +1,127 @@
-# ENVI-met webReader: Advanced Environmental Data Analysis and Visualization for EDX/EDT Files
+# EnviReader: Advanced Environmental Data Analysis and Visualization
 
 ## Abstract
 
-The **ENVI-met webReader** is a cutting-edge web-based solution designed for advanced environmental data analysis and visualization of **EDX/EDT files** produced by [ENVI-met](https://envi-met.com). Built on a **modular ES6 framework**, it offers a robust and adaptable architecture for seamless integration of various components and future scalability.
+**EnviReader** (formerly ENVI-met webReader) is a cutting-edge web-based application designed for the advanced analysis and visualization of **EDX/EDT files** produced by [ENVI-met](https://envi-met.com). Completely rebuilt from the ground up using **React and Vite**, this new iteration offers a highly robust, modular, and performant architecture.
 
-The user interface focuses on **user experience**, offering **light and dark mode** options and a comprehensive feature set for efficient data management, representation, and comparative analysis. Key capabilities include:
+The user interface has been entirely redesigned with a focus on **User Experience (UX)** and **modern design aesthetics**. It features fully responsive layouts, collapsible sidebars, dynamic widgets, and seamless **Light and Dark mode** transitions. 
 
-- **Sophisticated data manipulation** tools (filtering, aggregation, statistical analysis).
-- **Powerful visualization** components (charts, 3D renderings, interactive maps).
-- **Comparative analysis** tools for juxtaposing datasets and deriving insights.
-- **Local file handling**, enabling users to open **EDX/EDT files directly on their computer** without the need for uploading or transferring data, ensuring instant access and maintaining data privacy.
+Key capabilities include:
+- **Instant Local File Handling**: Open and process large environmental datasets directly in your browser. No server uploads are required, ensuring ultra-fast access and 100% data privacy.
+- **Advanced Data Visualization**: Integration with **ECharts** and **Three.js** provides dynamic, interactive charts (line graphs, scatter plots, heatmaps) and rich 3D renderings of models, including customizable 3D vegetation.
+- **Sophisticated Data Manipulation & Export**: Advanced filtering, layer selection, data aggregation, and comprehensive export options (including SVG charts and raw data) for interdisciplinary collaboration.
+- **Global Accessibility**: Built-in internationalization (i18n) supporting multiple languages out-of-the-box.
 
-Integration with [**ECharts**](https://echarts.apache.org/en/index.html) elevates the user experience, providing dynamic, interactive visualizations such as line graphs, scatter plots, and heatmaps. The system is optimized through **data caching** and **performance techniques** for a smooth, responsive user experience.
-
-Designed for **environmental scientists, urban planners, and decision-makers**, the ENVI-met webReader is a robust tool for handling complex environmental data.
-
----
-
-## Project Objectives
-
-1. Develop a web-based platform for efficient analysis and visualization of **EDX/EDT files** produced by [ENVI-met](https://envi-met.com).
-2. Create a **modular ES6 framework** for a robust, adaptable architecture with seamless integration and scalability.
-3. Design an intuitive **user interface** with light and dark modes, comprehensive data management, and comparative analysis tools.
-4. Implement advanced **data manipulation** tools for filtering, aggregation, and statistical analysis.
-5. Integrate **charting and visualization components** (charts, 3D renderings, interactive maps) for meaningful data representation.
-6. Enable **instant local file handling**, allowing users to open and analyze files directly on their device without data upload or server interaction.
-7. Leverage [**ECharts**](https://echarts.apache.org/en/index.html) for dynamic, interactive data visualizations, including customizable chart types.
-8. Develop tools for **data comparison**, highlighting differences with customizable color schemes and palette inversion.
-9. Optimize performance through **data caching** and efficient DOM manipulation for a responsive user experience.
-10. Create an **adaptive, responsive layout** for various screen sizes and devices.
-11. Add **terrain-following** and **wind integration** for enhanced environmental data analysis.
-12. Develop a centralized **state management system** to maintain data integrity across the application.
-13. Implement advanced **wind visualization features**, including opacity, density controls, and animations.
-14. Optimize rendering with **lazy loading** and other techniques for improved performance.
-15. Provide **data export capabilities** for interdisciplinary collaboration.
+Designed for **environmental scientists, urban planners, and decision-makers**, EnviReader is the ultimate, lightweight tool for handling complex environmental simulations directly on your machine or statically hosted anywhere.
 
 ---
 
-## Demo Video
+## Project Objectives & Key Features
 
-Watch a short video demonstration of the ENVI-met webReader in action:  
-[ENVI-met webReder - nov 2](https://youtu.be/ar0BFAbNEJo?si=NHZmQHQiElM4ShYy)
-
----
-
-## Key Features
-
-### 1. **Local File Handling**
-- Open **EDX/EDT files instantly** without the need to upload them to a server.
-- All data remains on the user’s device, ensuring **privacy** and **data security**.
-- The direct file handling approach enables **fast access** and avoids delays associated with heavy file uploads.
-
-### 2. **Advanced Data Manipulation**
-- Tools for **filtering, aggregation, and statistical analysis**.
-- Enables users to explore and refine datasets for deeper insights.
-
-### 3. **Visualization Components**
-- **Charts**, **3D renderings**, and **interactive maps**.
-- Integration with [**ECharts**](https://echarts.apache.org/en/index.html) for dynamic visualizations (e.g., scatter plots, heatmaps).
-- Customizable color schemes and palette inversion for enhanced representation.
-
-### 4. **Comparative Analysis**
-- Juxtapose datasets to identify trends, anomalies, and insights.
-- Display differences with **customizable visualization tools**.
-
-### 5. **Performance Optimization**
-- **Data caching** for reduced computational load.
-- **Lazy loading** and efficient rendering for a smooth user experience.
-
-### 6. **User Interface**
-- **Light and dark mode** options.
-- Responsive layout for desktops, tablets, and mobile devices.
-- Centralized **state management** for consistent data handling.
-
-### 7. **Wind and Terrain Visualization**
-- Realistic **wind animations** with density and opacity controls.
-- **Terrain-following capabilities** for localized environmental insights.
-
-### 8. **Data Export and Interdisciplinary Collaboration**
-- Export datasets in formats compatible with external analysis tools.
+1. **Modern React Architecture**: Built with React and Vite, the application relies on a modular component-based framework ensuring seamless integration, high scalability, and maintainability.
+2. **Local & Secure Processing**: The app reads and parses complex EDX/EDT simulation files directly on the client side. Your data never leaves your device.
+3. **Dynamic User Interface**: 
+   - **Light/Dark Themes**: Instant toggling through a centralized CSS design token system.
+   - **Collapsible Sidebars & Dynamic Widgets**: Optimized workspace layouts that adapt to your screen size and current focus.
+   - **Multi-language Support (i18n)**: Seamless language switching (English, Italian, Spanish, French, German, Chinese) driven by a centralized `translations.json`.
+4. **Three Specialized Views**:
+   - **Analysis View**: For deep diving into 2D maps and layers.
+   - **Model View**: 3D interactive rendering of the simulation domain, with customizable object styling (e.g., dynamic 3D vegetation coloring).
+   - **Boundary View**: Specialized charting interfaces for boundary conditions, featuring native **SVG export** capabilities.
+5. **Interactive Visualizations**: Leveraging **ECharts** for highly interactive and optimized 2D charts and data comparison.
+6. **Performance Optimization**: Efficient state management via React Context, data caching, lazy loading, and optimized DOM rendering for large datasets.
+7. **Static Hosting Ready**: Designed to be compiled into a fully static bundle, deployable on any standard web hosting, CDN, or GitHub Pages without needing a Node.js backend.
+8. **Export Capabilities**: Dedicated export modals allowing users to independently export graphical views (PNG, SVG) and structured data.
 
 ---
 
-## Limitations
+## Installation & Local Development
 
-While the ENVI-met webReader provides robust tools for environmental data analysis, there are a few limitations to consider:
+EnviReader is built with Vite, making local setup incredibly fast.
 
-1. **Browser Compatibility**
-   - Currently, the application is fully compatible only with **Chrome** and **Chromium-based browsers**. Compatibility with other browsers will be addressed in future updates.
+### Prerequisites
+- Node.js (v16+ recommended)
+- npm or yarn
 
-2. **Technology Stack**
-   - The project is built using **pure JavaScript**, avoiding frameworks like React, Angular, or Vue. While this ensures simplicity, it may limit scalability and ease of maintenance compared to modern framework-based approaches.
+### Setup Instructions
 
-3. **Feature Availability**
-   - Not all features described in this document are currently available. Many advanced functionalities, such as **wind integration**, **terrain following**, and certain comparative tools, are planned for **future development** and will be added in subsequent releases.
+1. **Clone the repository** (if not already done).
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+3. **Run the development server**:
+   ```bash
+   npm run dev
+   ```
+   *The application will be accessible at `http://localhost:5173` with Hot Module Replacement (HMR).*
 
-These limitations highlight the project's ongoing nature, with planned updates to address compatibility, feature expansion, and enhanced architecture.
+### Building for Production (Static Hosting)
+
+To build the application for deployment on any static hosting environment:
+
+```bash
+npm run build
+```
+
+This command generates a highly optimized `dist/` folder. The application uses relative paths (`base: './'` in Vite configuration), meaning the contents of the `dist` directory can be dropped directly into the root or any subfolder of a web server.
+
+---
+
+## Project Structure
+
+```text
+src/
+├── main.jsx                  # Application entry point
+├── App.jsx                   # Main layout and routing between the 3 views
+├── styles/
+│   ├── tokens.css            # Centralized design tokens (colors, themes, typography)
+│   └── app.css               # Global component styles
+├── data/
+│   ├── constants.js          # App configurations, palettes, view definitions
+│   └── parser/               # Handlers for reading/parsing SIMX/FOX/EDT formats
+├── i18n/
+│   └── I18nContext.jsx       # Internationalization provider (fetches public/translations.json)
+├── state/
+│   └── AppStateContext.jsx   # Global application state (theme, active view, layers)
+└── components/               # React Components
+    ├── TopBar.jsx, NavBar.jsx, CreditsModal.jsx
+    ├── controls/             # Reusable UI elements (Sliders, Toggles, Selects, Color Pickers)
+    ├── sidebar/              # Contextual sidebars (Analysis, Model, Boundary)
+    └── views/                # Main visualization areas (AnalysisView, ModelView, BoundaryView)
+```
+
+---
+
+## Adding a New Language
+
+EnviReader uses a dynamic internationalization system. To add a new language:
+1. Open `public/translations.json`.
+2. Add a new top-level object with the language code (e.g., `"pt": { ... }`).
+3. Translate all the keys present in the default `"it"` or `"en"` objects.
+4. The application's language selector will automatically detect and populate the new option.
 
 ---
 
 ## Target Audience
 
-The ENVI-met webReader is an invaluable tool for:
-- **Environmental scientists** conducting microclimate studies.
-- **Urban planners** designing sustainable cities.
-- **Decision-makers** analyzing complex environmental scenarios.
-
----
-
-## Visit the Project
-
-The ENVI-met webReader is accessible at [https://envireader.altervista.org](https://envireader.altervista.org).
+EnviReader is an invaluable tool for:
+- **Environmental scientists** conducting microclimate and heat island studies.
+- **Urban planners** and architects designing sustainable, climate-resilient cities.
+- **Decision-makers** analyzing complex environmental scenarios to improve urban comfort.
 
 ---
 
 ## Related Resources
 
-- Explore **ENVI-met** software for comprehensive environmental modeling: [https://envi-met.com](https://envi-met.com).
-- Learn more about **ECharts** for interactive data visualization: [https://echarts.apache.org/en/index.html](https://echarts.apache.org/en/index.html).
+- **ENVI-met**: Comprehensive environmental modeling software - [https://envi-met.com](https://envi-met.com)
+- **ECharts**: Powerful, interactive data visualization - [https://echarts.apache.org](https://echarts.apache.org)
+- **Three.js**: JavaScript 3D library - [https://threejs.org](https://threejs.org)
 
 ---
 
-## Why Choose ENVI-met webReader?
+## Why Choose EnviReader?
 
-The ENVI-met webReader provides an unparalleled combination of **advanced analytical tools**, **intuitive interface design**, and **powerful visualization capabilities**, making it the go-to solution for working with **EDX/EDT files** and complex environmental data. Its modular architecture ensures adaptability and growth, while performance optimizations guarantee efficiency and responsiveness.
+The redesigned EnviReader provides an unparalleled combination of **advanced analytical tools**, an **intuitive modern interface**, and **powerful visualization capabilities**. Its React-based modular architecture ensures adaptability, maintainability, and rapid future growth. By keeping processing strictly local and browser-based, it guarantees high performance and absolute data privacy.
 
-Experience the future of environmental data analysis and visualization with ENVI-met webReader.
+Experience the future of environmental data analysis and visualization directly in your browser.
