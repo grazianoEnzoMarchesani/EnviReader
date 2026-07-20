@@ -141,7 +141,11 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
     } else if (rv === 4) {
       pxArr[o] = 190; pxArr[o+1] = 40; pxArr[o+2] = 190; pxArr[o+3] = 200 * opF;
     } else if (rv >= 11 && rv <= 15 && showVegetation) {
-      pxArr[o] = 34; pxArr[o+1] = 197; pxArr[o+2] = 94; pxArr[o+3] = 200 * opF;
+      if (rv === 11) { pxArr[o] = 134; pxArr[o+1] = 239; pxArr[o+2] = 172; pxArr[o+3] = 200 * opF; } // Verde molto chiaro
+      else if (rv === 12) { pxArr[o] = 74; pxArr[o+1] = 222; pxArr[o+2] = 128; pxArr[o+3] = 200 * opF; } // Verde chiaro
+      else if (rv === 13) { pxArr[o] = 34; pxArr[o+1] = 197; pxArr[o+2] = 94; pxArr[o+3] = 200 * opF; } // Verde medio (originale)
+      else if (rv === 14) { pxArr[o] = 22; pxArr[o+1] = 163; pxArr[o+2] = 74; pxArr[o+3] = 200 * opF; } // Verde scuro
+      else if (rv === 15) { pxArr[o] = 21; pxArr[o+1] = 128; pxArr[o+2] = 61; pxArr[o+3] = 200 * opF; } // Verde molto scuro
     } else {
       pxArr[o+3] = 0; // Trasparente
     }

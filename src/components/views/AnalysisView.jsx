@@ -491,10 +491,10 @@ export default function AnalysisView() {
             <div className="view-bar-group">
               <Slider label={tr('slider_scale')} value={state.scaleFactor} min={1} max={3} step={0.25} unit="x" onChange={(v) => set({ scaleFactor: v })} />
             </div>
-            <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border-subtle)' }} />
+            <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border)' }} />
             <div className="view-bar-group">
               <span className="control-label" style={{ marginBottom: 0 }}>{tr('group_legend')}</span>
-              <select className="select" value={state.scaleType} onChange={(e) => set({ scaleType: e.target.value })}>
+              <select className="select" style={{ width: 'auto' }} value={state.scaleType} onChange={(e) => set({ scaleType: e.target.value })}>
                 {SCALE_TYPES.map((s) => (
                   <option key={s.value} value={s.value}>
                     {tr(s.labelKey)}
@@ -517,11 +517,11 @@ export default function AnalysisView() {
             
             {state.showObjectsOverlay && (
               <>
-                <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border-subtle)' }} />
+                <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border)' }} />
                 <div className="view-bar-group">
                   <Slider label={tr('slider_objects_opacity')} value={state.objOverlayOpacity} min={0} max={100} unit="%" onChange={(v) => set({ objOverlayOpacity: v })} />
                 </div>
-                <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border-subtle)' }} />
+                <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border)' }} />
                 <div className="view-bar-group">
                   <Toggle label={tr('toggle_obj_buildings')} on={state.objOverlayBuildings} onToggle={() => toggle('objOverlayBuildings')} />
                   <Toggle label={tr('toggle_obj_terrain')} on={state.objOverlayTerrain} onToggle={() => toggle('objOverlayTerrain')} />
@@ -530,7 +530,7 @@ export default function AnalysisView() {
               </>
             )}
             
-            <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border-subtle)' }} />
+            <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border)' }} />
             <div className="view-bar-group">
               <Toggle label={tr('toggle_compass')} on={state.showNorthArrow} onToggle={() => toggle('showNorthArrow')} />
               <Toggle label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} />

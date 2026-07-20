@@ -22,10 +22,10 @@ function DataTab() {
   const dims = state.edxMeta?.dimensions;
   const groupOptions = loaded
     ? state.dataGroups.map((p) => ({ value: p, label: p === '' ? '/' : p }))
-    : DATA_GROUPS.map((k) => ({ value: k, label: tr(k) }));
+    : [];
   const datasetOptions = state.edxMeta
     ? state.edxMeta.variableNames.map((n) => ({ value: n, label: n }))
-    : DATASETS.map((k) => ({ value: k, label: tr(k) }));
+    : [];
 
   return (
     <>
