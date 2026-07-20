@@ -268,10 +268,26 @@ button { font-family: inherit; }
   background: var(--accent-soft);
   padding: 1px 7px;
   border-radius: 6px;
-  min-width: 50px;
+  width: 50px;
   text-align: center;
   display: inline-block;
   box-sizing: border-box;
+}
+.slider-value-input {
+  border: 1px solid transparent;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: text;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.slider-value-input:hover {
+  border-color: var(--accent);
+}
+.slider-value-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 .slider-row { display: flex; align-items: center; gap: 8px; }
 .step-btn {
