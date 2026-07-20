@@ -6,8 +6,10 @@ import { useI18n } from '../../i18n/I18nContext';
 import Segmented from '../controls/Segmented';
 import Slider from '../controls/Slider';
 import Select from '../controls/Select';
-import Toggle from '../controls/Toggle';
+import IconToggle from '../controls/IconToggle';
 import { paletteLabel } from '../controls/PaletteSelector';
+import { IconLayers3D, IconBuilding, IconTerrain, IconTree, IconCompass, IconCalendar, IconClock, IconSettings } from '../icons/ToolbarIcons';
+import ViewSettingsModal from '../ViewSettingsModal';
 import MapChart, { MapThumb, niceCeil } from '../MapChart';
 import TimeSeriesChart from '../TimeSeriesChart';
 import { useSlice, usePointSeries, useInxRotation, useWindField } from '../../lib/useSlice';
@@ -23,7 +25,7 @@ function formatTime(time) {
 
 // Valore mostrato dal color picker quando sectionLineColor è null (colore di
 // tema): un grigio neutro, dato che l'input nativo non sa rendere "auto"
-const DEFAULT_SECTION_LINE_COLOR = '#808080';
+export const DEFAULT_SECTION_LINE_COLOR = '#808080';
 
 // Tutte e tre le viste di un fileset: la principale a piena risoluzione,
 // le altre due alimentano le anteprime di cambio vista
@@ -503,7 +505,7 @@ export default function AnalysisView() {
             <div className="view-bar-group">
               <Slider label={tr('slider_scale')} value={state.scaleFactor} min={1} max={3} step={0.25} unit="x" onChange={(v) => set({ scaleFactor: v })} />
             </div>
-            <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border)' }} />
+            <div className="vertical-divider" />
             <div className="view-bar-group">
               <span className="control-label" style={{ marginBottom: 0 }}>{tr('group_legend')}</span>
               <select className="select" style={{ width: 'auto' }} value={state.scaleType} onChange={(e) => set({ scaleType: e.target.value })}>
@@ -514,62 +516,38 @@ export default function AnalysisView() {
                 ))}
               </select>
             </div>
-            <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border)' }} />
-            <div className="view-bar-group">
-              <span className="control-label" style={{ marginBottom: 0 }}>{tr('group_section_line')}</span>
-              <Slider label={tr('slider_section_line_width')} value={state.sectionLineWidth} min={1} max={5} step={1} unit="px" onChange={(v) => set({ sectionLineWidth: v })} />
-              <Slider label={tr('slider_section_line_gap')} value={state.sectionLineGap} min={0} max={12} step={1} unit="px" onChange={(v) => set({ sectionLineGap: v })} />
-              <span className="line-color-row">
-                <input
-                  type="color"
-                  className="line-color-input"
-                  title={tr('label_section_line_color')}
-                  aria-label={tr('label_section_line_color')}
-                  value={state.sectionLineColor || DEFAULT_SECTION_LINE_COLOR}
-                  onChange={(e) => set({ sectionLineColor: e.target.value })}
-                />
-                {state.sectionLineColor && (
-                  <button type="button" className="step-btn" title={tr('btn_section_line_color_reset')} onClick={() => set({ sectionLineColor: null })}>↺</button>
-                )}
-              </span>
+            <div className="vertical-divider" />
+            <div className="icon-toggle-row">
+              <IconToggle icon={IconLayers3D} label={tr('toggle_objects_overlay')} on={state.showObjectsOverlay} onToggle={() => toggle('showObjectsOverlay')} />
+              {state.showObjectsOverlay && (
+                <>
+                  <IconToggle icon={IconBuilding} label={tr('toggle_obj_buildings')} on={state.objOverlayBuildings} onToggle={() => toggle('objOverlayBuildings')} />
+                  <IconToggle icon={IconTerrain} label={tr('toggle_obj_terrain')} on={state.objOverlayTerrain} onToggle={() => toggle('objOverlayTerrain')} />
+                  <IconToggle icon={IconTree} label={tr('toggle_obj_vegetation')} on={state.objOverlayVegetation} onToggle={() => toggle('objOverlayVegetation')} />
+                </>
+              )}
+              <div className="vertical-divider" />
+              <IconToggle icon={IconCompass} label={tr('toggle_compass')} on={state.showNorthArrow} onToggle={() => toggle('showNorthArrow')} />
+              <IconToggle icon={IconCalendar} label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} />
+              <IconToggle icon={IconClock} label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} />
             </div>
-          </div>
-        </div>
-
-        <div className="view-bar-bottom">
-          <div className="view-bar-panel">
+            <div className="vertical-divider" />
             <div className="view-bar-group">
-              <Toggle 
-                label={tr('toggle_objects_overlay')} 
-                on={state.showObjectsOverlay} 
-                onToggle={() => toggle('showObjectsOverlay')} 
-              />
-            </div>
-            
-            {state.showObjectsOverlay && (
-              <>
-                <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border)' }} />
-                <div className="view-bar-group">
-                  <Slider label={tr('slider_objects_opacity')} value={state.objOverlayOpacity} min={0} max={100} unit="%" onChange={(v) => set({ objOverlayOpacity: v })} />
-                </div>
-                <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border)' }} />
-                <div className="view-bar-group">
-                  <Toggle label={tr('toggle_obj_buildings')} on={state.objOverlayBuildings} onToggle={() => toggle('objOverlayBuildings')} />
-                  <Toggle label={tr('toggle_obj_terrain')} on={state.objOverlayTerrain} onToggle={() => toggle('objOverlayTerrain')} />
-                  <Toggle label={tr('toggle_obj_vegetation')} on={state.objOverlayVegetation} onToggle={() => toggle('objOverlayVegetation')} />
-                </div>
-              </>
-            )}
-            
-            <div className="vertical-divider" style={{ width: 1, height: 20, background: 'var(--border)' }} />
-            <div className="view-bar-group">
-              <Toggle label={tr('toggle_compass')} on={state.showNorthArrow} onToggle={() => toggle('showNorthArrow')} />
-              <Toggle label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} />
-              <Toggle label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} />
+              <button
+                type="button"
+                className="icon-toggle"
+                title={tr('btn_view_settings')}
+                aria-label={tr('btn_view_settings')}
+                onClick={() => toggle('viewSettingsOpen')}
+              >
+                <IconSettings />
+              </button>
             </div>
           </div>
         </div>
       </div>
+
+      <ViewSettingsModal />
 
       <div className="chart-grid" ref={flipRef} style={{ '--chart-w': cardWidth }}>
         {chartsToShow.map((c) => (

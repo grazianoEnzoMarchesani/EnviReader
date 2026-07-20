@@ -60,6 +60,7 @@ const initialState = {
   customRangeModal: null,
   timeSeriesOpen: true,
   showCredits: false,
+  viewSettingsOpen: false,
   showBuildings: true,
   showVegetation: true,
   showTerrain: true,

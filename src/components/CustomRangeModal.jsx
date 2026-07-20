@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAppState } from '../state/AppStateContext';
 import { useI18n } from '../i18n/I18nContext';
 
+const roundForDisplay = (n) => Math.round(n * 100) / 100;
+
 export default function CustomRangeModal() {
   const { state, set } = useAppState();
   const { tr } = useI18n();
@@ -12,8 +14,8 @@ export default function CustomRangeModal() {
 
   useEffect(() => {
     if (modalData) {
-      setMinVal(modalData.min != null ? String(modalData.min) : '');
-      setMaxVal(modalData.max != null ? String(modalData.max) : '');
+      setMinVal(modalData.min != null ? String(roundForDisplay(modalData.min)) : '');
+      setMaxVal(modalData.max != null ? String(roundForDisplay(modalData.max)) : '');
     }
   }, [modalData]);
 
@@ -44,12 +46,12 @@ export default function CustomRangeModal() {
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">{modalData.title}</div>
         <p className="modal-text" style={{ marginBottom: '16px' }}>
-          Imposta i limiti manuali per questa specifica visualizzazione.
+          {tr('modal_custom_range_desc')}
         </p>
 
         <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
           <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Minimo</label>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>{tr('label_min')}</label>
             <input
               type="number"
               step="any"
@@ -59,7 +61,7 @@ export default function CustomRangeModal() {
             />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Massimo</label>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>{tr('label_max')}</label>
             <input
               type="number"
               step="any"
@@ -72,10 +74,10 @@ export default function CustomRangeModal() {
 
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
           <button className="primary-btn" onClick={handleClose} style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)' }}>
-            Annulla
+            {tr('btn_cancel')}
           </button>
           <button className="primary-btn" onClick={handleSave}>
-            Applica
+            {tr('btn_apply')}
           </button>
         </div>
       </div>

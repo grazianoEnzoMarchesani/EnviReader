@@ -60,6 +60,7 @@ export const FALLBACK_I18N = {
     "compare_b": "Only B",
     "compare_ab": "A vs B",
     "compare_abdiff": "A vs B vs Diff",
+    "btn_view_settings": "View settings",
     "group_legend": "Legend bounds",
     "group_section_line": "Section line",
     "slider_section_line_width": "Line thickness",
@@ -244,6 +245,10 @@ export const FALLBACK_I18N = {
     "import_code_placeholder": "Paste the code (EVR1:…)",
     "btn_add": "Add",
     "import_invalid": "Invalid code or file",
+    "modal_custom_range_desc": "Set the manual limits for this specific view.",
+    "label_min": "Min",
+    "label_max": "Max",
+    "btn_apply": "Apply",
     "toggle_compass": "Show compass",
     "toggle_calendar_widget": "Show simulation date",
     "toggle_clock_widget": "Show simulation time"
