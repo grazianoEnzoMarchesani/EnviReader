@@ -1,0 +1,14 @@
+# Permette richieste da altri domini (CORS)
+Header set Access-Control-Allow-Origin "*"
+
+# # av:php5-engine
+AddHandler av-php82 .php
+
+<IfModule mod_mime.c>
+  AddType application/javascript .js
+  AddType image/svg+xml .svg .svgz
+</IfModule>
+
+<FilesMatch "\.js$">
+  Header set Content-Type "application/javascript"
+</FilesMatch>
