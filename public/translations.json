@@ -251,7 +251,9 @@
     "btn_apply": "Applica",
     "toggle_compass": "Mostra bussola",
     "toggle_calendar_widget": "Mostra calendario",
-    "toggle_clock_widget": "Mostra orologio"
+    "toggle_clock_widget": "Mostra orologio",
+    "chip_sectionx_prefix": "long.",
+    "chip_sectiony_prefix": "trasv."
   },
   "en": {
     "lang_name": "English",
@@ -505,7 +507,9 @@
     "btn_apply": "Apply",
     "toggle_compass": "Show compass",
     "toggle_calendar_widget": "Show calendar",
-    "toggle_clock_widget": "Show clock"
+    "toggle_clock_widget": "Show clock",
+    "chip_sectionx_prefix": "lon.",
+    "chip_sectiony_prefix": "trv."
   },
   "es": {
     "lang_name": "Español",
@@ -764,7 +768,9 @@
     "btn_apply": "Aplicar",
     "toggle_compass": "Mostrar brújula",
     "toggle_calendar_widget": "Mostrar calendario",
-    "toggle_clock_widget": "Mostrar reloj"
+    "toggle_clock_widget": "Mostrar reloj",
+    "chip_sectionx_prefix": "long.",
+    "chip_sectiony_prefix": "transv."
   },
   "fr": {
     "lang_name": "Français",
@@ -1023,7 +1029,9 @@
     "btn_apply": "Appliquer",
     "toggle_compass": "Afficher la boussole",
     "toggle_calendar_widget": "Afficher le calendrier",
-    "toggle_clock_widget": "Afficher l'horloge"
+    "toggle_clock_widget": "Afficher l'horloge",
+    "chip_sectionx_prefix": "long.",
+    "chip_sectiony_prefix": "transv."
   },
   "de": {
     "lang_name": "Deutsch",
@@ -1282,6 +1290,8 @@
     "btn_apply": "Anwenden",
     "toggle_compass": "Kompass anzeigen",
     "toggle_calendar_widget": "Kalender anzeigen",
-    "toggle_clock_widget": "Uhr anzeigen"
+    "toggle_clock_widget": "Uhr anzeigen",
+    "chip_sectionx_prefix": "Läng.",
+    "chip_sectiony_prefix": "Quer."
   }
 }

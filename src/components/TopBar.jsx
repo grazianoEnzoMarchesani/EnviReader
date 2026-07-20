@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAppState } from '../state/AppStateContext';
 import { useI18n } from '../i18n/I18nContext';
 import SaveChartModal from './SaveChartModal';
+import NavBar from './NavBar';
 
 export default function TopBar() {
   const { state, toggle, toggleTheme, openFilesetA, toggleFilesetB } = useAppState();
@@ -25,28 +26,32 @@ export default function TopBar() {
   return (
     <>
       <header className="topbar">
-        <div className="topbar-left">
-          <div className="brand" onClick={() => toggle('showCredits')}>
-            <span className="brand-title">EnviReader</span>
-            <span className="brand-tagline">{tr('app_tagline')}</span>
+        <div className="topbar-main">
+          <div className="topbar-left">
+            <div className="brand" onClick={() => toggle('showCredits')}>
+              <span className="brand-title">EnviReader</span>
+              <span className="brand-tagline">{tr('app_tagline')}</span>
+            </div>
+            <div className="divider-v" />
+            <button
+              className={`btn btn-fileset-a${state.filesetAOpen ? ' open' : ''}`}
+              onClick={openFilesetA}
+              disabled={loading != null}
+              aria-busy={loading === 'A'}
+            >
+              {filesetLabel('A')}
+            </button>
+            <button
+              className={`btn btn-fileset-b${state.filesetBOpen ? ' open' : ''}`}
+              onClick={toggleFilesetB}
+              disabled={loading != null}
+              aria-busy={loading === 'B'}
+            >
+              {filesetLabel('B')}
+            </button>
           </div>
-          <div className="divider-v" />
-          <button
-            className={`btn btn-fileset-a${state.filesetAOpen ? ' open' : ''}`}
-            onClick={openFilesetA}
-            disabled={loading != null}
-            aria-busy={loading === 'A'}
-          >
-            {filesetLabel('A')}
-          </button>
-          <button
-            className={`btn btn-fileset-b${state.filesetBOpen ? ' open' : ''}`}
-            onClick={toggleFilesetB}
-            disabled={loading != null}
-            aria-busy={loading === 'B'}
-          >
-            {filesetLabel('B')}
-          </button>
+          <div className="divider-v nav-divider" />
+          <NavBar />
         </div>
         <div className="topbar-right">
           <div className="lang-row">

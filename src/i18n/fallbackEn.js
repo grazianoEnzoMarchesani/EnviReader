@@ -120,6 +120,8 @@ export const FALLBACK_I18N = {
     "chart_diff_title": "Difference",
     "chart_caption_diff": "A/B difference",
     "chip_level_prefix": "lvl.",
+    "chip_sectionx_prefix": "lon.",
+    "chip_sectiony_prefix": "trv.",
     "group_time_series": "Time series",
     "ts_caption": "chart — time evolution of the selected dataset (coming soon)",
     "credits_title": "Information & Credits",

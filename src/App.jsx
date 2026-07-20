@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { I18nProvider } from './i18n/I18nContext';
 import TopBar from './components/TopBar';
-import NavBar from './components/NavBar';
 import CreditsModal from './components/CreditsModal';
 import CustomRangeModal from './components/CustomRangeModal';
 import AnalysisSidebar from './components/sidebar/AnalysisSidebar';
@@ -26,7 +25,6 @@ function AppLayout() {
   return (
     <div className="app-root">
       <TopBar />
-      <NavBar />
       <div className={`body-row ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <aside className="sidebar">
           <div className="sidebar-inner">

@@ -7,7 +7,6 @@ import Segmented from '../controls/Segmented';
 import Slider from '../controls/Slider';
 import Select from '../controls/Select';
 import IconToggle from '../controls/IconToggle';
-import { paletteLabel } from '../controls/PaletteSelector';
 import { IconLayers3D, IconBuilding, IconTerrain, IconTree, IconCompass, IconCalendar, IconClock, IconSettings } from '../icons/ToolbarIcons';
 import ViewSettingsModal from '../ViewSettingsModal';
 import MapChart, { MapThumb, niceCeil } from '../MapChart';
@@ -386,8 +385,16 @@ export default function AnalysisView() {
 
   const emptyCaption = (key) =>
     state[`fileset${key}Open`] ? tr('map_no_data') : tr('map_open_hint');
+  // Coordinata che definisce la vista corrente: quota per la pianta,
+  // posizione della sezione (fissa nella vista stessa) per le sezioni
+  const contextValueLabel =
+    state.viewType === 'plan'
+      ? `${tr('chip_level_prefix')} ${state.level}`
+      : state.viewType === 'sectionX'
+        ? `${tr('chip_sectionx_prefix')} ${state.sectionX}`
+        : `${tr('chip_sectiony_prefix')} ${state.sectionY}`;
   const rangeStats = (range) =>
-    range ? `${datasetLabel} · ${formatValue(range.min, range.max - range.min)} – ${formatValue(range.max, range.max - range.min)}` : datasetLabel;
+    `${datasetLabel} · ${range ? `${formatValue(range.min, range.max - range.min)} – ${formatValue(range.max, range.max - range.min)} · ` : ''}${contextValueLabel}`;
 
   // "Fileset A · nomeSimulazione": il prefisso A/B resta per leggere A − B / B − A
   const filesetLabel = (key) => {
@@ -482,25 +489,6 @@ export default function AnalysisView() {
     <>
       <div className="view-bar">
         <div className="view-bar-top">
-          <div className="view-bar-context">
-            <div className="chip"><span className="chip-dot" />{datasetLabel}</div>
-            <div className="chip">{timeLabel}</div>
-            <div className="chip">{tr('chip_level_prefix')} {state.level}</div>
-            <div className="chip">
-              <span
-                className="chip-palette-swatch"
-                style={{ background: `linear-gradient(90deg, ${activePalette.colors.join(',')})` }}
-              />
-              {paletteLabel(activePalette, tr)}
-            </div>
-          </div>
-          <div className="view-bar-modes">
-            <Segmented options={compareOptions} value={state.compareMode} onSelect={setCompareMode} variant="accent" />
-            <Segmented options={viewTypeOptions} value={state.viewType} onSelect={(v) => set({ viewType: v })} variant="dark" />
-          </div>
-        </div>
-
-        <div className="view-bar-bottom">
           <div className="view-bar-panel">
             <div className="view-bar-group">
               <Slider label={tr('slider_scale')} value={state.scaleFactor} min={1} max={3} step={0.25} unit="x" onChange={(v) => set({ scaleFactor: v })} />
@@ -544,6 +532,11 @@ export default function AnalysisView() {
               </button>
             </div>
           </div>
+
+          <div className="view-bar-modes">
+            <Segmented options={compareOptions} value={state.compareMode} onSelect={setCompareMode} variant="accent" />
+            <Segmented options={viewTypeOptions} value={state.viewType} onSelect={(v) => set({ viewType: v })} variant="dark" />
+          </div>
         </div>
       </div>
 
@@ -579,7 +572,7 @@ export default function AnalysisView() {
           <span className="chart-title">{tr('group_time_series')}</span>
           {pointSeriesA && (
             <span className="chart-stats">
-              {datasetLabel} · {state.sectionX}, {state.sectionY} · {tr('chip_level_prefix')} {state.level}
+              {datasetLabel} · {tr('chip_sectionx_prefix')} {state.sectionX}, {tr('chip_sectiony_prefix')} {state.sectionY} · {tr('chip_level_prefix')} {state.level}
             </span>
           )}
           <span className={`chevron${state.timeSeriesOpen ? ' open' : ''}`} />
