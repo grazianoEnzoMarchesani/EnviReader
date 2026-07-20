@@ -103,14 +103,15 @@ const streamWidth = (size) => 0.6 + 3 * (size / 100);
 // Interpolazione bilineare delle componenti del vento nel punto (x, y) in
 // coordinate di griglia (centri cella sugli interi); null su celle senza dati.
 function sampleField(field, x, y) {
-  const x0 = Math.floor(x);
-  const y0 = Math.floor(y);
-  if (x0 < 0 || y0 < 0 || x0 >= field.w - 1 || y0 >= field.h - 1) {
-    const cx = Math.min(field.w - 1, Math.max(0, Math.round(x)));
-    const cy = Math.min(field.h - 1, Math.max(0, Math.round(y)));
-    const i = cy * field.w + cx;
-    return Number.isFinite(field.u[i]) && Number.isFinite(field.v[i]) ? [field.u[i], field.v[i]] : null;
-  }
+  if (field.w < 2 || field.h < 2) return null;
+  // Clamp-to-edge: la cella di interpolazione resta ancorata all'ultima
+  // valida, così l'ultima riga/colonna resta bilineare invece di collassare
+  // su un singolo vicino più prossimo (causava streamline convergenti a
+  // raggiera vicino ai bordi della griglia).
+  const cx = Math.min(field.w - 1, Math.max(0, x));
+  const cy = Math.min(field.h - 1, Math.max(0, y));
+  const x0 = Math.min(field.w - 2, Math.floor(cx));
+  const y0 = Math.min(field.h - 2, Math.floor(cy));
   const i00 = y0 * field.w + x0;
   const i10 = i00 + 1;
   const i01 = i00 + field.w;
@@ -118,8 +119,8 @@ function sampleField(field, x, y) {
   const u = [field.u[i00], field.u[i10], field.u[i01], field.u[i11]];
   const v = [field.v[i00], field.v[i10], field.v[i01], field.v[i11]];
   for (let k = 0; k < 4; k++) if (!Number.isFinite(u[k]) || !Number.isFinite(v[k])) return null;
-  const fx = x - x0;
-  const fy = y - y0;
+  const fx = cx - x0;
+  const fy = cy - y0;
   const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
   return [
     u[0] * w00 + u[1] * w10 + u[2] * w01 + u[3] * w11,
@@ -132,7 +133,14 @@ function sampleField(field, x, y) {
 // le ferma quando toccano la scia di un'altra; l'integrazione segue il verso
 // del campo in avanti e all'indietro dal seme, a passo costante in celle.
 // Ogni punto è [x, y, velocità]: la velocità modula lo spessore del tratto.
-function traceStreamlines(field, sep) {
+function traceStreamlines(field, sep, refValue) {
+  // Soglia di stop relativa alla velocità di riferimento: vicino a punti
+  // singolari del campo (ricircoli, scie di edifici) il vento tende a zero e
+  // le linee, marciando a passo pieno normalizzato, continuerebbero fin
+  // quasi al punto esatto prima di fermarsi — creando un ventaglio di raggi
+  // che convergono tutti sullo stesso pixel. Fermandole prima si evita
+  // l'affollamento visivo lasciando codine corte invece di raggi lunghi.
+  const minSpeed = Math.max(1e-4, (refValue || 0) * 0.03);
   // La maschera è più fine del passo di semina (metà): una linea in marcia
   // muore solo quando arriva a ~sep/2 da un'altra, non a sep — altrimenti le
   // linee si spezzano in trattini appena nate. Il seme invece pretende libere
@@ -168,7 +176,7 @@ function traceStreamlines(field, sep) {
       const uv = sampleField(field, x, y);
       if (!uv) break;
       const speed = Math.hypot(uv[0], uv[1]);
-      if (speed < 1e-4) break;
+      if (speed < minSpeed) break;
       x += (uv[0] / speed) * STEP * dir;
       y += (uv[1] / speed) * STEP * dir;
       if (x < 0 || y < 0 || x > field.w - 1 || y > field.h - 1) break;
@@ -245,7 +253,7 @@ export function renderWindOnCanvas(canvas, wind, frameSize) {
     const wMin = 0.3;
     const wMax = streamWidth(size);
     const paths = Array.from({ length: BUCKETS }, () => new Path2D());
-    for (const line of traceStreamlines(field, step)) {
+    for (const line of traceStreamlines(field, step, refValue)) {
       for (let p = 1; p < line.length; p++) {
         const speed = (line[p - 1][2] + line[p][2]) / 2;
         const t = Math.min(1, speed / refValue);
