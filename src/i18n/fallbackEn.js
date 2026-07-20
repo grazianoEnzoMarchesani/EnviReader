@@ -62,6 +62,8 @@ export const FALLBACK_I18N = {
     "compare_ab": "A vs B",
     "compare_abdiff": "A vs B vs Diff",
     "btn_view_settings": "View settings",
+    "btn_collapse_toolbar": "Collapse toolbar",
+    "btn_expand_toolbar": "Expand toolbar",
     "group_legend": "Legend bounds",
     "group_section_line": "Section line",
     "slider_section_line_width": "Line thickness",

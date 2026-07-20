@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { VIEW_TYPES, SCALE_TYPES } from '../../data/constants';
 import { findPalette } from '../../data/palettes';
 import { useAppState } from '../../state/AppStateContext';
@@ -485,59 +485,116 @@ export default function AnalysisView() {
   ];
   const viewTypeOptions = VIEW_TYPES.map((v) => ({ key: v.key, label: tr(v.labelKey) }));
 
+  const viewBarTopRef = useRef(null);
+  const viewBarPanelRef = useRef(null);
+  const viewBarModesRef = useRef(null);
+  // 'inline'  -> affiancati, condividono la riga col pannello, ancorati a destra
+  // 'stacked' -> impilati (compatti), a destra: sulla riga del pannello se lo
+  //              spazio libero dopo di esso basta a contenerli anche solo
+  //              impilati, altrimenti scendono impilati su una riga propria
+  // 'wrapped' -> affiancati, ma solo quando anche impilati non condividerebbero
+  //              la riga col pannello: scendono su una riga propria, e siccome
+  //              lì hanno tutta la larghezza per stare in fila, tornano
+  //              affiancati, ancorati a sinistra
+  const [modesLayout, setModesLayout] = useState('stacked');
+  const [viewBarCollapsed, setViewBarCollapsed] = useState(false);
+
+  useEffect(() => {
+    const topEl = viewBarTopRef.current;
+    const panelEl = viewBarPanelRef.current;
+    const modesEl = viewBarModesRef.current;
+    if (!topEl || !panelEl || !modesEl) return;
+    const measure = () => {
+      const widths = Array.from(modesEl.querySelectorAll('.segmented')).map((el) => el.getBoundingClientRect().width);
+      const gap = 12;
+      const unstackedWidth = widths.reduce((sum, w) => sum + w, 0) + gap * (widths.length - 1);
+      const stackedWidth = Math.max(0, ...widths);
+      const topWidth = topEl.getBoundingClientRect().width;
+      const leftover = topWidth - panelEl.getBoundingClientRect().width - 16;
+      if (unstackedWidth <= leftover) {
+        setModesLayout('inline');
+      } else if (stackedWidth > leftover && unstackedWidth <= topWidth) {
+        setModesLayout('wrapped');
+      } else {
+        setModesLayout('stacked');
+      }
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(topEl);
+    observer.observe(panelEl);
+    return () => observer.disconnect();
+  }, [state.compareMode, state.viewType, state.filesetBOpen, state.showObjectsOverlay]);
+
   return (
     <>
-      <div className="view-bar">
-        <div className="view-bar-top">
-          <div className="view-bar-panel">
-            <div className="view-bar-group">
-              <Slider label={tr('slider_scale')} value={state.scaleFactor} min={1} max={3} step={0.25} unit="x" onChange={(v) => set({ scaleFactor: v })} />
-            </div>
-            <div className="vertical-divider" />
-            <div className="view-bar-group">
-              <span className="control-label" style={{ marginBottom: 0 }}>{tr('group_legend')}</span>
-              <select className="select" style={{ width: 'auto' }} value={state.scaleType} onChange={(e) => set({ scaleType: e.target.value })}>
-                {SCALE_TYPES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {tr(s.labelKey)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="vertical-divider" />
-            <div className="icon-toggle-row">
-              <IconToggle icon={IconLayers3D} label={tr('toggle_objects_overlay')} on={state.showObjectsOverlay} onToggle={() => toggle('showObjectsOverlay')} />
-              {state.showObjectsOverlay && (
-                <>
-                  <IconToggle icon={IconBuilding} label={tr('toggle_obj_buildings')} on={state.objOverlayBuildings} onToggle={() => toggle('objOverlayBuildings')} />
-                  <IconToggle icon={IconTerrain} label={tr('toggle_obj_terrain')} on={state.objOverlayTerrain} onToggle={() => toggle('objOverlayTerrain')} />
-                  <IconToggle icon={IconTree} label={tr('toggle_obj_vegetation')} on={state.objOverlayVegetation} onToggle={() => toggle('objOverlayVegetation')} />
-                </>
-              )}
-              <div className="vertical-divider" />
-              <IconToggle icon={IconCompass} label={tr('toggle_compass')} on={state.showNorthArrow} onToggle={() => toggle('showNorthArrow')} />
-              <IconToggle icon={IconCalendar} label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} />
-              <IconToggle icon={IconClock} label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} />
-            </div>
-            <div className="vertical-divider" />
-            <div className="view-bar-group">
-              <button
-                type="button"
-                className="icon-toggle"
-                title={tr('btn_view_settings')}
-                aria-label={tr('btn_view_settings')}
-                onClick={() => toggle('viewSettingsOpen')}
-              >
-                <IconSettings />
-              </button>
-            </div>
-          </div>
+      <div className={`view-bar${viewBarCollapsed ? ' view-bar-collapsed' : ''}`}>
+        <div className="view-bar-collapse">
+          <div className="view-bar-collapse-inner">
+            <div className="view-bar-top" ref={viewBarTopRef}>
+              <div className="view-bar-panel" ref={viewBarPanelRef}>
+                <div className="view-bar-group">
+                  <Slider label={tr('slider_scale')} value={state.scaleFactor} min={1} max={3} step={0.25} unit="x" onChange={(v) => set({ scaleFactor: v })} />
+                </div>
+                <div className="vertical-divider" />
+                <div className="view-bar-group">
+                  <span className="control-label" style={{ marginBottom: 0 }}>{tr('group_legend')}</span>
+                  <select className="select" style={{ width: 'auto' }} value={state.scaleType} onChange={(e) => set({ scaleType: e.target.value })}>
+                    {SCALE_TYPES.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {tr(s.labelKey)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="vertical-divider" />
+                <div className="icon-toggle-row">
+                  <IconToggle icon={IconLayers3D} label={tr('toggle_objects_overlay')} on={state.showObjectsOverlay} onToggle={() => toggle('showObjectsOverlay')} />
+                  {state.showObjectsOverlay && (
+                    <>
+                      <IconToggle icon={IconBuilding} label={tr('toggle_obj_buildings')} on={state.objOverlayBuildings} onToggle={() => toggle('objOverlayBuildings')} />
+                      <IconToggle icon={IconTerrain} label={tr('toggle_obj_terrain')} on={state.objOverlayTerrain} onToggle={() => toggle('objOverlayTerrain')} />
+                      <IconToggle icon={IconTree} label={tr('toggle_obj_vegetation')} on={state.objOverlayVegetation} onToggle={() => toggle('objOverlayVegetation')} />
+                    </>
+                  )}
+                  <div className="vertical-divider" />
+                  <IconToggle icon={IconCompass} label={tr('toggle_compass')} on={state.showNorthArrow} onToggle={() => toggle('showNorthArrow')} />
+                  <IconToggle icon={IconCalendar} label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} />
+                  <IconToggle icon={IconClock} label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} />
+                </div>
+                <div className="vertical-divider" />
+                <div className="view-bar-group">
+                  <button
+                    type="button"
+                    className="icon-toggle"
+                    title={tr('btn_view_settings')}
+                    aria-label={tr('btn_view_settings')}
+                    onClick={() => toggle('viewSettingsOpen')}
+                  >
+                    <IconSettings />
+                  </button>
+                </div>
+              </div>
 
-          <div className="view-bar-modes">
-            <Segmented options={compareOptions} value={state.compareMode} onSelect={setCompareMode} variant="accent" />
-            <Segmented options={viewTypeOptions} value={state.viewType} onSelect={(v) => set({ viewType: v })} variant="dark" />
+              <div className={`view-bar-modes view-bar-modes--${modesLayout}`} ref={viewBarModesRef}>
+                <Segmented options={compareOptions} value={state.compareMode} onSelect={setCompareMode} variant="accent" />
+                <Segmented options={viewTypeOptions} value={state.viewType} onSelect={(v) => set({ viewType: v })} variant="dark" />
+              </div>
+            </div>
           </div>
         </div>
+
+        <button
+          type="button"
+          className="view-bar-toggle"
+          onClick={() => setViewBarCollapsed((v) => !v)}
+          title={tr(viewBarCollapsed ? 'btn_expand_toolbar' : 'btn_collapse_toolbar')}
+          aria-label={tr(viewBarCollapsed ? 'btn_expand_toolbar' : 'btn_collapse_toolbar')}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="18 15 12 9 6 15"></polyline>
+          </svg>
+        </button>
       </div>
 
       <ViewSettingsModal />
