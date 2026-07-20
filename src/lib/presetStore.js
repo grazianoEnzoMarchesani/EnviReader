@@ -30,7 +30,7 @@ function sanitizeSettings(raw) {
   const angle = Number(raw.sectionAngle);
   if (Number.isFinite(angle)) s.sectionAngle = angle;
   if (typeof raw.hour === 'string' && /^\d{1,2}:\d{2}$/.test(raw.hour)) s.hour = raw.hour;
-  if (raw.windStyle === 'arrows' || raw.windStyle === 'streamlines') s.windStyle = raw.windStyle;
+  if (raw.windStyle === 'arrows' || raw.windStyle === 'streamlines' || raw.windStyle === 'combined') s.windStyle = raw.windStyle;
   if (SCALE_VALUES.includes(raw.scaleType)) s.scaleType = raw.scaleType;
   return Object.keys(s).length ? s : null;
 }

@@ -80,6 +80,7 @@ function WindTab() {
   const styleOptions = [
     { key: 'arrows', label: tr('wind_style_arrows') },
     { key: 'streamlines', label: tr('wind_style_streamlines') },
+    { key: 'combined', label: tr('wind_style_combined') },
   ];
   return (
     <>

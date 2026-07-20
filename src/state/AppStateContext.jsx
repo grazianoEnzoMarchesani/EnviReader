@@ -44,7 +44,7 @@ const initialState = {
   objOverlayBuildings: true,
   objOverlayTerrain: true,
   objOverlayVegetation: true,
-  windStyle: 'arrows', // 'arrows' | 'streamlines'
+  windStyle: 'arrows', // 'arrows' | 'streamlines' | 'combined'
   palette: 'Turbo',
   paletteOpen: false,
   paletteReversed: false,

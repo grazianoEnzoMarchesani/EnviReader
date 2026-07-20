@@ -207,7 +207,12 @@ function traceStreamlines(field, sep, refValue) {
 
 export function renderWindOnCanvas(canvas, wind, frameSize) {
   if (!canvas || !wind || !frameSize || !(wind.refValue > 0)) return;
-  const dpr = window.devicePixelRatio || 1;
+  // Sovracampiona sempre ad almeno 2x anche su schermi non Retina (dpr 1):
+  // altrimenti il buffer del canvas ha la stessa risoluzione della dimensione
+  // CSS e le streamline (linee sottili e curve) risultano visibilmente
+  // seghettate. Con dpr forzato a 2+ il browser ridimensiona il canvas
+  // in downscale, ottenendo un antialiasing "gratuito" anche su 1080p.
+  const dpr = Math.max(window.devicePixelRatio || 1, 2);
   canvas.width = Math.round(frameSize.w * dpr);
   canvas.height = Math.round(frameSize.h * dpr);
   const ctx = canvas.getContext('2d');
@@ -248,12 +253,13 @@ export function renderWindOnCanvas(canvas, wind, frameSize) {
     return (1 - cy / extH) * frameSize.h;
   };
 
-  if (style === 'streamlines') {
+  if (style === 'streamlines' || style === 'combined') {
     const BUCKETS = 6;
     const wMin = 0.3;
     const wMax = streamWidth(size);
     const paths = Array.from({ length: BUCKETS }, () => new Path2D());
-    for (const line of traceStreamlines(field, step, refValue)) {
+    const allLines = traceStreamlines(field, step, refValue);
+    for (const line of allLines) {
       for (let p = 1; p < line.length; p++) {
         const speed = (line[p - 1][2] + line[p][2]) / 2;
         const t = Math.min(1, speed / refValue);
@@ -272,6 +278,9 @@ export function renderWindOnCanvas(canvas, wind, frameSize) {
         ctx.lineWidth = wMin + ((q + 0.5) / BUCKETS) * (wMax - wMin) + pass.extra;
         ctx.stroke(paths[q]);
       }
+    }
+    if (style === 'combined') {
+      drawStreamlineArrowheads(ctx, allLines, toPx, toPy, alpha, wMax, isThumb);
     }
     return;
   }
@@ -295,6 +304,59 @@ export function renderWindOnCanvas(canvas, wind, frameSize) {
         if (len < (isThumb ? 0.5 : 1.5)) continue;
         drawArrow(ctx, toPx(gx), toPy(gy), Math.atan2(-v, u), len, isThumb);
       }
+    }
+  }
+}
+
+// Modalità "combined": sovrappone alle streamline piccoli triangolini di
+// direzione a spaziatura fissa in px CSS, così l'occhio legge il verso del
+// vento senza appesantire il disegno con code d'asta come in modalità frecce.
+const COMBINED_ARROW_SPACING = 130; // px CSS tra un triangolino e il successivo
+const COMBINED_ARROW_SPACING_THUMB = 70;
+
+function drawStreamlineArrowheads(ctx, lines, toPx, toPy, alpha, wMax, isThumb) {
+  const spacing = isThumb ? COMBINED_ARROW_SPACING_THUMB : COMBINED_ARROW_SPACING;
+  const head = Math.min(isThumb ? 6 : 12, Math.max(isThumb ? 3 : 5, wMax * 2.6));
+  const marks = [];
+  for (const line of lines) {
+    if (line.length < 2) continue;
+    let px0 = toPx(line[0][0]);
+    let py0 = toPy(line[0][1]);
+    let acc = spacing / 2;
+    for (let p = 1; p < line.length; p++) {
+      const px1 = toPx(line[p][0]);
+      const py1 = toPy(line[p][1]);
+      const segLen = Math.hypot(px1 - px0, py1 - py0);
+      if (segLen > 0) {
+        while (acc <= segLen) {
+          const t = acc / segLen;
+          marks.push([px0 + (px1 - px0) * t, py0 + (py1 - py0) * t, Math.atan2(py1 - py0, px1 - px0)]);
+          acc += spacing;
+        }
+        acc -= segLen;
+      }
+      px0 = px1;
+      py0 = py1;
+    }
+  }
+  const passes = [
+    { fill: `rgba(255,255,255,${alpha * 0.9})`, extra: 1.2 },
+    { fill: `rgba(15,23,42,${alpha})`, extra: 0 },
+  ];
+  for (const pass of passes) {
+    ctx.fillStyle = pass.fill;
+    const len = head + pass.extra;
+    for (const [x, y, angle] of marks) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.moveTo(len * 0.6, 0);
+      ctx.lineTo(-len * 0.4, -len * 0.4);
+      ctx.lineTo(-len * 0.4, len * 0.4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
     }
   }
 }
@@ -748,7 +810,7 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
         />
         <span className="map-legend-label">{formatValue(max, span)}</span>
       </div>
-      {windLegend && windLegend.style === 'streamlines' && (
+      {windLegend && (windLegend.style === 'streamlines' || windLegend.style === 'combined') && (
         <div className="map-wind-legend">
           <span className="map-legend-label">0</span>
           <svg width="46" height="10" fill="currentColor" stroke="none">
@@ -760,7 +822,7 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
           <span className="map-legend-label">{String(windLegend.value)} m/s</span>
         </div>
       )}
-      {windLegend && windLegend.style !== 'streamlines' && (
+      {windLegend && windLegend.style !== 'streamlines' && windLegend.style !== 'combined' && (
         <div className="map-wind-legend">
           <svg width={Math.ceil(windLegend.len) + 2} height="10" stroke="currentColor" fill="none" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
             <line x1="1" y1="5" x2={windLegend.len} y2="5" />

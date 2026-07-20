@@ -49,6 +49,7 @@ export const FALLBACK_I18N = {
     "group_wind_style": "Style",
     "wind_style_arrows": "Arrows",
     "wind_style_streamlines": "Streamlines",
+    "wind_style_combined": "Combined",
     "slider_wind_opacity": "Wind opacity",
     "slider_wind_size": "Wind size",
     "slider_wind_density": "Wind density",
