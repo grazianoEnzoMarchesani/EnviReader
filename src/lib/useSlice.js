@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { getFilesInFolder, getFileCoupleSeries, readEDX, loadSlice, loadPointSeries, findWindVariables, sectionLinePath } from './envimet';
+import { useEffect, useMemo, useState } from 'react';
+import { getFilesInFolder, getFileCoupleSeries, readEDX, loadSlice, loadPointSeries, findWindVariables, sectionLinePath, terrainCut } from './envimet';
 import { findInxFile, readInxRotation } from './inx';
 
 const clamp = (v, max) => Math.min(Math.max(0, v), Math.max(0, max));
@@ -147,6 +147,17 @@ export function useInxRotation(fileset) {
   }, [fileset]);
 
   return rotation;
+}
+
+// Quota di taglio "segui il terreno" (con l'eventuale "livella salendo") di un
+// fileset: memoizzata così i suoi coefficienti si calcolano una volta sola e
+// gli hook a valle ricaricano solo quando cambia davvero qualcosa
+export function useTerrainCut(terrain, state) {
+  const { followTerrain, level, levelOut, levelOutHeight } = state;
+  return useMemo(
+    () => (followTerrain ? terrainCut(terrain, level, levelOut, levelOutHeight) : null),
+    [terrain, followTerrain, level, levelOut, levelOutHeight],
+  );
 }
 
 // Andamento nel tempo del valore nel punto (sectionX, sectionY) al livello corrente

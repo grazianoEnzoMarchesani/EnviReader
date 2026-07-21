@@ -7,11 +7,13 @@ import { loadObjectsVolume } from '../../lib/envimet';
 import { sunPosition, sunPathSamples, sunDiagramCurves, estimateTimezoneOffset } from '../../lib/sunPosition';
 import { getSunSample, formatDateLabel, formatHourLabel } from '../../lib/sunLink';
 import Model3DViewer from '../Model3DViewer';
+import TimeSeriesChart from '../TimeSeriesChart';
 import Segmented from '../controls/Segmented';
 import Slider from '../controls/Slider';
 import IconToggle from '../controls/IconToggle';
 import { IconBuilding, IconTree, IconTerrain, IconReceptor, IconGrid, IconWireframe, IconSun } from '../icons/ToolbarIcons';
 import { useFlip } from '../../lib/useFlip';
+import { usePointSeries, useTerrainCut } from '../../lib/useSlice';
 
 const LAYER_ICONS = {
   showBuildings: IconBuilding,
@@ -186,6 +188,16 @@ export default function ModelView() {
   const sunA = useModelSun(loadedA?.model, state);
   const sunB = useModelSun(loadedB?.model, state);
   const [viewBarCollapsed, setViewBarCollapsed] = useState(false);
+
+  // Serie temporale nel punto selezionato (incrocio delle sezioni, livello
+  // corrente): stessa logica e stesso componente della vista 2D
+  const terrainCutA = useTerrainCut(state.terrainA, state);
+  const terrainCutB = useTerrainCut(state.terrainB, state);
+  const pointArgs = [state.dataGroup, state.dataset, state.sectionX, state.sectionY, state.level];
+  const pointSeriesA = usePointSeries(state.filesetA, ...pointArgs, terrainCutA);
+  const pointSeriesB = usePointSeries(state.filesetB, ...pointArgs, terrainCutB);
+  const loaded = !!state.edxMeta;
+  const datasetLabel = loaded ? state.dataset : tr(state.dataset);
 
   const sunSample = useMemo(
     () => getSunSample(state),
@@ -386,13 +398,29 @@ export default function ModelView() {
       <div className="timeseries-card">
         <div className="timeseries-header" onClick={() => toggle('timeSeriesOpen')}>
           <span className="chart-title">{tr('group_time_series')}</span>
+          {pointSeriesA && (
+            <span className="chart-stats">
+              {datasetLabel} · {tr('chip_sectionx_prefix')} {state.sectionX}, {tr('chip_sectiony_prefix')} {state.sectionY} · {tr('chip_level_prefix')} {state.level}
+            </span>
+          )}
           <span className={`chevron${state.timeSeriesOpen ? ' open' : ''}`} />
         </div>
-        {state.timeSeriesOpen && (
-          <div className="timeseries-body">
-            <span className="chart-caption">{tr('ts_caption')}</span>
-          </div>
-        )}
+        {state.timeSeriesOpen &&
+          (pointSeriesA ? (
+            <TimeSeriesChart
+              series={[
+                { name: filesetLabel('A'), color: 'var(--series-a)', values: pointSeriesA },
+                { name: filesetLabel('B'), color: 'var(--series-b)', values: state.compareMode3D !== 'single' ? pointSeriesB : null },
+              ]}
+              labels={state.seriesLabels}
+              time={state.time}
+              onSelectTime={(t) => set({ time: t })}
+            />
+          ) : (
+            <div className="timeseries-body">
+              <span className="chart-caption">{tr('ts_caption')}</span>
+            </div>
+          ))}
       </div>
     </div>
   );

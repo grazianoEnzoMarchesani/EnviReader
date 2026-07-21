@@ -11,8 +11,8 @@ import { IconLayers3D, IconBuilding, IconTerrain, IconTree, IconCompass, IconCal
 import ViewSettingsModal from '../ViewSettingsModal';
 import MapChart, { MapThumb, niceCeil } from '../MapChart';
 import TimeSeriesChart from '../TimeSeriesChart';
-import { useSlice, usePointSeries, useInxRotation, useWindField } from '../../lib/useSlice';
-import { terrainCut, terrainCutProfile } from '../../lib/envimet';
+import { useSlice, usePointSeries, useInxRotation, useWindField, useTerrainCut } from '../../lib/useSlice';
+import { terrainCutProfile } from '../../lib/envimet';
 import { useFlip } from '../../lib/useFlip';
 import { formatValue } from '../../lib/colormap';
 
@@ -42,17 +42,6 @@ function useWindFields(enabled, fileset, group, time, level, sectionX, sectionY,
     sectionX: useWindField(enabled, fileset, group, time, 'sectionX', level, sectionX, sectionY, sectionAngle, terrain),
     sectionY: useWindField(enabled, fileset, group, time, 'sectionY', level, sectionX, sectionY, sectionAngle, terrain),
   };
-}
-
-// Quota di taglio "segui il terreno" (con l'eventuale "livella salendo") di un
-// fileset: memoizzata così i suoi coefficienti si calcolano una volta sola e
-// gli hook a valle ricaricano solo quando cambia davvero qualcosa
-function useTerrainCut(terrain, state) {
-  const { followTerrain, level, levelOut, levelOutHeight } = state;
-  return useMemo(
-    () => (followTerrain ? terrainCut(terrain, level, levelOut, levelOutHeight) : null),
-    [terrain, followTerrain, level, levelOut, levelOutHeight],
-  );
 }
 
 // Differenza cella per cella tra due slice della stessa griglia, con range
