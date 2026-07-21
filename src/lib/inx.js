@@ -90,7 +90,7 @@ const MATRIX_STRING_IDS = new Set(['ID_plants1D', 'ID_soilprofile', 'ID_sources'
 export function parseINX(text) {
   const model = {
     header: {}, geometry: {}, geometry3D: null, location: {},
-    buildings2D: {}, soils: null, plants1D: null, terrain: null,
+    buildings2D: {}, soils: null, plants1D: null, terrain: null, demReference: 0,
     plants3D: [], receptors: [], buildingInfo: new Map(),
     buildings3D: null, wallDB: null,
   };
@@ -127,6 +127,7 @@ export function parseINX(text) {
       }
     } else if (tag === 'simpleplants2D' || tag === 'soils2D' || tag === 'dem') {
       for (const sub of splitBlocks(`<ENVI-MET_Datafile>${body}</ENVI-MET_Datafile>`)) {
+        if (sub.tag === 'DEMReference') { model.demReference = num(sub.body) || 0; continue; }
         if (sub.attrs.type !== 'matrix-data') continue;
         const matrix = parseMatrix(sub.body, sub.attrs, !MATRIX_STRING_IDS.has(sub.tag));
         if (sub.tag === 'ID_plants1D') model.plants1D = matrix;

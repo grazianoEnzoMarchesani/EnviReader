@@ -373,6 +373,35 @@ export async function loadPointSeries(series, variableName, { x, y, level, terra
   );
 }
 
+// Volume completo (tutti gli x,y,z) della variabile "Objects" dei risultati,
+// usato per ricostruire la vegetazione nel viewer 3D: si scandagliano i gruppi
+// dati finché non si trova un EDX che la contiene (nome variabile non fisso).
+export async function loadObjectsVolume(structure) {
+  for (const group of listDataGroups(structure)) {
+    const series = getFileCoupleSeries(getFilesInFolder(structure, group));
+    if (!series.length) continue;
+    try {
+      const edx = await readEDX(series[0].EDX);
+      const varIndex = edx.variableNames.findIndex((name) => /objects/i.test(name));
+      if (varIndex === -1) continue;
+      const { x: dimX, y: dimY, z: dimZ } = edx.dimensions;
+      const n = dimX * dimY * dimZ;
+      const varOffset = varIndex * n * 4;
+      const dataView = await getDataView(series[0].EDT);
+      if (varOffset + n * 4 > dataView.byteLength) continue;
+      const data = new Float32Array(n);
+      for (let idx = 0; idx < n; idx++) {
+        const v = dataView.getFloat32(varOffset + idx * 4, true);
+        data[idx] = v === NO_DATA ? NaN : v;
+      }
+      return { dims: edx.dimensions, data };
+    } catch {
+      // gruppo illeggibile o senza la variabile: prova il successivo
+    }
+  }
+  return null;
+}
+
 // Quota del terreno dai risultati solaraccess/ground, per "segui il terreno":
 // { data: indice z per cella, max: quota massima } — il massimo, calcolato una
 // volta sola qui, è il piano d'arrivo di "livella salendo"

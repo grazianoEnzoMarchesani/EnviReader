@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildModelScene, setLayerVisibility, setWireframe, disposeGroup } from '../lib/inxScene';
 
-export default function Model3DViewer({ model, flags, wireframe, resetNonce }) {
+export default function Model3DViewer({ model, objectsVolume, flags, wireframe, resetNonce }) {
   const containerRef = useRef(null);
   const stageRef = useRef(null); // { renderer, scene, camera, controls, layers, resetView }
 
@@ -60,7 +60,7 @@ export default function Model3DViewer({ model, flags, wireframe, resetNonce }) {
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage || !model) return;
-    const { group, layers, size, maxHeight } = buildModelScene(model);
+    const { group, layers, size, maxHeight } = buildModelScene(model, objectsVolume);
     stage.scene.add(group);
     stage.layers = layers;
 
@@ -77,7 +77,7 @@ export default function Model3DViewer({ model, flags, wireframe, resetNonce }) {
       disposeGroup(group);
       stage.layers = null;
     };
-  }, [model]);
+  }, [model, objectsVolume]);
 
   // toggle dei livelli e wireframe, senza ricostruire
   useEffect(() => {

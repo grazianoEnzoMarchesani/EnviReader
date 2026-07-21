@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { useI18n } from '../../i18n/I18nContext';
 import { findInxFile, readINX } from '../../lib/inx';
+import { loadObjectsVolume } from '../../lib/envimet';
 import Model3DViewer from '../Model3DViewer';
 import Segmented from '../controls/Segmented';
 
@@ -23,11 +24,29 @@ function useInxModel(fileset) {
   return loaded;
 }
 
+// Volume "Objects" (EDT/EDX) del fileset per la vegetazione 3D, se ci sono risultati
+function useObjectsVolume(fileset) {
+  const [volume, setVolume] = useState(null);
+  useEffect(() => {
+    setVolume(null);
+    const structure = fileset?.structure;
+    if (!structure) return;
+    let cancelled = false;
+    loadObjectsVolume(structure)
+      .then((v) => { if (!cancelled) setVolume(v); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [fileset]);
+  return volume;
+}
+
 export default function ModelView() {
   const { state } = useAppState();
   const { tr } = useI18n();
   const loadedA = useInxModel(state.filesetA);
   const loadedB = useInxModel(state.filesetB);
+  const objectsVolumeA = useObjectsVolume(state.filesetA);
+  const objectsVolumeB = useObjectsVolume(state.filesetB);
   const [selected, setSelected] = useState('A');
 
   // il modello mostrato segue la selezione, con fallback sul fileset disponibile
@@ -35,6 +54,7 @@ export default function ModelView() {
   const shown = available[selected] ? selected : loadedA ? 'A' : loadedB ? 'B' : null;
   const loaded = shown ? available[shown] : null;
   const model = loaded?.model;
+  const objectsVolume = shown === 'B' ? objectsVolumeB : objectsVolumeA;
 
   // stessa etichetta delle card di Analisi: "Fileset A · nomeSimulazione"
   const filesetLabel = (key) => {
@@ -94,7 +114,7 @@ export default function ModelView() {
       <div className={`model-viewer${model ? ' is-3d' : ''}`}>
         {model ? (
           <>
-            <Model3DViewer model={model} flags={flags} wireframe={state.wireframe} resetNonce={state.resetViewNonce} />
+            <Model3DViewer model={model} objectsVolume={objectsVolume} flags={flags} wireframe={state.wireframe} resetNonce={state.resetViewNonce} />
             <span className="model-overlay-hint">{tr('model_hint')}</span>
           </>
         ) : (
