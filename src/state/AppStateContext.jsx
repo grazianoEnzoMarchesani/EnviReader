@@ -9,6 +9,7 @@ const initialState = {
   appView: 'analysis',
   activeTab: 'data',
   compareMode: 'single',
+  compareMode3D: 'single', // confronto nel viewer 3D: 'single' | 'b' | 'ab' (niente diff, non ha senso per un modello 3D)
   viewType: 'plan',
   filesetAOpen: false,
   filesetBOpen: false,
@@ -70,7 +71,15 @@ const initialState = {
   showCalendarWidget: true,
   showClockWidget: true,
   wireframe: false,
+  cameraProjection: 'perspective', // 'perspective' | 'parallel' (viewer 3D)
+  gizmoNorthMode: 'true', // riferimento cardinali del ViewCube: 'true' (nord vero) | 'grid' (lato piatto del modello)
   resetViewNonce: 0, // incrementato da "Reimposta vista": il viewer 3D lo osserva
+  sunPathEnabled: false, // simulazione percorso solare + ombre nel modello 3D
+  // scostamento manuale dello slider solare rispetto al timestep dei risultati:
+  // con risultati caricati è un indice nella serie reale (state.seriesLabels),
+  // senza risultati è un'ora del giorno decimale (0-24) per la sola anteprima
+  // geometrica; null = segue state.time (vedi src/lib/sunLink.js)
+  sunTimeOverride: null,
   // condizioni al contorno: fileset mostrato, periodo dei grafici FOX,
   // eventuale file FOX aperto a mano quando non è nella cartella risultati
   boundaryFileset: 'A',
@@ -176,7 +185,7 @@ export function AppStateProvider({ children }) {
       // chiudere il fileset B riporta sempre il confronto a "single"
       toggleFilesetB: () => {
         if (stateRef.current.filesetBOpen) {
-          set({ filesetB: null, terrainB: null, filesetBOpen: false, compareMode: 'single', foxFileB: null, scaleFactor: 3 });
+          set({ filesetB: null, terrainB: null, filesetBOpen: false, compareMode: 'single', compareMode3D: 'single', foxFileB: null, scaleFactor: 3 });
         } else {
           openFileset('B');
         }
@@ -207,6 +216,7 @@ export function AppStateProvider({ children }) {
         else if (!isCurrentlySingle && willBeSingle) newScale = 3;
         return { compareMode: mode, scaleFactor: newScale };
       }),
+      setCompareMode3D: (mode) => set((s) => (mode !== 'single' && !s.filesetBOpen ? {} : { compareMode3D: mode })),
       // Applica un preset: ogni campo è opzionale e viene ignorato se non ha
       // riscontro nel fileset aperto (gruppo/variabile assenti, indici fuori griglia)
       applyPreset: async (preset) => {

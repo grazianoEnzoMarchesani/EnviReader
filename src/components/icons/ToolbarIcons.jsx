@@ -79,3 +79,40 @@ export function IconSettings(props) {
     </svg>
   );
 }
+
+export function IconReceptor(props) {
+  return (
+    <svg {...base} width="18" height="18" {...props}>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+    </svg>
+  );
+}
+
+export function IconGrid(props) {
+  return (
+    <svg {...base} width="18" height="18" {...props}>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="1.5" />
+      <path d="M3.5 9.5h17M3.5 15.5h17M9.5 3.5v17M15.5 3.5v17" />
+    </svg>
+  );
+}
+
+export function IconWireframe(props) {
+  return (
+    <svg {...base} width="18" height="18" {...props}>
+      <path d="M12 3 20 8v8l-8 5-8-5V8l8-5Z" />
+      <path d="M12 3v18M4 8l8 5 8-5M4 16l8-5 8 5" />
+    </svg>
+  );
+}
+
+export function IconSun(props) {
+  return (
+    <svg {...base} width="18" height="18" {...props}>
+      <circle cx="12" cy="12" r="4.5" />
+      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" />
+    </svg>
+  );
+}

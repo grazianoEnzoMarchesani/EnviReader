@@ -19,6 +19,8 @@ const VEGETATION_COLORS = VEGETATION_HEX.map((hex) => Number(`0x${hex.slice(1)}`
 const VEGETATION_RV_MIN = 11;
 const VEGETATION_RV_MAX = 15;
 
+const DEG = Math.PI / 180;
+
 const WALL_COLORS = [0xcfc8bb, 0xbfb6a6, 0xd8cfc0, 0xa8a39a, 0xc2b8ab, 0xb0a494];
 const ROOF_COLORS = [0xa9573f, 0x8d8d8d, 0x9c6b52, 0x6f6f6f];
 const SOIL_COLORS = {
@@ -66,12 +68,334 @@ export function buildModelScene(model, objectsVolume = null) {
     maxHeight = Math.max(maxHeight, layer.userData.maxHeight ?? 0);
   }
 
-  group.add(new THREE.HemisphereLight(0xffffff, 0x777766, 1.15));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.6);
-  sun.position.set(-W * 0.6, Math.max(W, H) * 0.8, -H * 0.4);
-  group.add(sun);
+  const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x777766, 1.15);
+  group.add(hemisphereLight);
+  const decorativeLight = new THREE.DirectionalLight(0xffffff, 1.6);
+  decorativeLight.position.set(-W * 0.6, Math.max(W, H) * 0.8, -H * 0.4);
+  group.add(decorativeLight);
 
-  return { group, layers, size: { W, H }, maxHeight };
+  const sunLayer = buildSunLayer({ W, H });
+  sunLayer.group.name = 'sun';
+  group.add(sunLayer.group);
+  layers.sun = sunLayer.group;
+
+  return { group, layers, size: { W, H }, maxHeight, hemisphereLight, decorativeLight, sunLayer };
+}
+
+/* ---------- percorso solare e luce con ombre ---------- */
+
+// Palette del diagramma solare (coerente con l'accento arancio dell'app).
+const SUN_PATH_COLOR = 0xff8a3d; // arco del giorno corrente (evidenziato)
+const SUN_ARC_COLOR = 0xffc27a; // archi giornalieri mensili (rete)
+const SUN_SOLSTICE_COLOR = 0xff9a3c; // solstizi = inviluppo annuale
+const SUN_ANALEMMA_COLOR = 0xc9b39a; // analemmi orari (rete "verticale")
+const SUN_COMPASS_COLOR = 0x9aa0a6; // orizzonte e bussola a terra
+const CARDINALS = [
+  [0, 'N'], [45, 'NE'], [90, 'E'], [135, 'SE'],
+  [180, 'S'], [225, 'SW'], [270, 'W'], [315, 'NW'],
+];
+
+// Luce direzionale con ombre configurate per l'inviluppo del modello, più il
+// diagramma del percorso solare: bussola a terra, rete annuale (archi mensili +
+// analemmi orari, vedi sunDiagramCurves), arco del giorno corrente evidenziato e
+// un marcatore che segue lo slider orario. Tutto raggruppato per essere
+// mostrato/nascosto in blocco quando la simulazione solare è attiva (vedi
+// Model3DViewer). La rete e la bussola si (ri)costruiscono in setSunDiagram; le
+// parti che seguono l'ora (luce, marcatore, raggio, arco del giorno) in updateSunLayer.
+function buildSunLayer({ W, H }) {
+  const span = Math.max(W, H);
+  const radius = span * 0.92;
+
+  const group = new THREE.Group();
+  group.visible = false;
+  group.userData = { radius, span, lastPoints: null, lastDiagram: null, lastRotation: null };
+
+  const light = new THREE.DirectionalLight(0xfff3e0, 0);
+  light.castShadow = true;
+  const shadowExtent = span * 0.65;
+  light.shadow.camera.left = -shadowExtent;
+  light.shadow.camera.right = shadowExtent;
+  light.shadow.camera.top = shadowExtent;
+  light.shadow.camera.bottom = -shadowExtent;
+  light.shadow.camera.near = 1;
+  light.shadow.camera.far = radius + shadowExtent * 2;
+  light.shadow.mapSize.set(2048, 2048);
+  light.shadow.bias = -0.0012;
+  light.shadow.normalBias = 0.4;
+  light.target = new THREE.Object3D();
+  group.add(light.target);
+  group.add(light);
+
+  // contenitori ricostruiti in setSunDiagram (dipendono da località/rotazione)
+  const compassGroup = new THREE.Group();
+  const netGroup = new THREE.Group();
+  group.add(compassGroup, netGroup);
+
+  const pathLine = new THREE.Line(
+    new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({ color: SUN_PATH_COLOR, transparent: true, opacity: 0.95 }),
+  );
+  group.add(pathLine);
+
+  const ray = new THREE.Line(
+    new THREE.BufferGeometry(),
+    new THREE.LineDashedMaterial({
+      color: SUN_PATH_COLOR, transparent: true, opacity: 0.5,
+      dashSize: span * 0.03, gapSize: span * 0.02,
+    }),
+  );
+  group.add(ray);
+
+  // sole: disco caldo nitido + alone morbido a gradiente radiale. Entrambi
+  // sprite (sempre di fronte alla camera → cerchi puliti da ogni angolo) con
+  // texture a gradiente, così l'alone sfuma nel trasparente invece di apparire
+  // come il "quadrato" a tinta piatta di uno SpriteMaterial senza texture.
+  const marker = new THREE.Group();
+  const glow = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: makeGlowTexture(), transparent: true, depthWrite: false }),
+  );
+  glow.scale.setScalar(Math.max(span * 0.14, 3));
+  glow.renderOrder = 0;
+  const core = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: makeDiscTexture(), transparent: true, depthWrite: false }),
+  );
+  core.scale.setScalar(Math.max(span * 0.035, 0.7));
+  core.renderOrder = 1;
+  marker.add(glow, core);
+  group.add(marker);
+
+  return { group, light, pathLine, ray, marker, compassGroup, netGroup };
+}
+
+// Direzione unitaria (world space) verso il sole, dato l'azimuth (0=nord,
+// orario) e l'altitudine sull'orizzonte, corretta per la rotazione del
+// modello (vedi convenzioni in testa al file: -X = est, +Z = nord a
+// rotazione 0; readInxRotation in inx.js per il segno della rotazione).
+function sunDirection(azimuthDeg, altitudeDeg, modelRotationDeg = 0) {
+  const az = azimuthDeg * DEG;
+  const alt = altitudeDeg * DEG;
+  const theta = (modelRotationDeg || 0) * DEG;
+  const trueEastX = -Math.cos(theta);
+  const trueEastZ = Math.sin(theta);
+  const trueNorthX = Math.sin(theta);
+  const trueNorthZ = Math.cos(theta);
+  const cosAlt = Math.cos(alt);
+  const x = cosAlt * (Math.sin(az) * trueEastX + Math.cos(az) * trueNorthX);
+  const z = cosAlt * (Math.sin(az) * trueEastZ + Math.cos(az) * trueNorthZ);
+  return new THREE.Vector3(x, Math.sin(alt), z);
+}
+
+// Disco caldo del sole: gradiente radiale nitido con bordo antialias (l'ultimo
+// stop a alpha 0 sfuma il contorno). Texture su canvas per uno sprite.
+function makeDiscTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 60);
+  g.addColorStop(0, 'rgba(255, 246, 219, 1)');
+  g.addColorStop(0.5, 'rgba(255, 213, 128, 1)');
+  g.addColorStop(0.9, 'rgba(246, 193, 100, 1)');
+  g.addColorStop(1, 'rgba(246, 193, 100, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.anisotropy = 4;
+  return texture;
+}
+
+// Alone morbido attorno al sole: gradiente radiale che sfuma nel trasparente,
+// così non resta il bordo "quadrato" di uno sprite a tinta piatta.
+function makeGlowTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  g.addColorStop(0, 'rgba(255, 226, 165, 0.6)');
+  g.addColorStop(0.35, 'rgba(255, 202, 120, 0.28)');
+  g.addColorStop(0.7, 'rgba(255, 190, 96, 0.08)');
+  g.addColorStop(1, 'rgba(255, 190, 96, 0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(canvas);
+}
+
+// Etichetta di testo come sprite (canvas texture): resta sempre rivolta alla
+// camera, dimensione in unità di scena.
+function makeLabelSprite(text, { color, size = 64, weight = '700', scale }) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.font = `${weight} ${size}px -apple-system, system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = color;
+  ctx.fillText(text, 64, 64);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.anisotropy = 4;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
+  sprite.scale.set(scale, scale, 1);
+  return sprite;
+}
+
+// Svuota un gruppo liberando geometrie, materiali e texture dei figli.
+function disposeChildren(group) {
+  group.traverse((obj) => {
+    if (obj === group) return;
+    obj.geometry?.dispose();
+    if (obj.material) {
+      obj.material.map?.dispose();
+      obj.material.dispose();
+    }
+  });
+  group.clear();
+}
+
+// Polilinea di un arco solare: proietta i campioni {azimuth, altitude} sulla
+// cupola (raggio) e spezza la linea all'orizzonte, così i tratti sotto terra
+// non vengono uniti attraverso il modello.
+function buildArc(samples, rotationDeg, radius, material) {
+  const arc = new THREE.Group();
+  let run = [];
+  const flush = () => {
+    if (run.length > 1) {
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(run), material);
+      if (material.isLineDashedMaterial) line.computeLineDistances();
+      arc.add(line);
+    }
+    run = [];
+  };
+  for (const s of samples) {
+    if (s.altitude > 0) run.push(sunDirection(s.azimuth, s.altitude, rotationDeg).multiplyScalar(radius));
+    else flush();
+  }
+  flush();
+  return arc;
+}
+
+// Bussola a terra: cerchio dell'orizzonte, tacche ogni 15° (più lunghe ai punti
+// cardinali) ed etichette N/E/S/W… orientate al nord vero del modello.
+function buildCompass(compassGroup, rotationDeg, radius, span) {
+  disposeChildren(compassGroup);
+  const groundMat = new THREE.LineBasicMaterial({ color: SUN_COMPASS_COLOR, transparent: true, opacity: 0.6 });
+
+  const circlePts = [];
+  for (let i = 0; i <= 128; i++) {
+    circlePts.push(sunDirection((i / 128) * 360, 0, rotationDeg).multiplyScalar(radius).setY(0.05));
+  }
+  compassGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(circlePts), groundMat));
+
+  const tickPts = [];
+  for (let a = 0; a < 360; a += 15) {
+    const dir = sunDirection(a, 0, rotationDeg);
+    const inner = a % 45 === 0 ? 0.955 : 0.985;
+    tickPts.push(dir.clone().multiplyScalar(radius * inner).setY(0.05));
+    tickPts.push(dir.clone().multiplyScalar(radius).setY(0.05));
+  }
+  compassGroup.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(tickPts), groundMat));
+
+  const labelScale = Math.max(span * 0.06, 1.2);
+  for (const [az, text] of CARDINALS) {
+    const primary = text.length === 1;
+    const sprite = makeLabelSprite(text, {
+      color: primary ? '#4a5158' : '#9199a1',
+      size: primary ? 74 : 50,
+      scale: primary ? labelScale : labelScale * 0.72,
+    });
+    sprite.position.copy(sunDirection(az, 0, rotationDeg).multiplyScalar(radius * 1.09)).setY(labelScale * 0.5);
+    compassGroup.add(sprite);
+  }
+}
+
+// (Ri)costruisce la bussola e la rete annuale del percorso solare per la
+// località/rotazione correnti. Salta il lavoro se nulla è cambiato: la rete
+// dipende solo dalla località, non dall'ora dello slider.
+export function setSunDiagram(sunLayer, rotationDeg, diagram) {
+  const { group, compassGroup, netGroup } = sunLayer;
+  const { radius, span } = group.userData;
+  if (group.userData.lastDiagram === diagram && group.userData.lastRotation === rotationDeg) return;
+  group.userData.lastDiagram = diagram;
+  group.userData.lastRotation = rotationDeg;
+
+  buildCompass(compassGroup, rotationDeg, radius, span);
+  disposeChildren(netGroup);
+  if (!diagram) return;
+
+  const arcMat = new THREE.LineDashedMaterial({
+    color: SUN_ARC_COLOR, transparent: true, opacity: 0.5,
+    dashSize: radius * 0.03, gapSize: radius * 0.02,
+  });
+  const solsticeMat = new THREE.LineBasicMaterial({ color: SUN_SOLSTICE_COLOR, transparent: true, opacity: 0.75 });
+  const analemmaMat = new THREE.LineDashedMaterial({
+    color: SUN_ANALEMMA_COLOR, transparent: true, opacity: 0.4,
+    dashSize: radius * 0.02, gapSize: radius * 0.02,
+  });
+
+  for (const arc of diagram.dateArcs) {
+    netGroup.add(buildArc(arc.samples, rotationDeg, radius, arc.solstice ? solsticeMat : arcMat));
+  }
+  for (const an of diagram.analemmas) {
+    netGroup.add(buildArc(an.samples, rotationDeg, radius, analemmaMat));
+  }
+
+  // etichette orarie in cima a ogni analemma (ore pari, sole abbastanza alto):
+  // ne risulta una fila di numeri lungo l'arco del solstizio d'estate.
+  const hourScale = Math.max(span * 0.038, 0.9);
+  for (const an of diagram.analemmas) {
+    if (an.hour % 2 !== 0) continue;
+    let top = null;
+    for (const s of an.samples) if (s.altitude > 12 && (!top || s.altitude > top.altitude)) top = s;
+    if (!top) continue;
+    const sprite = makeLabelSprite(String(an.hour), { color: '#c0771f', size: 46, scale: hourScale });
+    sprite.position.copy(sunDirection(top.azimuth, top.altitude, rotationDeg).multiplyScalar(radius * 1.04));
+    netGroup.add(sprite);
+  }
+}
+
+// Riposiziona luce, marcatore, raggio e arco del giorno in base a
+// azimuth/altitudine correnti; ricostruisce la polilinea dell'arco del giorno
+// solo quando cambiano i campioni (pathPoints), non ad ogni tick dello slider.
+export function updateSunLayer(sunLayer, rotationDeg, azimuth, altitude, pathPoints) {
+  const { group, light, pathLine, ray, marker } = sunLayer;
+  const radius = group.userData.radius;
+  const sunPos = sunDirection(azimuth, altitude, rotationDeg).multiplyScalar(radius);
+
+  light.position.copy(sunPos);
+  light.target.position.set(0, 0, 0);
+  light.target.updateMatrixWorld();
+
+  const above = altitude > 0;
+  light.intensity = above ? 1.5 * Math.max(0.3, Math.sin(altitude * DEG)) : 0;
+  marker.position.copy(sunPos);
+  marker.visible = above;
+
+  ray.visible = above;
+  if (above) {
+    ray.geometry.dispose();
+    ray.geometry = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0.05, 0), sunPos]);
+    ray.computeLineDistances();
+  }
+
+  if (pathPoints && group.userData.lastPoints !== pathPoints) {
+    group.userData.lastPoints = pathPoints;
+    const pts = pathPoints
+      .filter((p) => p.altitude > 0)
+      .map((p) => sunDirection(p.azimuth, p.altitude, rotationDeg).multiplyScalar(radius));
+    pathLine.geometry.dispose();
+    pathLine.geometry = new THREE.BufferGeometry().setFromPoints(pts);
+  }
+}
+
+// Attiva/disattiva ombra propria e portata su edifici, vegetazione e terreno.
+export function setShadowCasting(layers, on) {
+  for (const key of ['terrain', 'buildings', 'vegetation']) {
+    layers[key]?.traverse((obj) => {
+      if (obj.isMesh || obj.isInstancedMesh) {
+        obj.castShadow = on;
+        obj.receiveShadow = on;
+      }
+    });
+  }
 }
 
 /* ---------- terreno ---------- */
@@ -172,7 +496,13 @@ function buildExtrudedBuildings(model, { toX, toZ, terrainAt }) {
       const top = zTop.data[j * I + i];
       const bottom = zBottom?.data[j * I + i] ?? 0;
       if (!(top > 0) || top <= bottom) continue; // scarta celle vuote e zTop negativi anomali
-      const ground = terrainAt(i, j);
+      // Il terreno (buildTerrain) non si ferma alla quota esatta di terrainAt: la
+      // arrotonda al confine di griglia più vicino (nearestBoundaryIndex, minimo 1
+      // livello). Se l'edificio si appoggiasse alla quota grezza invece che a questa
+      // stessa quota arrotondata, resterebbe sospeso o affondato di una frazione di
+      // cella rispetto alla superficie renderizzata del terreno.
+      const rawGround = terrainAt(i, j);
+      const ground = boundaries[Math.max(1, nearestBoundaryIndex(boundaries, rawGround))];
       const isFixed = (fixedheight?.data[j * I + i] ?? 0) === 1;
       // fixedheight=0: l'edificio segue il terreno locale (origine = quota del terreno).
       // fixedheight=1: l'edificio resta a quota assoluta (origine = DEMReference) e non
@@ -324,7 +654,8 @@ export function setLayerVisibility(layers, flags) {
 }
 
 export function setWireframe(layers, on) {
-  for (const layer of Object.values(layers)) {
+  for (const [name, layer] of Object.entries(layers)) {
+    if (name === 'sun') continue; // arco solare e marcatore: mai in wireframe
     layer?.traverse((obj) => {
       if (obj.material && 'wireframe' in obj.material) obj.material.wireframe = on;
     });

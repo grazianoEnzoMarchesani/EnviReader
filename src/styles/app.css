@@ -211,7 +211,7 @@ button { font-family: inherit; }
   transform: rotate(180deg);
 }
 
-.main { flex: 1; overflow-y: auto; padding: 22px 26px; min-height: 0; }
+.main { flex: 1; grid-column: 2; overflow-y: auto; padding: 22px 26px; min-height: 0; }
 
 /* ---------- sidebar tabs ---------- */
 .sidebar-tab-row { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
@@ -1129,8 +1129,14 @@ button { font-family: inherit; }
 .ts-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); }
 
 /* ---------- model view ---------- */
+/* Riempie tutta l'altezza disponibile di .main, come il chart-grid della vista
+   2D: niente più riquadro ad altezza fissa con spazio vuoto sotto */
+.model-view-page { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.model-viewer-row { display: flex; gap: 18px; flex: 1; min-height: 0; margin-bottom: 20px; }
+.model-panel { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; gap: 10px; }
 .model-viewer {
-  height: 520px;
+  flex: 1;
+  min-height: 0;
   border-radius: 10px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1143,6 +1149,7 @@ button { font-family: inherit; }
   background-image: repeating-linear-gradient(45deg, var(--stripe-a) 0 16px, transparent 16px 32px);
 }
 .model-hint { font-size: 11px; color: var(--text-faint); font-style: italic; }
+.sidebar-field { display: flex; flex-direction: column; gap: 6px; margin: 4px 0; }
 
 /* viewer 3D attivo: il canvas riempie il riquadro, niente trama a righe */
 .model-viewer.is-3d {
@@ -1154,6 +1161,48 @@ button { font-family: inherit; }
 }
 .model-canvas { position: absolute; inset: 0; }
 .model-canvas canvas { width: 100%; height: 100%; display: block; }
+/* contenitore del gizmo di orientamento (ViewCube): ospita l'area di hit del
+   cubo/bussola più i pulsanti fissi (casetta = reimposta vista, frecce curve
+   = ruota di 90°) agli angoli, come nei tipici gizmo dei software CAD */
+.view-gizmo-wrap {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 108px;
+  height: 108px;
+  z-index: 2;
+}
+/* area di hit del gizmo: il disegno è sul canvas WebGL sotto, questo div
+   sovrapposto intercetta hover/click senza farli arrivare a OrbitControls */
+.view-gizmo {
+  position: absolute;
+  inset: 0;
+}
+.view-gizmo-btn {
+  position: absolute;
+  z-index: 3;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-secondary);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+}
+.view-gizmo-btn:hover {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  transform: scale(1.1);
+}
+.view-gizmo-home { top: -4px; left: -4px; }
+.view-gizmo-rotate-ccw { top: -4px; right: 16px; }
+.view-gizmo-rotate-cw { top: -4px; right: -4px; }
 .model-overlay-hint {
   position: absolute;
   bottom: 10px;
@@ -1162,6 +1211,35 @@ button { font-family: inherit; }
   color: var(--text-faint);
   font-style: italic;
   pointer-events: none;
+}
+.sun-info-panel {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 11px;
+  pointer-events: none;
+  opacity: 0.94;
+}
+.sun-info-row { display: flex; align-items: center; gap: 14px; justify-content: space-between; }
+.sun-info-row span { color: var(--text-faint); }
+.sun-info-row strong { color: var(--text); font-family: var(--mono); font-weight: 600; }
+.sun-info-warning { color: var(--text-faint); font-style: italic; font-size: 11px; max-width: 220px; }
+.sun-linked-date { display: block; margin: -4px 0 8px; }
+.sun-timeline-label {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---------- boundary view ---------- */
