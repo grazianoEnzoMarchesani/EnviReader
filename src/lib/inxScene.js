@@ -18,6 +18,10 @@ import { VEGETATION_COLORS as VEGETATION_HEX, buildLUT } from './colormap';
 const VEGETATION_COLORS = VEGETATION_HEX.map((hex) => Number(`0x${hex.slice(1)}`));
 const VEGETATION_RV_MIN = 11;
 const VEGETATION_RV_MAX = 15;
+// Stessi codici del volume "Objects" usati dal riferimento 2D (vedi
+// objectsToImageData in colormap.js): 1 = edificio, 2 = terreno/suolo.
+const OBJECTS_RV_BUILDING = 1;
+const OBJECTS_RV_TERRAIN = 2;
 
 const DEG = Math.PI / 180;
 
@@ -31,15 +35,30 @@ const SOIL_COLORS = {
 const SOIL_DEFAULT = 0x97927f;
 const RECEPTOR_COLOR = 0xe0a83c;
 
-// Livelli verticali da usare per un dato K: se lo spacing_z reale del file EDX
-// dei risultati correnti copre almeno K livelli, si usa quello (stessa quota
-// che ENVI-met ha davvero scritto nei dati, vedi zLevelsFromSpacing) invece di
-// ricalcolare splitting/telescoping da zero con buildZLevels. Così edifici,
-// terreno, vegetazione e overlay dati condividono la stessa griglia verticale
-// e non si sfasano tra loro quando lo spacingZ è disponibile.
+// Livelli verticali da usare per un dato K: i primi livelli, fin dove lo
+// spacing_z reale del file EDX dei risultati correnti arriva, usano quella
+// quota (la stessa che ENVI-met ha davvero scritto nei dati, vedi
+// zLevelsFromSpacing) invece della ricostruzione approssimata di
+// splitting/telescoping. Se K supera i livelli coperti dai risultati (es. il
+// dominio verticale del modello INX è più alto della griglia dei risultati
+// caricati), i livelli eccedenti proseguono con la stessa formula di
+// telescoping di buildZLevels, partendo dall'ultimo livello reale — così
+// edifici, terreno, vegetazione e overlay dati restano allineati sulla parte
+// bassa/comune della griglia invece di sfasarsi per intero quando K eccede lo
+// spacingZ disponibile.
 function resolveZLevels(geometry, K, spacingZ) {
-  if (spacingZ && spacingZ.length >= K) return zLevelsFromSpacing(spacingZ.slice(0, K));
-  return buildZLevels(geometry, K);
+  if (!spacingZ || !spacingZ.length) return buildZLevels(geometry, K);
+  const levels = zLevelsFromSpacing(spacingZ.slice(0, K));
+  if (levels.length >= K) return levels;
+  const { dz, useTelescoping, verticalStretch, startStretch } = geometry;
+  let z = levels.length ? levels[levels.length - 1].base + levels[levels.length - 1].height : 0;
+  let current = levels.length ? levels[levels.length - 1].height : dz;
+  for (let k = levels.length; k < K; k++) {
+    if (useTelescoping && verticalStretch > 0 && z >= startStretch) current *= 1 + verticalStretch / 100;
+    levels.push({ base: z, height: current });
+    z += current;
+  }
+  return levels;
 }
 
 function hashPick(id, palette) {
@@ -61,12 +80,23 @@ export function buildModelScene(model, objectsVolume = null, spacingZ = null) {
   const toZ = (j) => H / 2 - (j + 0.5) * dy;
   const terrainAt = (i, j) => model.terrain?.data[j * I + i] ?? 0;
 
+  // Il volume "Objects" dei risultati (EDT/EDX) è la fonte più affidabile per
+  // edifici e terreno: stessa griglia voxel esatta usata dall'overlay dati e
+  // già caricata per la vegetazione (vedi buildVegetation), invece di
+  // ricostruire noi una quota continua e arrotondarla al confine più vicino
+  // (nearestBoundaryIndex), che può sfasarsi dalla vera griglia di ENVI-met.
+  // Fallback al metodo basato su INX (zTop/zBottom/terrainheight) quando i
+  // risultati non sono ancora caricati o non coprono la stessa griglia I×J.
+  const fromObjects = objectsVolume && objectsVolume.dims.x === I && objectsVolume.dims.y === J
+    ? buildFromObjectsVolume(model, objectsVolume, { toX, toZ }, spacingZ)
+    : null;
+
   const group = new THREE.Group();
   const layers = {
-    terrain: buildTerrain(model, { toX, toZ }, spacingZ),
-    buildings: model.buildings3D?.entries.length
+    terrain: fromObjects?.terrain ?? buildTerrain(model, { toX, toZ }, spacingZ),
+    buildings: fromObjects?.buildings ?? (model.buildings3D?.entries.length
       ? buildVoxelBuildings(model, { toX, toZ }, spacingZ)
-      : buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ),
+      : buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ)),
     vegetation: buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ),
     receptors: buildReceptors(model, { toX, toZ, terrainAt }),
     grid: buildGrid(model, { W, H }),
@@ -619,6 +649,73 @@ function buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ) {
   return layer;
 }
 
+/* ---------- edifici e terreno dal volume "Objects" ---------- */
+
+// Ricostruisce edifici e terreno voxel per voxel direttamente dal volume
+// "Objects" dei risultati (EDT/EDX) invece che da zTop/zBottom/terrainheight
+// dell'INX + un arrotondamento nostro della quota continua al confine di
+// griglia più vicino: quel metodo può sfasarsi dalla vera griglia usata da
+// ENVI-met (nearestBoundaryIndex non sempre arrotonda nella stessa direzione
+// del vero calcolo interno, causando edifici/terreno sfalsati rispetto alle
+// sezioni dati che invece leggono la quota assoluta della stessa griglia).
+// Qui invece si legge dove ENVI-met ha davvero messo edificio/terreno,
+// voxel per voxel, sulla stessa identica griglia zLevels usata dall'overlay
+// e dalla vegetazione: combaciano sempre per costruzione. Stessi codici rv
+// del riferimento 2D "Objects" (colormap.js): 1 = edificio, 2 = terreno.
+function buildFromObjectsVolume(model, objectsVolume, { toX, toZ }, spacingZ) {
+  const { I, J, dx, dy } = model.geometry;
+  const { buildingNr } = model.buildings2D;
+  const { dims, data } = objectsVolume;
+  const zLevels = resolveZLevels(model.geometry, dims.z, spacingZ);
+  const walls = [];
+  const roofs = [];
+  const soilCells = [];
+  let buildingsMaxHeight = 0;
+  let terrainMaxHeight = 0;
+  for (let k = 0; k < dims.z; k++) {
+    const level = zLevels[k];
+    const voxelY = level.base + level.height / 2;
+    const aboveLevel = k + 1 < dims.z ? zLevels[k + 1] : null;
+    for (let j = 0; j < J; j++) {
+      // stessa convenzione di specchiamento riga di buildVegetation: la
+      // matrice INX ha la riga 0 a nord, i dati EDT la riga 0 a sud.
+      const edtRow = J - 1 - j;
+      for (let i = 0; i < I; i++) {
+        const rv = Math.round(data[(k * J + edtRow) * I + i]);
+        if (rv === OBJECTS_RV_BUILDING) {
+          const nr = buildingNr?.data[j * I + i] ?? 0;
+          const { wall, roof } = buildingColors(model, nr);
+          walls.push({ x: toX(i), z: toZ(j), y: voxelY, sx: dx, sz: dy, sy: level.height, color: wall });
+          buildingsMaxHeight = Math.max(buildingsMaxHeight, level.base + level.height);
+          const aboveRv = aboveLevel ? Math.round(data[((k + 1) * J + edtRow) * I + i]) : NaN;
+          if (aboveRv !== OBJECTS_RV_BUILDING) {
+            roofs.push({ x: toX(i), z: toZ(j), y: level.base + level.height + 0.06, sx: dx, sz: dy, sy: 0.12, color: roof });
+          }
+        } else if (rv === OBJECTS_RV_TERRAIN) {
+          const id = model.soils?.data[j * I + i] ?? '';
+          soilCells.push({ x: toX(i), z: toZ(j), y: voxelY, sx: dx, sz: dy, sy: level.height, color: soilColor(id) });
+          terrainMaxHeight = Math.max(terrainMaxHeight, level.base + level.height);
+        }
+      }
+    }
+  }
+  let buildings = null;
+  if (walls.length) {
+    buildings = new THREE.Group();
+    buildings.add(instancedBoxes(walls, new THREE.MeshLambertMaterial()));
+    buildings.add(instancedBoxes(roofs, new THREE.MeshLambertMaterial()));
+    buildings.userData.maxHeight = buildingsMaxHeight;
+  }
+  let terrain = null;
+  if (soilCells.length) {
+    terrain = new THREE.Group();
+    terrain.add(instancedBoxes(soilCells, new THREE.MeshLambertMaterial()));
+    terrain.userData.maxHeight = terrainMaxHeight;
+  }
+  if (!buildings && !terrain) return null;
+  return { buildings, terrain };
+}
+
 /* ---------- overlay dati (voxel) ---------- */
 
 // L'overlay drappeggia esattamente sul terreno/edifici sottostanti (stessa
@@ -883,6 +980,34 @@ export function buildDataOverlay(model, overlay) {
   if (!any) return null;
   layer.userData.maxHeight = maxHeight;
   return layer;
+}
+
+/* ---------- interazione 3D: griglia <-> mondo ---------- */
+
+// Converte un punto mondo (intersezione del raycaster col terreno a quota 0,
+// la quota è ignorata) nella cella di griglia frazionaria (col, row) — stessa
+// convenzione (col = i, row = sectionY con riga 0 a sud, vedi addPlanCells)
+// di un click sulla pianta 2D, così i due gesti individuano la stessa cella.
+export function worldToGrid(model, point) {
+  const { I, J, dx, dy } = model.geometry;
+  const W = I * dx;
+  const H = J * dy;
+  const col = (W / 2 - point.x) / dx - 0.5;
+  const jGrid = (H / 2 - point.z) / dy - 0.5;
+  const row = J - 1 - jGrid;
+  return { col, row };
+}
+
+// Inversa di worldToGrid: posizione mondo (a quota 0) di una cella di
+// griglia, anche frazionaria — usata per proiettare a schermo un punto lungo
+// la traccia di una sezione (vedi lineHitTest in Model3DViewer).
+export function gridToWorld(model, col, row) {
+  const { I, J, dx, dy } = model.geometry;
+  const W = I * dx;
+  const H = J * dy;
+  const x = W / 2 - (col + 0.5) * dx;
+  const z = H / 2 - (J - 0.5 - row) * dy;
+  return new THREE.Vector3(x, 0, z);
 }
 
 /* ---------- ricettori ---------- */

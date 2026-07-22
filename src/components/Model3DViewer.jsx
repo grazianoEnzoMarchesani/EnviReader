@@ -7,18 +7,24 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildModelScene, setLayerVisibility, setWireframe, disposeGroup, updateSunLayer, setSunDiagram, setShadowCasting, buildDataOverlay } from '../lib/inxScene';
+import { buildModelScene, setLayerVisibility, setWireframe, disposeGroup, updateSunLayer, setSunDiagram, setShadowCasting, buildDataOverlay, worldToGrid, gridToWorld } from '../lib/inxScene';
 import { createViewCube } from '../lib/viewCube';
 import { useI18n } from '../i18n/I18nContext';
 
 const DEG = Math.PI / 180;
 
-export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOverlay, flags, wireframe, resetNonce, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode }) {
+export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOverlay, flags, wireframe, resetNonce, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange }) {
   const { tr } = useI18n();
   const containerRef = useRef(null);
   const gizmoRef = useRef(null); // div overlay che intercetta i click del gizmo
   const stageRef = useRef(null); // { renderer, scene, camera, controls, layers, resetView, setProjection }
   const gizmoApiRef = useRef(null); // API del ViewCube (setNorthReference, ecc.)
+  // stato dell'incrocio sezioni sempre fresco per i listener del canvas,
+  // registrati una sola volta al mount (vedi effetto sotto)
+  const interactionRef = useRef({ model, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange });
+  useEffect(() => {
+    interactionRef.current = { model, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange };
+  });
 
   // setup del renderer: una volta sola per montaggio
   useEffect(() => {
@@ -113,10 +119,135 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
     observer.observe(container);
     resize();
 
-    const clock = new THREE.Clock();
+    // Interazione sul terreno: click sposta l'incrocio delle sezioni (x,z),
+    // trascinare vicino a una traccia la ruota — stessa semantica di
+    // MapChart in 2D (vedi handleCellClick/rotDragTo), riproiettata sullo
+    // schermo 3D. Non tocca mai `level` (la quota di taglio orizzontale
+    // resta riservata allo slider): il raycaster interseca sempre il piano
+    // y=0, quindi conta solo la posizione in pianta del click.
+    const raycaster = new THREE.Raycaster();
+    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    let dragMode = null; // null | 'maybe-click' | 'orbit' | 'rotate'
+    let dragWhich = null; // 'v' | 'h' durante 'rotate'
+    let downPos = null;
+
+    const groundHit = (e) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera({ x, y }, stage.camera);
+      const point = new THREE.Vector3();
+      return raycaster.ray.intersectPlane(groundPlane, point) ? point : null;
+    };
+
+    const projectToScreen = (vec3) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      const p = vec3.clone().project(stage.camera);
+      return { x: rect.left + (p.x * 0.5 + 0.5) * rect.width, y: rect.top + (-p.y * 0.5 + 0.5) * rect.height };
+    };
+
+    // Vicino al perno il trascinamento resta indefinito (angolo instabile):
+    // lì il gesto è sempre un click che sposta l'incrocio, mai una rotazione.
+    const lineHitTest = (clientX, clientY) => {
+      const { model: m, sectionX: sx, sectionY: sy, sectionAngle: sa } = interactionRef.current;
+      if (!m) return null;
+      const { I, J } = m.geometry;
+      const pivotScreen = projectToScreen(gridToWorld(m, sx, sy));
+      if (Math.hypot(clientX - pivotScreen.x, clientY - pivotScreen.y) <= 18) return null;
+      const rad = (sa * Math.PI) / 180;
+      const span = Math.max(I, J) * 0.5;
+      const dirs = { v: [-Math.sin(rad), Math.cos(rad)], h: [Math.cos(rad), Math.sin(rad)] };
+      let best = null;
+      for (const which of ['v', 'h']) {
+        const [gx, gy] = dirs[which];
+        const farScreen = projectToScreen(gridToWorld(m, sx + gx * span, sy + gy * span));
+        const ddx = farScreen.x - pivotScreen.x;
+        const ddy = farScreen.y - pivotScreen.y;
+        const len = Math.hypot(ddx, ddy) || 1;
+        const ux = ddx / len;
+        const uy = ddy / len;
+        const dist = Math.abs((clientX - pivotScreen.x) * uy - (clientY - pivotScreen.y) * ux);
+        if (dist < 9 && (!best || dist < best.dist)) best = { which, dist };
+      }
+      return best?.which ?? null;
+    };
+
+    const onHoverMove = (e) => {
+      if (dragMode) return;
+      renderer.domElement.style.cursor = lineHitTest(e.clientX, e.clientY) ? 'grab' : '';
+    };
+
+    const onWindowMove = (e) => {
+      if (dragMode === 'rotate') {
+        const point = groundHit(e);
+        if (!point) return;
+        const { model: m, sectionX: sx, sectionY: sy } = interactionRef.current;
+        const { col, row } = worldToGrid(m, point);
+        const vx = col - sx;
+        const vy = row - sy;
+        if (Math.hypot(vx, vy) < 0.75) return; // troppo vicino al perno: angolo instabile
+        let deg = (dragWhich === 'v' ? Math.atan2(-vx, vy) : Math.atan2(vy, vx)) * (180 / Math.PI);
+        while (deg > 90) deg -= 180;
+        while (deg <= -90) deg += 180;
+        deg = Math.round(deg);
+        if (Math.abs(deg) < 3) deg = 0; // snap: tornare all'ortogonale è facile
+        if (deg === -90) deg = 90;
+        interactionRef.current.onAngleChange?.(deg);
+      } else if (dragMode === 'maybe-click' && Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 6) {
+        dragMode = 'orbit'; // movimento oltre soglia: era un orbit, non un click
+      }
+    };
+
+    const onWindowUp = (e) => {
+      window.removeEventListener('pointermove', onWindowMove);
+      window.removeEventListener('pointerup', onWindowUp);
+      if (dragMode === 'rotate') {
+        stage.controls.enabled = true;
+        renderer.domElement.style.cursor = '';
+      } else if (dragMode === 'maybe-click') {
+        const point = groundHit(e);
+        const { model: m } = interactionRef.current;
+        if (point && m) {
+          const { I, J } = m.geometry;
+          const { col, row } = worldToGrid(m, point);
+          interactionRef.current.onPivotChange?.(
+            Math.min(I - 1, Math.max(0, Math.round(col))),
+            Math.min(J - 1, Math.max(0, Math.round(row))),
+          );
+        }
+      }
+      dragMode = null;
+      dragWhich = null;
+      downPos = null;
+    };
+
+    const onPointerDown = (e) => {
+      if (e.button !== 0 || !interactionRef.current.model) return;
+      downPos = { x: e.clientX, y: e.clientY };
+      const which = lineHitTest(e.clientX, e.clientY);
+      if (which) {
+        // trascinamento vicino a una traccia: ruota le sezioni, camera ferma
+        dragMode = 'rotate';
+        dragWhich = which;
+        stage.controls.enabled = false;
+        renderer.domElement.style.cursor = 'grabbing';
+      } else {
+        // altrove: potrebbe diventare un orbit (OrbitControls resta attivo e
+        // gestisce il trascinamento) o restare un click che sposta il perno
+        dragMode = 'maybe-click';
+      }
+      window.addEventListener('pointermove', onWindowMove);
+      window.addEventListener('pointerup', onWindowUp);
+    };
+
+    renderer.domElement.addEventListener('pointerdown', onPointerDown);
+    renderer.domElement.addEventListener('pointermove', onHoverMove);
+
+    const timer = new THREE.Timer();
     let frame;
     const loop = () => {
-      const delta = clock.getDelta();
+      timer.update();
+      const delta = timer.getDelta();
       // durante l'animazione del gizmo la camera è pilotata direttamente,
       // quindi si salta l'update (con damping) di OrbitControls
       const animating = gizmo.update(delta);
@@ -130,6 +261,10 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+      renderer.domElement.removeEventListener('pointermove', onHoverMove);
+      window.removeEventListener('pointermove', onWindowMove);
+      window.removeEventListener('pointerup', onWindowUp);
       gizmo.dispose();
       stage.controls.dispose();
       renderer.dispose();

@@ -151,7 +151,7 @@ function computeStats(model) {
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
-function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverlay, datasetLabel, flags, wireframe, resetNonce, projection, gizmoNorthMode, sun, sunPathEnabled, emptyHint }) {
+function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverlay, datasetLabel, flags, wireframe, resetNonce, projection, gizmoNorthMode, sun, sunPathEnabled, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, emptyHint }) {
   const { tr } = useI18n();
   const model = loaded?.model;
   const stats = computeStats(model);
@@ -185,6 +185,11 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverl
               sunPathPoints={sunPathPoints}
               sunDiagram={sunDiagram}
               gizmoNorthMode={gizmoNorthMode}
+              sectionX={sectionX}
+              sectionY={sectionY}
+              sectionAngle={sectionAngle}
+              onPivotChange={onPivotChange}
+              onAngleChange={onAngleChange}
             />
             {dataOverlay && (
               <div className="data-voxel-legend">
@@ -485,6 +490,11 @@ export default function ModelView() {
             projection={state.cameraProjection}
             gizmoNorthMode={state.gizmoNorthMode}
             sunPathEnabled={state.sunPathEnabled}
+            sectionX={state.sectionX}
+            sectionY={state.sectionY}
+            sectionAngle={state.sectionAngle}
+            onPivotChange={(i, j) => set({ sectionX: i, sectionY: j })}
+            onAngleChange={(deg) => set({ sectionAngle: deg })}
             emptyHint={tr('model_empty_hint')}
           />
         ))}
