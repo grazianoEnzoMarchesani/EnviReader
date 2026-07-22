@@ -7,7 +7,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildModelScene, setLayerVisibility, setWireframe, disposeGroup, updateSunLayer, setSunDiagram, setShadowCasting, buildDataOverlay, worldToGrid, gridToWorld } from '../lib/inxScene';
+import { buildModelScene, setLayerVisibility, setWireframe, disposeGroup, updateSunLayer, setSunDiagram, setShadowCasting, buildDataOverlay, buildWindOnSlices, buildWindVolume, worldToGrid, gridToWorld } from '../lib/inxScene';
 import { createViewCube } from '../lib/viewCube';
 import { useI18n } from '../i18n/I18nContext';
 
@@ -43,7 +43,7 @@ function resolveCssColor(varName) {
 // A ~3×FOLLOW_TAU l'inseguimento è visivamente concluso (vedi loop sotto).
 const FOLLOW_TAU = 0.12;
 
-export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOverlay, flags, wireframe, resetNonce, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
+export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, resetNonce, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
   const { tr } = useI18n();
   const containerRef = useRef(null);
   const gizmoRef = useRef(null); // div overlay che intercetta i click del gizmo
@@ -677,6 +677,72 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
       if (obj.material && 'wireframe' in obj.material) obj.material.wireframe = wireframe;
     });
   }, [wireframe, dataOverlay]);
+
+  // Vento sulle fette dati (pianta/sezioni): stesso pattern di dataOverlayLayer
+  // qui sopra, gruppo indipendente così i due overlay si ricostruiscono senza
+  // interferire tra loro.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage?.scene || !model) return;
+    if (stage.windOverlayLayer) {
+      stage.scene.remove(stage.windOverlayLayer);
+      disposeGroup(stage.windOverlayLayer);
+      stage.windOverlayLayer = null;
+    }
+    const layer = buildWindOnSlices(model, windOverlay);
+    if (layer) {
+      stage.scene.add(layer);
+      stage.windOverlayLayer = layer;
+    }
+    return () => {
+      if (stage.windOverlayLayer) {
+        stage.scene.remove(stage.windOverlayLayer);
+        disposeGroup(stage.windOverlayLayer);
+        stage.windOverlayLayer = null;
+      }
+    };
+  }, [model, windOverlay]);
+
+  // Campo di vento volumetrico: stesso pattern, gruppo indipendente
+  // ('windVolume'). Le celle (frecce/segmenti) arrivano già pronte dal worker
+  // (vedi useWindVolumeCells in useSlice.js), quindi la ricostruzione qui è
+  // keyed solo su windVolumeOverlay?.cells — non sull'intero oggetto, che
+  // include anche `opacity` — così muovere lo slider "Wind opacity" non
+  // rifà la mesh da zero: se ne occupa il piccolo effetto subito sotto,
+  // che aggiorna solo il materiale.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage?.scene || !model) return;
+    if (stage.windVolumeLayer) {
+      stage.scene.remove(stage.windVolumeLayer);
+      disposeGroup(stage.windVolumeLayer);
+      stage.windVolumeLayer = null;
+    }
+    const layer = buildWindVolume(windVolumeOverlay);
+    if (layer) {
+      stage.scene.add(layer);
+      stage.windVolumeLayer = layer;
+    }
+    return () => {
+      if (stage.windVolumeLayer) {
+        stage.scene.remove(stage.windVolumeLayer);
+        disposeGroup(stage.windVolumeLayer);
+        stage.windVolumeLayer = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [model, windVolumeOverlay?.cells]);
+
+  // Opacità del campo di vento volumetrico: solo materiale, nessuna
+  // ricostruzione della geometria (vedi commento sopra).
+  useEffect(() => {
+    const layer = stageRef.current?.windVolumeLayer;
+    if (!layer) return;
+    const alpha = Math.min(1, Math.max(0, (windVolumeOverlay?.opacity ?? 100) / 100));
+    layer.traverse((obj) => {
+      if (obj.material) obj.material.opacity = alpha;
+    });
+  }, [windVolumeOverlay?.opacity]);
 
   // "Reimposta vista" dalla sidebar
   useEffect(() => {

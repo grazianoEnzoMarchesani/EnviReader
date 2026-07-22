@@ -5,6 +5,15 @@
 const FILE_PAIR_REGEX = /^(.+?)_((?:BIO_)?[A-Z]+)_(\d{4}-\d{2}-\d{2})(?:_(\d{2}\.\d{2}\.\d{2}))?\.(EDT|EDX)$/i;
 const NO_DATA = -999;
 
+// I float dei file EDT sono little-endian (vedi i `true` passati a
+// getFloat32/getInt32 in tutto il file). Su hardware little-endian (praticamente
+// tutti i browser: x86/x86_64/ARM in modalità LE) una Float32Array può leggere
+// direttamente la stessa memoria del buffer senza ricopiarla/decodificarla
+// elemento per elemento — molto più veloce di un loop di DataView.getFloat32
+// su griglie grandi (vedi readVolumeVar, che ricarica l'intero volume vento
+// ad ogni cambio di istante).
+const IS_LITTLE_ENDIAN = new Int16Array(new Int8Array([1, 0]).buffer)[0] === 1;
+
 /* ---------- selezione della cartella dei risultati ---------- */
 
 // onGranted viene chiamato quando l'utente ha scelto la cartella e concesso il
@@ -153,12 +162,23 @@ export function readEDX(file) {
   return promise;
 }
 
+// Contenuto testuale di un tag di primo livello, via regex invece del
+// DOMParser: l'EDX è un XML piatto (tag leaf con solo numeri/liste separate
+// da virgola, nessuna struttura annidata da attraversare), quindi non serve
+// un parser DOM vero — ed è un bene, perché DOMParser non esiste nei Web
+// Worker (usato da loadWindVolume per il campo di vento volumetrico, vedi
+// windVolumeWorker.js). Stessa scelta già fatta per l'INX (vedi inx.js).
+function tagText(xmlText, tag) {
+  const m = xmlText.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`, 'i'));
+  return m ? m[1].trim() : '';
+}
+
 async function parseEDX(file) {
   const buffer = await file.arrayBuffer();
-  const xml = new DOMParser().parseFromString(decodeEDXText(buffer), 'text/xml');
-  const num = (sel) => parseInt(xml.querySelector(sel)?.textContent ?? '0', 10);
-  const nums = (sel) =>
-    (xml.querySelector(sel)?.textContent ?? '')
+  const xmlText = decodeEDXText(buffer);
+  const num = (tag) => parseInt(tagText(xmlText, tag) || '0', 10);
+  const nums = (tag) =>
+    tagText(xmlText, tag)
       .split(',')
       .map((s) => parseFloat(s.trim()))
       .filter(Number.isFinite);
@@ -171,7 +191,7 @@ async function parseEDX(file) {
     spacing,
     extent: { x: sum(spacing.x), y: sum(spacing.y), z: sum(spacing.z) },
     nrVariables: num('nr_variables'),
-    variableNames: (xml.querySelector('name_variables')?.textContent ?? '')
+    variableNames: tagText(xmlText, 'name_variables')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean),
@@ -457,6 +477,58 @@ export async function loadObjectsVolume(structure) {
     }
   }
   return null;
+}
+
+// Legge una variabile intera (I×J×Z) da un EDT già aperto: stessa lettura
+// grezza di loadObjectsVolume, fattorizzata perché loadWindVolume la ripete
+// tre volte (u, v, w) sullo stesso file. Su hardware little-endian (vedi
+// IS_LITTLE_ENDIAN) la sorgente è una vista Float32Array a costo zero sullo
+// stesso buffer, invece del loop di DataView.getFloat32 elemento per elemento
+// (molto più lento su griglie grandi, ricaricate ad ogni cambio di istante).
+function readVolumeVar(dataView, varIndex, n) {
+  const varOffset = varIndex * n * 4;
+  if (varOffset + n * 4 > dataView.byteLength) return null;
+  const data = new Float32Array(n);
+  if (IS_LITTLE_ENDIAN) {
+    const src = new Float32Array(dataView.buffer, dataView.byteOffset + varOffset, n);
+    for (let idx = 0; idx < n; idx++) {
+      const v = src[idx];
+      data[idx] = v === NO_DATA ? NaN : v;
+    }
+  } else {
+    for (let idx = 0; idx < n; idx++) {
+      const v = dataView.getFloat32(varOffset + idx * 4, true);
+      data[idx] = v === NO_DATA ? NaN : v;
+    }
+  }
+  return data;
+}
+
+// Volume vento (u, v, w) dell'intero dominio 3D per un fileset/gruppo/istante:
+// a differenza di loadObjectsVolume (geometria statica, invariante nel tempo)
+// qui gruppo e istante contano, quindi va ricaricato ad ogni cambio. Usata dal
+// campo di vento volumetrico del viewer 3D (a differenza di loadSlice/
+// useWindField, che caricano solo la proiezione su un piano alla volta).
+export async function loadWindVolume(structure, groupPath, timeIndex) {
+  const series = getFileCoupleSeries(getFilesInFolder(structure, groupPath));
+  if (!series.length) return null;
+  const pair = series[Math.min(Math.max(0, timeIndex), series.length - 1)];
+  const edx = await readEDX(pair.EDX);
+  const names = findWindVariables(edx.variableNames);
+  if (!names) return null;
+  const { x: dimX, y: dimY, z: dimZ } = edx.dimensions;
+  const n = dimX * dimY * dimZ;
+  const dataView = await getDataView(pair.EDT);
+  const u = readVolumeVar(dataView, edx.variableNames.indexOf(names.u), n);
+  const v = readVolumeVar(dataView, edx.variableNames.indexOf(names.v), n);
+  const w = readVolumeVar(dataView, edx.variableNames.indexOf(names.w), n);
+  if (!u || !v || !w) return null;
+  let maxMag = 0;
+  for (let i = 0; i < n; i++) {
+    const mag = Math.hypot(u[i], v[i], w[i]);
+    if (mag > maxMag) maxMag = mag;
+  }
+  return { dims: edx.dimensions, u, v, w, maxMag };
 }
 
 // Quota del terreno dai risultati solaraccess/ground, per "segui il terreno":

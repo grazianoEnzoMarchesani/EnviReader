@@ -9,12 +9,13 @@ import Select from '../controls/Select';
 import IconToggle from '../controls/IconToggle';
 import { IconLayers3D, IconBuilding, IconTerrain, IconTerrainFix, IconTree, IconCompass, IconCalendar, IconClock, IconSettings } from '../icons/ToolbarIcons';
 import ViewSettingsModal from '../ViewSettingsModal';
-import MapChart, { MapThumb, niceCeil } from '../MapChart';
+import MapChart, { MapThumb } from '../MapChart';
 import TimeSeriesChart from '../TimeSeriesChart';
-import { useSlices, usePointSeries, useInxRotation, useWindField, useTerrainCut } from '../../lib/useSlice';
+import { useSlices, usePointSeries, useInxRotation, useWindFields, useTerrainCut } from '../../lib/useSlice';
 import { terrainCutProfile, isBiometDataset } from '../../lib/envimet';
 import { useFlip } from '../../lib/useFlip';
 import { formatValue } from '../../lib/colormap';
+import { niceCeil } from '../../lib/windField';
 
 function formatTime(time) {
   const h = String(Math.floor(time / 4)).padStart(2, '0');
@@ -25,14 +26,6 @@ function formatTime(time) {
 // Valore mostrato dal color picker quando sectionLineColor è null (colore di
 // tema): un grigio neutro, dato che l'input nativo non sa rendere "auto"
 export const DEFAULT_SECTION_LINE_COLOR = '#808080';
-
-function useWindFields(enabled, fileset, group, time, level, sectionX, sectionY, sectionAngle, terrain) {
-  return {
-    plan: useWindField(enabled, fileset, group, time, 'plan', level, sectionX, sectionY, sectionAngle, terrain),
-    sectionX: useWindField(enabled, fileset, group, time, 'sectionX', level, sectionX, sectionY, sectionAngle, terrain),
-    sectionY: useWindField(enabled, fileset, group, time, 'sectionY', level, sectionX, sectionY, sectionAngle, terrain),
-  };
-}
 
 // Differenza cella per cella tra due slice della stessa griglia, con range
 // simmetrico attorno allo zero (il punto neutro della palette divergente)
@@ -407,7 +400,7 @@ export default function AnalysisView() {
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('A', vType, range),
       body: sliceA ? (
-        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} timeLabel={timeLabel} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} />
+        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} />
       ) : null,
     },
     {
@@ -426,7 +419,7 @@ export default function AnalysisView() {
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('B', vType, range),
       body: sliceB ? (
-        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} timeLabel={timeLabel} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} />
+        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} />
       ) : null,
     },
     {
@@ -444,7 +437,7 @@ export default function AnalysisView() {
       reversed: diffReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('Diff', vType, range),
       body: sliceDiff ? (
-        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={activeDiffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} timeLabel={timeLabel} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} />
+        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={activeDiffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} />
       ) : null,
     },
   ];

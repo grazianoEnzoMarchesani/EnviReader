@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getFilesInFolder, getFileCoupleSeries, readEDX, loadSlice, loadPointSeries, findWindVariables, sectionLinePath, terrainCut } from './envimet';
 import { findInxFile, readInxRotation } from './inx';
 
@@ -132,7 +132,7 @@ export function useWindField(enabled, fileset, groupPath, timeIndex, viewType, l
           const mag = Math.hypot(horiz.data[i], vert.data[i]);
           if (mag > maxMag) maxMag = mag;
         }
-        if (alive) setWind({ u: horiz.data, v: vert.data, w: horiz.w, h: horiz.h, maxMag });
+        if (alive) setWind({ u: horiz.data, v: vert.data, w: horiz.w, h: horiz.h, maxMag, line: horiz.line ?? null });
       } catch (err) {
         console.error('Errore nel caricamento del campo di vento:', err);
         if (alive) setWind(null);
@@ -142,6 +142,90 @@ export function useWindField(enabled, fileset, groupPath, timeIndex, viewType, l
   }, [enabled, fileset, groupPath, timeIndex, viewType, level, sectionX, sectionY, angle, terrain]);
 
   return wind;
+}
+
+// Le tre viste (pianta, sezione X, sezione Y) del campo di vento di un
+// fileset in un colpo solo: usata sia dalla vista 2D (le card A/B/Diff) sia
+// dal viewer 3D (vento disegnato sulle fette già posizionate nel modello).
+export function useWindFields(enabled, fileset, group, time, level, sectionX, sectionY, sectionAngle, terrain) {
+  return {
+    plan: useWindField(enabled, fileset, group, time, 'plan', level, sectionX, sectionY, sectionAngle, terrain),
+    sectionX: useWindField(enabled, fileset, group, time, 'sectionX', level, sectionX, sectionY, sectionAngle, terrain),
+    sectionY: useWindField(enabled, fileset, group, time, 'sectionY', level, sectionX, sectionY, sectionAngle, terrain),
+  };
+}
+
+// Contatore globale di richieste al worker del vento volumetrico: ogni
+// richiesta ha un id crescente, così una risposta che arriva "in ritardo" (il
+// worker era ancora a metà del calcolo precedente quando ne è partito uno
+// nuovo) si riconosce confrontando l'id con l'ultimo inviato e si scarta,
+// invece di sovrascrivere un risultato più recente con uno superato.
+let windVolumeRequestId = 0;
+
+// Calcola in un Web Worker dedicato (windVolumeWorker.js) le celle
+// (frecce/segmenti streamline) del campo di vento volumetrico 3D: a
+// differenza di useWindField (una sola fetta 2D alla volta, sul thread
+// principale) qui il lavoro — caricare l'intero volume (u, v, w) e tracciare
+// le streamline in 3D — è pesante, quindi gira fuori dal thread della UI, che
+// resta reattivo (camera, controlli) anche mentre il worker calcola. Un
+// worker per istanza dell'hook (quindi uno per fileset A, uno per B): nasce
+// alla prima richiesta utile e vive finché il componente resta montato.
+// Ritorna { cells, loading }: `loading` è true dall'invio della richiesta al
+// worker fino alla risposta (o all'errore), usato in ModelView.jsx per
+// mostrare un indicatore di caricamento sul toggle "Wind volume" — il vento
+// già disegnato resta visibile nel frattempo (`cells` non viene azzerato
+// all'invio di una nuova richiesta), quindi `loading` serve solo a far capire
+// che quello a schermo sta per essere aggiornato, non a nasconderlo.
+export function useWindVolumeCells(enabled, fileset, groupPath, timeIndex, geometry, spacingZ, style, size, density) {
+  const [cells, setCells] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const workerRef = useRef(null);
+  const latestIdRef = useRef(0);
+
+  // Il worker termina solo allo smontaggio: ricrearlo ad ogni richiesta
+  // costerebbe di più del tenerlo vivo, e le richieste successive lo trovano
+  // già pronto.
+  useEffect(() => () => {
+    workerRef.current?.terminate();
+    workerRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (!enabled || !fileset?.structure || groupPath == null || !geometry) {
+      // Invalida l'id "corrente": se una risposta del worker per una
+      // richiesta precedente arriva dopo che l'utente ha spento il vento
+      // volumetrico, va comunque ignorata (l'id 0 non corrisponde a nessuna
+      // richiesta reale, essendo windVolumeRequestId incrementato da 1 in su).
+      latestIdRef.current = 0;
+      setCells(null);
+      setLoading(false);
+      return undefined;
+    }
+    if (!workerRef.current) {
+      workerRef.current = new Worker(new URL('./windVolumeWorker.js', import.meta.url), { type: 'module' });
+    }
+    const worker = workerRef.current;
+    const requestId = ++windVolumeRequestId;
+    latestIdRef.current = requestId;
+    setLoading(true);
+
+    const onMessage = (e) => {
+      if (e.data.requestId !== latestIdRef.current) return; // risposta superata da una richiesta più recente
+      setLoading(false);
+      if (e.data.error) {
+        console.error('Errore nel calcolo del vento volumetrico:', e.data.error);
+        setCells(null);
+        return;
+      }
+      setCells(e.data.empty ? null : { arrowCells: e.data.arrowCells, segCells: e.data.segCells, headCells: e.data.headCells });
+    };
+    worker.addEventListener('message', onMessage);
+    worker.postMessage({ requestId, structure: fileset.structure, groupPath, timeIndex, geometry, spacingZ, style, size, density });
+
+    return () => worker.removeEventListener('message', onMessage);
+  }, [enabled, fileset, groupPath, timeIndex, geometry, spacingZ, style, size, density]);
+
+  return { cells, loading };
 }
 
 // Rotazione del modello (modelRotation dell'INX in inputData) per orientare

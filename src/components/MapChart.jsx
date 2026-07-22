@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildLUT, sliceToImageData, orientColors, formatValue, objectsToImageData } from '../lib/colormap';
+import { traceStreamlines2D } from '../lib/windField';
 
 // Anteprima in miniatura di uno slice, usata nei riquadri di cambio vista.
 // Mantiene le proporzioni fisiche: altezza fissa e larghezza proporzionale,
@@ -76,16 +77,6 @@ export function MapThumb({ slice, objectsSlice, objectsOpts, colors, reversed, w
 
 /* ---------- campo di vento a frecce ---------- */
 
-// Arrotonda per eccesso a un valore "tondo" 1/2/5 × 10^k: è il valore di
-// riferimento della legenda del vento (nessuna freccia lo supera).
-export function niceCeil(value) {
-  if (!(value > 0)) return 0;
-  const exp = Math.floor(Math.log10(value));
-  const base = value / 10 ** exp;
-  const nice = base <= 1 ? 1 : base <= 2 ? 2 : base <= 5 ? 5 : 10;
-  return nice * 10 ** exp;
-}
-
 // Passo di campionamento della griglia e lunghezza (px CSS) della freccia di
 // riferimento; usato sia dal disegno sia dalla legenda, così coincidono sempre.
 function windLayout(field, frameSize, density, size, isThumb) {
@@ -99,111 +90,6 @@ function windLayout(field, frameSize, density, size, isThumb) {
 
 // Spessore massimo delle streamline (px) in funzione dello slider "dimensione"
 const streamWidth = (size) => 0.6 + 3 * (size / 100);
-
-// Interpolazione bilineare delle componenti del vento nel punto (x, y) in
-// coordinate di griglia (centri cella sugli interi); null su celle senza dati.
-function sampleField(field, x, y) {
-  if (field.w < 2 || field.h < 2) return null;
-  // Clamp-to-edge: la cella di interpolazione resta ancorata all'ultima
-  // valida, così l'ultima riga/colonna resta bilineare invece di collassare
-  // su un singolo vicino più prossimo (causava streamline convergenti a
-  // raggiera vicino ai bordi della griglia).
-  const cx = Math.min(field.w - 1, Math.max(0, x));
-  const cy = Math.min(field.h - 1, Math.max(0, y));
-  const x0 = Math.min(field.w - 2, Math.floor(cx));
-  const y0 = Math.min(field.h - 2, Math.floor(cy));
-  const i00 = y0 * field.w + x0;
-  const i10 = i00 + 1;
-  const i01 = i00 + field.w;
-  const i11 = i01 + 1;
-  const u = [field.u[i00], field.u[i10], field.u[i01], field.u[i11]];
-  const v = [field.v[i00], field.v[i10], field.v[i01], field.v[i11]];
-  for (let k = 0; k < 4; k++) if (!Number.isFinite(u[k]) || !Number.isFinite(v[k])) return null;
-  const fx = cx - x0;
-  const fy = cy - y0;
-  const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
-  return [
-    u[0] * w00 + u[1] * w10 + u[2] * w01 + u[3] * w11,
-    v[0] * w00 + v[1] * w10 + v[2] * w01 + v[3] * w11,
-  ];
-}
-
-// Linee di flusso a spaziatura uniforme (Jobard–Lefer semplificato): una
-// maschera di occupazione a passo `sep` celle decide dove nascono le linee e
-// le ferma quando toccano la scia di un'altra; l'integrazione segue il verso
-// del campo in avanti e all'indietro dal seme, a passo costante in celle.
-// Ogni punto è [x, y, velocità]: la velocità modula lo spessore del tratto.
-function traceStreamlines(field, sep, refValue) {
-  // Soglia di stop relativa alla velocità di riferimento: vicino a punti
-  // singolari del campo (ricircoli, scie di edifici) il vento tende a zero e
-  // le linee, marciando a passo pieno normalizzato, continuerebbero fin
-  // quasi al punto esatto prima di fermarsi — creando un ventaglio di raggi
-  // che convergono tutti sullo stesso pixel. Fermandole prima si evita
-  // l'affollamento visivo lasciando codine corte invece di raggi lunghi.
-  const minSpeed = Math.max(1e-4, (refValue || 0) * 0.03);
-  // La maschera è più fine del passo di semina (metà): una linea in marcia
-  // muore solo quando arriva a ~sep/2 da un'altra, non a sep — altrimenti le
-  // linee si spezzano in trattini appena nate. Il seme invece pretende libere
-  // anche le celle adiacenti, così i punti di partenza distano circa sep.
-  const res = Math.max(0.75, sep / 2);
-  const mw = Math.ceil(field.w / res);
-  const mh = Math.ceil(field.h / res);
-  const mask = new Int32Array(mw * mh).fill(-1);
-  const maskCol = (x) => Math.min(mw - 1, Math.max(0, Math.floor(x / res)));
-  const maskRow = (y) => Math.min(mh - 1, Math.max(0, Math.floor(y / res)));
-  const maskIdx = (x, y) => maskRow(y) * mw + maskCol(x);
-  const seedFree = (x, y) => {
-    const c = maskCol(x);
-    const r = maskRow(y);
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        const rr = r + dr;
-        const cc = c + dc;
-        if (rr < 0 || cc < 0 || rr >= mh || cc >= mw) continue;
-        if (mask[rr * mw + cc] !== -1) return false;
-      }
-    }
-    return true;
-  };
-  const lines = [];
-  const STEP = 0.4; // passo di integrazione in celle
-  const maxSteps = 4 * (field.w + field.h);
-
-  const march = (id, x0, y0, dir, out) => {
-    let x = x0;
-    let y = y0;
-    for (let s = 0; s < maxSteps; s++) {
-      const uv = sampleField(field, x, y);
-      if (!uv) break;
-      const speed = Math.hypot(uv[0], uv[1]);
-      if (speed < minSpeed) break;
-      x += (uv[0] / speed) * STEP * dir;
-      y += (uv[1] / speed) * STEP * dir;
-      if (x < 0 || y < 0 || x > field.w - 1 || y > field.h - 1) break;
-      const m = maskIdx(x, y);
-      if (mask[m] !== -1 && mask[m] !== id) break;
-      mask[m] = id;
-      out.push([x, y, speed]);
-    }
-  };
-
-  for (let gy = 0; gy < field.h; gy += sep) {
-    for (let gx = 0; gx < field.w; gx += sep) {
-      if (!seedFree(gx, gy)) continue;
-      const uv0 = sampleField(field, gx, gy);
-      if (!uv0) continue;
-      const id = lines.length;
-      mask[maskIdx(gx, gy)] = id;
-      const fwd = [];
-      const bwd = [];
-      march(id, gx, gy, 1, fwd);
-      march(id, gx, gy, -1, bwd);
-      const pts = [...bwd.reverse(), [gx, gy, Math.hypot(uv0[0], uv0[1])], ...fwd];
-      if (pts.length >= 3) lines.push(pts);
-    }
-  }
-  return lines;
-}
 
 export function renderWindOnCanvas(canvas, wind, frameSize) {
   if (!canvas || !wind || !frameSize || !(wind.refValue > 0)) return;
@@ -258,7 +144,7 @@ export function renderWindOnCanvas(canvas, wind, frameSize) {
     const wMin = 0.3;
     const wMax = streamWidth(size);
     const paths = Array.from({ length: BUCKETS }, () => new Path2D());
-    const allLines = traceStreamlines(field, step, refValue);
+    const allLines = traceStreamlines2D(field, step, refValue);
     for (const line of allLines) {
       for (let p = 1; p < line.length; p++) {
         const speed = (line[p - 1][2] + line[p][2]) / 2;
@@ -481,7 +367,7 @@ function crossGeometry(control, slice, W, H) {
 
 // Mappa raster: il canvas ha la risoluzione della griglia ENVI-met e viene
 // ingrandito via CSS (image-rendering: pixelated), come le celle di Leonardo.
-export default function MapChart({ slice, objectsSlice, objectsOpts, colors, reversed, min, max, onCellClick, marks, sectionControl, sectionLineStyle, compass, showCalendar, showClock, timeLabel, wind, onLegendClick }) {
+export default function MapChart({ slice, objectsSlice, objectsOpts, colors, reversed, min, max, onCellClick, marks, sectionControl, sectionLineStyle, compass, showCalendar, showClock, timeLabel, wind, onLegendClick, widgetScale }) {
   const canvasRef = useRef(null);
   const objectsCanvasRef = useRef(null);
   const frameRef = useRef(null);
@@ -716,6 +602,7 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
           '--section-line-width': `${sectionLineStyle?.width ?? 1}px`,
           '--section-line-dash': `4 ${sectionLineStyle?.gap ?? 3}`,
           ...(sectionLineStyle?.color ? { '--section-line-color': sectionLineStyle.color } : {}),
+          '--widget-scale': (widgetScale ?? 100) / 100,
         }}
         onMouseMove={sectionControl ? handleFrameMove : undefined}
         onMouseLeave={sectionControl ? () => { if (!rotDragging) setRotHandle(null); } : undefined}

@@ -11,11 +11,14 @@ import { MapCalendar, MapClock } from '../MapChart';
 import TimeSeriesChart from '../TimeSeriesChart';
 import Segmented from '../controls/Segmented';
 import IconToggle from '../controls/IconToggle';
-import { IconBuilding, IconTree, IconTerrain, IconTerrainFix, IconReceptor, IconGrid, IconWireframe, IconSun, IconLayers3D, IconSectionX, IconSectionY, IconSmoothSurface, IconSyncRotate, IconCalendar, IconClock } from '../icons/ToolbarIcons';
+import { IconBuilding, IconTree, IconTerrain, IconTerrainFix, IconReceptor, IconGrid, IconWireframe, IconSun, IconLayers3D, IconSectionX, IconSectionY, IconSmoothSurface, IconSyncRotate, IconCalendar, IconClock, IconSettings } from '../icons/ToolbarIcons';
+import ViewSettingsModal from '../ViewSettingsModal';
 import { useFlip } from '../../lib/useFlip';
-import { usePointSeries, useSlices, useTerrainCut } from '../../lib/useSlice';
+import { usePointSeries, useSlices, useTerrainCut, useWindFields, useWindVolumeCells } from '../../lib/useSlice';
+import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { findPalette } from '../../data/palettes';
 import { formatValue, orientColors } from '../../lib/colormap';
+import { niceCeil } from '../../lib/windField';
 
 const LAYER_ICONS = {
   showBuildings: IconBuilding,
@@ -186,6 +189,45 @@ function useDataOverlay(slices, terrainCut, views, colors, reversed, sectionX, s
   }, [slices.plan, slices.sectionX, slices.sectionY, terrainCut, views.plan, views.sectionX, views.sectionY, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ, range]);
 }
 
+// Confeziona l'overlay 3D del vento sulle fette dati di un fileset: stessa
+// forma di useDataOverlay (stessi piani attivi `views`, stesso pivot/terrainCut/
+// livello), ma il dato sono i campi di vento per piano (useWindFields) invece
+// dello slice scalare, e il "colore" è lo stile/opacità/dimensione/densità
+// della scheda Wind condivisa con la vista 2D. refValue è passato dal
+// chiamante (condiviso tra A e B e tutti i piani, vedi AnalysisView.jsx) così
+// le lunghezze delle frecce restano confrontabili.
+function useWindOnSlicesOverlay(windFields, refValue, views, style, opacity, size, density, terrainCut, level, dimZ, spacingZ, sectionX, sectionY) {
+  return useMemo(() => {
+    if (!dimZ || !(refValue > 0)) return null;
+    if (!(views.plan && windFields.plan) && !(views.sectionX && windFields.sectionX) && !(views.sectionY && windFields.sectionY)) return null;
+    return {
+      views: {
+        plan: views.plan ? windFields.plan : null,
+        sectionX: views.sectionX ? windFields.sectionX : null,
+        sectionY: views.sectionY ? windFields.sectionY : null,
+      },
+      refValue,
+      style,
+      opacity,
+      size,
+      density,
+      pivot: { sectionX, sectionY },
+      terrainCut,
+      level,
+      dimZ,
+      spacingZ,
+    };
+  }, [windFields.plan, windFields.sectionX, windFields.sectionY, refValue, views.plan, views.sectionX, views.sectionY, style, opacity, size, density, terrainCut, level, dimZ, spacingZ, sectionX, sectionY]);
+}
+
+// Confeziona l'overlay 3D del campo di vento volumetrico di un fileset: le
+// celle (frecce/segmenti) arrivano già pronte dal worker (useWindVolumeCells),
+// qui si aggiunge solo l'opacità — l'unico parametro che Model3DViewer può
+// aggiornare senza ricostruire la mesh (vedi il suo effetto dedicato).
+function useWindVolumeOverlay(cells, opacity) {
+  return useMemo(() => (cells ? { cells, opacity } : null), [cells, opacity]);
+}
+
 function computeStats(model) {
   if (!model) return null;
   const { I, J, Z, dx, dy } = model.geometry;
@@ -200,14 +242,14 @@ function computeStats(model) {
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
-function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverlay, flags, wireframe, resetNonce, projection, gizmoNorthMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled }) {
+function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, resetNonce, projection, gizmoNorthMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled }) {
   const { tr } = useI18n();
   const model = loaded?.model;
   const stats = computeStats(model);
   const { hasLocation, sunActive, sunInfo, sunPathPoints, sunDiagram } = sun;
 
   return (
-    <div className="model-panel" data-flip-key={flipKey}>
+    <div className="model-panel" data-flip-key={flipKey} style={{ '--widget-scale': (widgetScale ?? 100) / 100 }}>
       <div className="chart-header">
         <div className="chart-title">{title}</div>
         {stats && (
@@ -224,6 +266,8 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverl
               objectsVolume={objectsVolume}
               spacingZ={spacingZ}
               dataOverlay={dataOverlay}
+              windOverlay={windOverlay}
+              windVolumeOverlay={windVolumeOverlay}
               flags={flags}
               wireframe={wireframe}
               resetNonce={resetNonce}
@@ -325,6 +369,58 @@ export default function ModelView() {
   const dataOverlayA = useDataOverlay(slicesA, terrainCutA, voxelViews, activePalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ, overlayRangeA);
   const dataOverlayB = useDataOverlay(slicesB, terrainCutB, voxelViews, activePalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ, overlayRangeB);
 
+  // Vento sulle fette dati già disegnate (pianta/sezioni): quali piani sono
+  // "selezionati" (dataVoxelPlan/SectionX/SectionY) resta indipendente dal
+  // master "Data overlay" (showDataVoxels), che controlla solo i voxel
+  // colorati — altrimenti spegnere i colori farebbe sparire anche il vento,
+  // che l'utente si aspetta di vedere anche a overlay dati spento. Stile/
+  // opacità/dimensione/densità sono quelli della scheda Wind condivisa con la
+  // vista 2D. Il riferimento delle lunghezze è condiviso tra A/B e tutti i
+  // piani, come in AnalysisView.jsx, così le frecce restano confrontabili.
+  const windPlaneViews = {
+    plan: state.dataVoxelPlan,
+    sectionX: state.dataVoxelSectionX,
+    sectionY: state.dataVoxelSectionY,
+  };
+  const windArgs = [state.dataGroup, state.time, state.level, state.sectionX, state.sectionY, state.sectionAngle];
+  const windFieldsA = useWindFields(state.showWindField, state.filesetA, ...windArgs, terrainCutA);
+  const windFieldsB = useWindFields(state.showWindField && state.compareMode3D !== 'single', state.filesetB, ...windArgs, terrainCutB);
+  let windMaxMag = 0;
+  for (const k of ['plan', 'sectionX', 'sectionY']) {
+    if (windFieldsA[k] && windFieldsA[k].maxMag > windMaxMag) windMaxMag = windFieldsA[k].maxMag;
+    if (windFieldsB[k] && windFieldsB[k].maxMag > windMaxMag) windMaxMag = windFieldsB[k].maxMag;
+  }
+  const windRefValue = niceCeil(windMaxMag);
+  const windOverlayA = useWindOnSlicesOverlay(windFieldsA, windRefValue, windPlaneViews, state.windStyle, state.windOpacity, state.windSize, state.windDensity, terrainCutA, state.level, dimZ, spacingZ, state.sectionX, state.sectionY);
+  const windOverlayB = useWindOnSlicesOverlay(windFieldsB, windRefValue, windPlaneViews, state.windStyle, state.windOpacity, state.windSize, state.windDensity, terrainCutB, state.level, dimZ, spacingZ, state.sectionX, state.sectionY);
+
+  // Campo di vento volumetrico: caricamento dell'intero volume (u, v, w) e
+  // tracciamento streamline/campionamento frecce in un Web Worker dedicato
+  // (vedi useWindVolumeCells in useSlice.js, windVolumeWorker.js) —
+  // indipendente dalle fette dati mostrate (vedi toggle "Wind volume" nella
+  // toolbar). Il calcolo resta pesante, quindi tempo/dimensione/densità sono
+  // "debounced": trascinare uno di questi slider aggiorna il worker solo a
+  // fine trascinamento invece che ad ogni tick intermedio, che altrimenti
+  // metterebbe in coda un ricalcolo dopo l'altro. L'opacità NON è debounced:
+  // Model3DViewer la applica solo al materiale, senza mai ricostruire la mesh.
+  const debouncedTime = useDebouncedValue(state.time, 250);
+  const debouncedWindSize = useDebouncedValue(state.windSize, 250);
+  const debouncedWindDensity = useDebouncedValue(state.windDensity, 250);
+  const { cells: windVolumeCellsA, loading: windVolumeLoadingA } = useWindVolumeCells(state.showWindVolume, state.filesetA, state.dataGroup, debouncedTime, loadedA?.model?.geometry, spacingZ, state.windStyle, debouncedWindSize, debouncedWindDensity);
+  const { cells: windVolumeCellsB, loading: windVolumeLoadingB } = useWindVolumeCells(state.showWindVolume && state.compareMode3D !== 'single', state.filesetB, state.dataGroup, debouncedTime, loadedB?.model?.geometry, spacingZ, state.windStyle, debouncedWindSize, debouncedWindDensity);
+  const windVolumeOverlayA = useWindVolumeOverlay(windVolumeCellsA, state.windOpacity);
+  const windVolumeOverlayB = useWindVolumeOverlay(windVolumeCellsB, state.windOpacity);
+  // Il toggle in toolbar è unico per entrambi i fileset: mostra il
+  // caricamento finché ALMENO uno dei due (quelli effettivamente attivi) sta
+  // ancora aspettando la risposta del worker.
+  const windVolumeLoading = windVolumeLoadingA || (state.compareMode3D !== 'single' && windVolumeLoadingB);
+  // Il toggle "Wind volume" vive ora nella sidebar (WindTab), non più nella
+  // toolbar: sincronizza qui lo stato di caricamento perché la sidebar non ha
+  // accesso ai fileset/geometrie caricati localmente in questa vista
+  useEffect(() => {
+    set({ windVolumeLoading });
+  }, [windVolumeLoading]);
+
   const flags = useMemo(
     () => ({
       showBuildings: state.showBuildings,
@@ -364,8 +460,8 @@ export default function ModelView() {
   const panelKeys = state.compareMode3D === 'ab' ? ['A', 'B'] : state.compareMode3D === 'b' ? ['B'] : ['A'];
 
   const panelProps = {
-    A: { title: filesetLabel('A'), loaded: loadedA, objectsVolume: objectsVolumeA, spacingZ, dataOverlay: dataOverlayA, sun: sunA, onLegendClick: (range) => handleLegendClick('A', range) },
-    B: { title: filesetLabel('B'), loaded: loadedB, objectsVolume: objectsVolumeB, spacingZ, dataOverlay: dataOverlayB, sun: sunB, onLegendClick: (range) => handleLegendClick('B', range) },
+    A: { title: filesetLabel('A'), loaded: loadedA, objectsVolume: objectsVolumeA, spacingZ, dataOverlay: dataOverlayA, windOverlay: windOverlayA, windVolumeOverlay: windVolumeOverlayA, sun: sunA, onLegendClick: (range) => handleLegendClick('A', range) },
+    B: { title: filesetLabel('B'), loaded: loadedB, objectsVolume: objectsVolumeB, spacingZ, dataOverlay: dataOverlayB, windOverlay: windOverlayB, windVolumeOverlay: windVolumeOverlayB, sun: sunB, onLegendClick: (range) => handleLegendClick('B', range) },
   };
   const flipRef = useFlip();
 
@@ -497,6 +593,18 @@ export default function ModelView() {
                     <IconToggle icon={IconClock} label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} />
                   </div>
                 </div>
+                <div className="vertical-divider" />
+                <div className="view-bar-group">
+                  <button
+                    type="button"
+                    className="icon-toggle"
+                    title={tr('btn_view_settings')}
+                    aria-label={tr('btn_view_settings')}
+                    onClick={() => toggle('viewSettingsOpen')}
+                  >
+                    <IconSettings />
+                  </button>
+                </div>
               </div>
 
               {(loadedA || loadedB) && (
@@ -521,6 +629,8 @@ export default function ModelView() {
         </button>
       </div>
 
+      <ViewSettingsModal />
+
       <div className="model-viewer-row" ref={flipRef}>
         {panelKeys.map((key) => (
           <ModelPanel
@@ -535,6 +645,7 @@ export default function ModelView() {
             sunPathEnabled={state.sunPathEnabled}
             showCalendarWidget={state.showCalendarWidget}
             showClockWidget={state.showClockWidget}
+            widgetScale={state.widgetScale}
             timeLabel={timeLabel}
             cameraSyncRef={cameraSyncRef}
             cameraSyncEnabled={state.syncCamera3D && panelKeys.length === 2}

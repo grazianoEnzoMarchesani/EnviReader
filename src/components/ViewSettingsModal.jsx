@@ -10,32 +10,39 @@ export default function ViewSettingsModal() {
   if (!state.viewSettingsOpen) return null;
 
   const close = () => set({ viewSettingsOpen: false });
+  // Nel viewer 3D non esistono linea di sezione né overlay oggetti in 2D: il
+  // modale mostra lì solo lo slider dimensione widget, valido per entrambe le viste.
+  const is3D = state.appView === 'model';
 
   return (
     <div className="modal-backdrop" onClick={close}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">{tr('btn_view_settings')}</div>
 
-        <div className="modal-section-title">{tr('group_section_line')}</div>
-        <div className="view-bar-group">
-          <Slider label={tr('slider_section_line_width')} value={state.sectionLineWidth} min={1} max={5} step={1} unit="px" onChange={(v) => set({ sectionLineWidth: v })} />
-          <Slider label={tr('slider_section_line_gap')} value={state.sectionLineGap} min={0} max={12} step={1} unit="px" onChange={(v) => set({ sectionLineGap: v })} />
-          <span className="line-color-row">
-            <input
-              type="color"
-              className="line-color-input"
-              title={tr('label_section_line_color')}
-              aria-label={tr('label_section_line_color')}
-              value={state.sectionLineColor || DEFAULT_SECTION_LINE_COLOR}
-              onChange={(e) => set({ sectionLineColor: e.target.value })}
-            />
-            {state.sectionLineColor && (
-              <button type="button" className="step-btn" title={tr('btn_section_line_color_reset')} onClick={() => set({ sectionLineColor: null })}>↺</button>
-            )}
-          </span>
-        </div>
+        {!is3D && (
+          <>
+            <div className="modal-section-title">{tr('group_section_line')}</div>
+            <div className="view-bar-group">
+              <Slider label={tr('slider_section_line_width')} value={state.sectionLineWidth} min={1} max={5} step={1} unit="px" onChange={(v) => set({ sectionLineWidth: v })} />
+              <Slider label={tr('slider_section_line_gap')} value={state.sectionLineGap} min={0} max={12} step={1} unit="px" onChange={(v) => set({ sectionLineGap: v })} />
+              <span className="line-color-row">
+                <input
+                  type="color"
+                  className="line-color-input"
+                  title={tr('label_section_line_color')}
+                  aria-label={tr('label_section_line_color')}
+                  value={state.sectionLineColor || DEFAULT_SECTION_LINE_COLOR}
+                  onChange={(e) => set({ sectionLineColor: e.target.value })}
+                />
+                {state.sectionLineColor && (
+                  <button type="button" className="step-btn" title={tr('btn_section_line_color_reset')} onClick={() => set({ sectionLineColor: null })}>↺</button>
+                )}
+              </span>
+            </div>
+          </>
+        )}
 
-        {state.showObjectsOverlay && (
+        {!is3D && state.showObjectsOverlay && (
           <>
             <div className="modal-section-title">{tr('toggle_objects_overlay')}</div>
             <div className="view-bar-group">
@@ -43,6 +50,11 @@ export default function ViewSettingsModal() {
             </div>
           </>
         )}
+
+        <div className="modal-section-title">{tr('group_widgets')}</div>
+        <div className="view-bar-group">
+          <Slider label={tr('slider_widget_scale')} value={state.widgetScale} min={100} max={300} step={10} unit="%" onChange={(v) => set({ widgetScale: v })} />
+        </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
           <button className="primary-btn" onClick={close}>{tr('btn_close')}</button>

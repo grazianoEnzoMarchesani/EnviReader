@@ -35,12 +35,16 @@ export function IconTerrain(props) {
   );
 }
 
-// Terreno + chiave inglese: il fix manuale del bug ENVI-met sulle sezioni biomet
+// Layer corretto: il fix manuale del bug ENVI-met sulle sezioni biomet.
+// Linea piena in alto = dato riposizionato sopra la superficie reale;
+// linea tratteggiata in basso = la vecchia posizione errata, schiacciata sul fondo.
 export function IconTerrainFix(props) {
   return (
     <svg {...base} width="18" height="18" {...props}>
-      <path d="M3 19 9 8l4 6.5L15.5 11 18 15" />
-      <path d="M16.2 21.8a2.2 2.2 0 1 1 3.1-3.1l3.4-3.4.9.9-3.4 3.4a2.2 2.2 0 0 1-4 2.2Z" />
+      <path d="M4 6h16" />
+      <path d="M12 17V9" />
+      <path d="M8.5 12.5 12 9l3.5 3.5" />
+      <path d="M4 19h16" strokeDasharray="2.5 2.5" />
     </svg>
   );
 }
@@ -161,6 +165,29 @@ export function IconSun(props) {
     <svg {...base} width="18" height="18" {...props}>
       <circle cx="12" cy="12" r="4.5" />
       <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" />
+    </svg>
+  );
+}
+
+export function IconWindVolume(props) {
+  return (
+    <svg {...base} width="18" height="18" {...props}>
+      <path d="M2 7h11.5a2.5 2.5 0 1 0-2.4-3.2" />
+      <path d="M2 12h15.5a2.5 2.5 0 1 1-2.4 3.2" />
+      <path d="M2 17h9" />
+    </svg>
+  );
+}
+
+// Sostituisce IconWindVolume sul toggle mentre il worker sta ricalcolando il
+// campo di vento volumetrico (vedi windVolumeLoading in ModelView.jsx):
+// stesso spirito del .btn-spinner già usato per il caricamento dei fileset,
+// qui come icona SVG (arco aperto) invece che bordo CSS, per restare
+// coerente con lo stile a tratto degli altri toggle della toolbar.
+export function IconSpinner(props) {
+  return (
+    <svg {...base} width="18" height="18" className="icon-spin" {...props}>
+      <path d="M12 3a9 9 0 1 1-6.36 2.64" />
     </svg>
   );
 }

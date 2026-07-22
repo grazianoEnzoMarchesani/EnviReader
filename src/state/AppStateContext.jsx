@@ -78,6 +78,7 @@ const initialState = {
   showNorthArrow: true,
   showCalendarWidget: true,
   showClockWidget: true,
+  widgetScale: 100, // dimensione (%) dei widget overlay (nord/bussola, calendario, orologio) in pianta/sezione e nel viewer 3D; 100 = minimo
   wireframe: false,
   // Overlay voxel del dataset corrente nel viewer 3D: stesso dato/palette della
   // vista 2D, disegnato come voxel colorati in pianta e/o nelle sezioni.
@@ -88,6 +89,13 @@ const initialState = {
   // false = un box per cella (a gradino con "segui il terreno" o sezioni
   // ruotate); true = superficie continua a piani inclinati, stesso dato/colore
   dataVoxelSmooth: true,
+  // Campo di vento volumetrico nel viewer 3D: frecce/streamline che riempiono
+  // lo spazio 3D secondo l'intero volume (u, v, w), non solo le fette dati
+  // (quello è già coperto da showWindField + showDataVoxels, vedi ModelView).
+  showWindVolume: false,
+  // Sincronizzato da ModelView mentre il worker ricalcola il volume: serve al
+  // toggle nella sidebar (spostato dalla toolbar) per mostrare lo stato di caricamento
+  windVolumeLoading: false,
   cameraProjection: 'perspective', // 'perspective' | 'parallel' (viewer 3D)
   gizmoNorthMode: 'true', // riferimento cardinali del ViewCube: 'true' (nord vero) | 'grid' (lato piatto del modello)
   resetViewNonce: 0, // incrementato da "Reimposta vista": il viewer 3D lo osserva

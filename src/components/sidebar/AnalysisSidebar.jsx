@@ -92,6 +92,13 @@ function WindTab() {
       <Slider label={tr('slider_wind_size')} value={state.windSize} min={0} max={100} unit="%" onChange={(v) => set({ windSize: v })} />
       <Slider label={tr('slider_wind_density')} value={state.windDensity} min={0} max={100} unit="%" onChange={(v) => set({ windDensity: v })} />
       <Toggle label={tr('toggle_wind_field')} on={state.showWindField} onToggle={() => toggle('showWindField')} />
+      {state.appView === 'model' && (
+        <Toggle
+          label={state.showWindVolume && state.windVolumeLoading ? tr('toggle_wind_volume_loading') : tr('toggle_wind_volume')}
+          on={state.showWindVolume}
+          onToggle={() => toggle('showWindVolume')}
+        />
+      )}
     </>
   );
 }
