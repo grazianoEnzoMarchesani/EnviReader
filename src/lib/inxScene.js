@@ -723,8 +723,12 @@ function buildFromObjectsVolume(model, objectsVolume, { toX, toZ }, spacingZ) {
 // Il polygon offset dell'hardware risolve il conflitto solo nel depth test,
 // senza spostare i vertici: l'utente non vede alcuno scostamento, la geometria
 // resta esattamente quella del dato.
+// Basic (non illuminato): il colore-dato deve restare fedele alla LUT a
+// qualunque ora/posizione del sole, senza la sfumatura Lambert né le ombre
+// (proprie o portate) della simulazione solare — vedi setShadowCasting, che
+// infatti non include mai questo layer.
 function overlayMaterial(opts) {
-  return new THREE.MeshLambertMaterial({ ...opts, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  return new THREE.MeshBasicMaterial({ ...opts, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
 }
 
 // Colore LUT per un valore dato min/max del range attivo; null per NaN (cella
@@ -979,6 +983,14 @@ export function buildDataOverlay(model, overlay) {
 
   if (!any) return null;
   layer.userData.maxHeight = maxHeight;
+  // Esplicito (oltre al MeshBasicMaterial unlit): l'overlay dati non deve mai
+  // proiettare né ricevere ombre della simulazione solare.
+  layer.traverse((obj) => {
+    if (obj.isMesh || obj.isInstancedMesh) {
+      obj.castShadow = false;
+      obj.receiveShadow = false;
+    }
+  });
   return layer;
 }
 

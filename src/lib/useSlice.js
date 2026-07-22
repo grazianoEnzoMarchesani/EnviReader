@@ -8,29 +8,34 @@ const clamp = (v, max) => Math.min(Math.max(0, v), Math.max(0, max));
 // sezioni campionano lungo la traccia ruotata (sempre passante per il perno
 // sectionX/sectionY); la pianta non dipende mai dall'angolo.
 // terrain è la quota di taglio già pronta (terrainCut in envimet.js) o null:
-// calcolata una volta a monte, i cicli di estrazione non fanno alcuna scelta
-function sliceConfig(viewType, dims, level, sectionX, sectionY, angle, terrain) {
+// calcolata una volta a monte, i cicli di estrazione non fanno alcuna scelta.
+// biometFix attiva, solo nelle sezioni, il fix del bug biomet (vedi
+// extractSlice in envimet.js): true quando l'utente lo ha acceso e il
+// dataset corrente è un output biomet.
+function sliceConfig(viewType, dims, level, sectionX, sectionY, angle, terrain, biometFix) {
   if (viewType === 'sectionX' || viewType === 'sectionY') {
     if (angle) {
-      return { line: sectionLinePath(dims, clamp(sectionX, dims.x - 1), clamp(sectionY, dims.y - 1), angle, viewType) };
+      return { line: sectionLinePath(dims, clamp(sectionX, dims.x - 1), clamp(sectionY, dims.y - 1), angle, viewType), biometFix };
     }
-    return viewType === 'sectionX' ? { sectionX: clamp(sectionX, dims.x - 1) } : { sectionY: clamp(sectionY, dims.y - 1) };
+    return viewType === 'sectionX'
+      ? { sectionX: clamp(sectionX, dims.x - 1), biometFix }
+      : { sectionY: clamp(sectionY, dims.y - 1), biometFix };
   }
   return { level: clamp(level, dims.z - 1), terrain };
 }
 
 // Le tre viste (pianta, sezione X, sezione Y) di un fileset in un colpo solo:
 // usata sia dalla vista 2D (le card A/B/Diff) sia dal viewer 3D (overlay voxel).
-export function useSlices(fileset, group, dataset, time, level, sectionX, sectionY, sectionAngle, terrain) {
+export function useSlices(fileset, group, dataset, time, level, sectionX, sectionY, sectionAngle, terrain, biometFix) {
   return {
-    plan: useSlice(fileset, group, dataset, time, 'plan', level, sectionX, sectionY, sectionAngle, terrain),
-    sectionX: useSlice(fileset, group, dataset, time, 'sectionX', level, sectionX, sectionY, sectionAngle, terrain),
-    sectionY: useSlice(fileset, group, dataset, time, 'sectionY', level, sectionX, sectionY, sectionAngle, terrain),
+    plan: useSlice(fileset, group, dataset, time, 'plan', level, sectionX, sectionY, sectionAngle, terrain, biometFix),
+    sectionX: useSlice(fileset, group, dataset, time, 'sectionX', level, sectionX, sectionY, sectionAngle, terrain, biometFix),
+    sectionY: useSlice(fileset, group, dataset, time, 'sectionY', level, sectionX, sectionY, sectionAngle, terrain, biometFix),
   };
 }
 
 // Carica in modo asincrono lo slice corrente (pianta o sezione) di un fileset.
-export function useSlice(fileset, groupPath, variableName, timeIndex, viewType, level, sectionX, sectionY, sectionAngle, terrain) {
+export function useSlice(fileset, groupPath, variableName, timeIndex, viewType, level, sectionX, sectionY, sectionAngle, terrain, biometFix) {
   const [slice, setSlice] = useState(null);
   // la pianta ignora l'angolo: evita di ricaricarla mentre si ruota la sezione
   const angle = viewType === 'plan' ? 0 : sectionAngle || 0;
@@ -50,7 +55,7 @@ export function useSlice(fileset, groupPath, variableName, timeIndex, viewType, 
         }
         const pair = series[clamp(timeIndex, series.length - 1)];
         const edx = await readEDX(pair.EDX);
-        const config = sliceConfig(viewType, edx.dimensions, level, sectionX, sectionY, angle, terrain);
+        const config = sliceConfig(viewType, edx.dimensions, level, sectionX, sectionY, angle, terrain, biometFix);
         const result = await loadSlice(pair.EDT, edx, variableName, config);
         if (alive) setSlice(result);
       } catch (err) {
@@ -59,7 +64,7 @@ export function useSlice(fileset, groupPath, variableName, timeIndex, viewType, 
       }
     })();
     return () => { alive = false; };
-  }, [fileset, groupPath, variableName, timeIndex, viewType, level, sectionX, sectionY, angle, terrain]);
+  }, [fileset, groupPath, variableName, timeIndex, viewType, level, sectionX, sectionY, angle, terrain, biometFix]);
 
   return slice;
 }

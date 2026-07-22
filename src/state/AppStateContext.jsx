@@ -34,6 +34,10 @@ const initialState = {
   sectionLineColor: null, // colore custom della croce; null = colore di tema (testo, 65%)
   scaleFactor: 3,
   followTerrain: true,
+  // Fix manuale del bug storico ENVI-met sui dataset biomet (PMV/PET/SET/
+  // UTCI) in sezione: isola la sola quota pedonale che segue il terreno e
+  // azzera lo "schiacciamento" verticale dell'export, in 2D e nel viewer 3D.
+  fixBiometSections: false,
   levelOut: true, // "livella salendo": smorza il rilievo con la quota, vedi terrainCut
   levelOutHeight: 1, // quota di transizione (livelli): oltre, il piano è orizzontale
   windOpacity: 50,
@@ -57,6 +61,10 @@ const initialState = {
   paletteDraft: null, // editor aperto: { target: 'main'|'diff', editingId, name, colors }
   diffOrderAB: true,
   scaleType: 'syncedViews',
+  // Legend bounds della vista 3D: scope ristretto rispetto alla 2D (qui non
+  // esiste una vista "singola" o "tra viste", perché ogni fileset ha una sola
+  // legenda che copre tutti i piani attivi insieme) — vedi SCALE_TYPES_3D.
+  scaleType3D: 'allFilesets',
   customRanges: {},
   customRangeModal: null,
   timeSeriesOpen: true,
@@ -83,12 +91,11 @@ const initialState = {
   cameraProjection: 'perspective', // 'perspective' | 'parallel' (viewer 3D)
   gizmoNorthMode: 'true', // riferimento cardinali del ViewCube: 'true' (nord vero) | 'grid' (lato piatto del modello)
   resetViewNonce: 0, // incrementato da "Reimposta vista": il viewer 3D lo osserva
-  sunPathEnabled: false, // simulazione percorso solare + ombre nel modello 3D
-  // scostamento manuale dello slider solare rispetto al timestep dei risultati:
-  // con risultati caricati è un indice nella serie reale (state.seriesLabels),
-  // senza risultati è un'ora del giorno decimale (0-24) per la sola anteprima
-  // geometrica; null = segue state.time (vedi src/lib/sunLink.js)
-  sunTimeOverride: null,
+  // true = ruotare uno dei due viewer 3D (A/B) ruota anche l'altro allo stesso
+  // orientamento (zoom e pan restano indipendenti); attivo di default perché è
+  // il caso d'uso più comune nel confronto A/B
+  syncCamera3D: true,
+  sunPathEnabled: false, // simulazione percorso solare + ombre nel modello 3D: segue state.time (vedi src/lib/sunLink.js)
   // condizioni al contorno: fileset mostrato, periodo dei grafici FOX,
   // eventuale file FOX aperto a mano quando non è nella cartella risultati
   boundaryFileset: 'A',
@@ -250,7 +257,7 @@ export function AppStateProvider({ children }) {
         if (s.sectionX != null) patch.sectionX = dims ? clampTo(s.sectionX, dims.x - 1) : s.sectionX;
         if (s.sectionY != null) patch.sectionY = dims ? clampTo(s.sectionY, dims.y - 1) : s.sectionY;
         if (s.levelOutHeight != null) patch.levelOutHeight = Math.max(1, dims ? clampTo(s.levelOutHeight, dims.z - 1) : s.levelOutHeight);
-        for (const k of ['sectionAngle', 'followTerrain', 'levelOut', 'showWindField', 'showObjectsOverlay', 'windStyle', 'windOpacity', 'windSize', 'windDensity', 'scaleType', 'palette', 'paletteReversed', 'diffPalette', 'diffPaletteReversed']) {
+        for (const k of ['sectionAngle', 'followTerrain', 'fixBiometSections', 'levelOut', 'showWindField', 'showObjectsOverlay', 'windStyle', 'windOpacity', 'windSize', 'windDensity', 'scaleType', 'palette', 'paletteReversed', 'diffPalette', 'diffPaletteReversed']) {
           if (s[k] != null) patch[k] = s[k];
         }
         set(patch);

@@ -35,6 +35,16 @@ export function IconTerrain(props) {
   );
 }
 
+// Terreno + chiave inglese: il fix manuale del bug ENVI-met sulle sezioni biomet
+export function IconTerrainFix(props) {
+  return (
+    <svg {...base} width="18" height="18" {...props}>
+      <path d="M3 19 9 8l4 6.5L15.5 11 18 15" />
+      <path d="M16.2 21.8a2.2 2.2 0 1 1 3.1-3.1l3.4-3.4.9.9-3.4 3.4a2.2 2.2 0 0 1-4 2.2Z" />
+    </svg>
+  );
+}
+
 export function IconTree(props) {
   return (
     <svg {...base} width="18" height="18" {...props}>
@@ -131,6 +141,17 @@ export function IconSmoothSurface(props) {
     <svg {...base} width="18" height="18" {...props}>
       <path d="M3 15c2.5-5 5 5 7.5 0S15 10 17.5 15 21 9 21 9" />
       <path d="M3 20h18" />
+    </svg>
+  );
+}
+
+export function IconSyncRotate(props) {
+  return (
+    <svg {...base} width="18" height="18" {...props}>
+      <path d="M4 12a8 8 0 0 1 13.5-5.5" />
+      <path d="M17 2.5v4h-4" />
+      <path d="M20 12a8 8 0 0 1-13.5 5.5" />
+      <path d="M7 21.5v-4h4" />
     </svg>
   );
 }

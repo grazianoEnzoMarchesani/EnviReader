@@ -162,7 +162,14 @@ function backdropTexture() {
 
 // Crea il gizmo. `stage` espone camera/controls correnti (cambiano con la
 // proiezione); `hitEl` è il div overlay che intercetta i click nell'angolo.
-export function createViewCube(stage, hitEl) {
+// `onUserGoTo(dirWorld, upOverride)`, se fornito, viene invocato ogni volta
+// che un gesto dell'utente (click su faccia/lettera, frecce di rotazione)
+// avvia un `goTo`: usato dal viewer per replicare la stessa vista sul
+// pannello gemello quando la rotazione sincronizzata è attiva (vedi
+// Model3DViewer). Non viene invocato quando `goTo` è chiamato "in silenzio"
+// per applicare una vista già ricevuta dall'altro pannello — altrimenti i
+// due pannelli si rimbalzerebbero l'un l'altro all'infinito.
+export function createViewCube(stage, hitEl, { onUserGoTo } = {}) {
   const scene = new THREE.Scene();
   const camera = new THREE.OrthographicCamera(-1.8, 1.8, 1.8, -1.8, 0.1, 10);
   camera.position.set(0, 0, 4);
@@ -383,7 +390,10 @@ export function createViewCube(stage, hitEl) {
   // sia la direzione (arco a raggio costante) sia il vettore up, così la vista
   // dall'alto può arrivare allo zenit esatto con un up dedicato (nord in alto,
   // o la direzione cardinale scelta se si è cliccata una lettera dell'anello).
-  function goTo(dirWorld, upOverride) {
+  // `silent` evita di rilanciare `onUserGoTo` quando la chiamata arriva già
+  // dalla sincronizzazione con l'altro pannello (vedi commento su createViewCube).
+  function goTo(dirWorld, upOverride, silent = false) {
+    if (!silent) onUserGoTo?.(dirWorld, upOverride ?? null);
     if (axialActive) {
       axialActive = false;
       stage.controls.removeEventListener('start', rebase);
@@ -481,6 +491,14 @@ export function createViewCube(stage, hitEl) {
       northMode = mode === 'grid' ? 'grid' : 'true';
       applyNorthReference();
     },
+    // applica dall'esterno la stessa vista raggiunta con un click su
+    // faccia/lettera (vedi onUserGoTo): usato per replicare sul pannello
+    // gemello la rotazione avviata sull'altro, con la stessa animazione e
+    // la stessa gestione della vista assiale (axialActive/rebase) di un
+    // click reale, invece di copiare a mano posizione/up della camera.
+    goTo(dirWorld, upOverride) {
+      goTo(dirWorld, upOverride, true);
+    },
     // ruota la vista di deltaDeg (gradi) attorno all'asse verticale, mantenendo
     // l'inclinazione corrente (frecce curve del gizmo): in vista assiale
     // dall'alto ruota l'up-vector (spin sul posto), altrimenti l'azimuth della
@@ -563,8 +581,18 @@ export function createViewCube(stage, hitEl) {
       renderer.setScissorTest(true);
       renderer.setScissor(vx, vy, vw, vh);
       renderer.setViewport(vx, vy, vw, vh);
+      // renderer.render() cancella sempre color+depth all'inizio se autoClear
+      // è true (vedi WebGLBackground.render in three.js), scissor rect incluso:
+      // senza disattivarlo qui, questa seconda render() nel riquadro del gizmo
+      // cancellerebbe i pixel del modello già disegnati lì dal render principale
+      // (risultato: un riquadro a tinta unita al posto del modello sotto il
+      // gizmo). Si disattiva autoClear e si cancella solo la depth a mano,
+      // così il colore del render principale resta intatto sotto al gizmo.
+      const prevAutoClear = renderer.autoClear;
+      renderer.autoClear = false;
       renderer.clearDepth();
       renderer.render(scene, camera);
+      renderer.autoClear = prevAutoClear;
       renderer.setScissorTest(false);
       renderer.setViewport(prev);
     },

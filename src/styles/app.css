@@ -890,6 +890,9 @@ button { font-family: inherit; }
   border: 1px solid var(--border-strong);
   pointer-events: none;
   z-index: 1;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
 }
 .map-north svg {
   width: 22px;
@@ -919,9 +922,20 @@ button { font-family: inherit; }
   font-size: 11px;
   font-weight: 700;
   color: var(--text);
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
 }
 .map-section-compass svg {
   color: var(--text-secondary);
+}
+/* Comparsa/scomparsa animata (in entrambe le direzioni, a differenza di
+   calendario/orologio che restano montati/smontati di scatto): l'elemento
+   resta nel DOM anche a toggle spento, così la transizione può giocare
+   anche in uscita invece che solo all'ingresso. */
+.map-widget-hidden {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 .map-calendar {
   position: absolute;
@@ -1233,27 +1247,49 @@ button { font-family: inherit; }
 .sun-info-row strong { color: var(--text); font-family: var(--mono); font-weight: 600; }
 .sun-info-warning { color: var(--text-faint); font-style: italic; font-size: 11px; max-width: 220px; }
 
-/* Legenda dell'overlay voxel del dataset nel viewer 3D: stessa struttura
-   (etichette + barra a gradiente) della legenda delle mappe 2D. */
-.data-voxel-legend {
+/* Comparsa/scomparsa dei badge calendario/orologio (sia in 2D dentro .map-frame
+   che in 3D dentro .model-viewer.is-3d, entrambi già position:relative), oltre
+   allo scorrimento di "top" del clock già esistente quando il calendario si
+   accende/spegne. */
+.map-calendar,
+.map-clock {
+  animation: widget-pop 0.2s ease-out;
+}
+@keyframes widget-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* Azimuth/altitudine del sole: colonna indipendente affiancata a destra del
+   gruppo calendario/orologio (spazio libero nell'angolo) invece che impilata
+   sotto, così accendere/spegnere calendario o orologio non la sposta. */
+.model-sun-widgets {
   position: absolute;
-  bottom: 10px;
-  left: 14px;
+  top: 8px;
+  left: 48px;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  font-size: 11px;
-  opacity: 0.94;
-  max-width: calc(100% - 28px);
+  z-index: 1;
   pointer-events: none;
 }
-.data-voxel-legend-title { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.data-voxel-legend .map-legend-bar { width: 90px; min-width: 0; }
+.model-sun-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
+  border: 1px solid var(--border-strong);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--text);
+  white-space: nowrap;
+  animation: widget-pop 0.2s ease-out;
+}
+.model-sun-badge svg { width: 14px; height: 14px; color: var(--text-secondary); flex-shrink: 0; }
+
 .sun-linked-date { display: block; margin: -4px 0 8px; }
 .sun-timeline-label {
   display: block;

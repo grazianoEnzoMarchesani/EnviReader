@@ -51,4 +51,9 @@ export const SCALE_TYPES = [
   { value: 'custom', labelKey: 'legend_custom' },
 ];
 
+// Sottoinsieme di SCALE_TYPES rilevante per la vista 3D: niente "singolo
+// grafico"/"tra viste" perché lì non esiste una vista alla volta, ogni
+// fileset ha una sola legenda condivisa da tutti i piani attivi.
+export const SCALE_TYPES_3D = SCALE_TYPES.filter((s) => s.value === 'filesetGlobal' || s.value === 'allFilesets' || s.value === 'custom');
+
 export const GITHUB_URL = 'https://github.com/grazianoEnzoMarchesani/EnviReader';

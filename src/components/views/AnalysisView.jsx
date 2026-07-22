@@ -7,12 +7,12 @@ import Segmented from '../controls/Segmented';
 import Slider from '../controls/Slider';
 import Select from '../controls/Select';
 import IconToggle from '../controls/IconToggle';
-import { IconLayers3D, IconBuilding, IconTerrain, IconTree, IconCompass, IconCalendar, IconClock, IconSettings } from '../icons/ToolbarIcons';
+import { IconLayers3D, IconBuilding, IconTerrain, IconTerrainFix, IconTree, IconCompass, IconCalendar, IconClock, IconSettings } from '../icons/ToolbarIcons';
 import ViewSettingsModal from '../ViewSettingsModal';
 import MapChart, { MapThumb, niceCeil } from '../MapChart';
 import TimeSeriesChart from '../TimeSeriesChart';
 import { useSlices, usePointSeries, useInxRotation, useWindField, useTerrainCut } from '../../lib/useSlice';
-import { terrainCutProfile } from '../../lib/envimet';
+import { terrainCutProfile, isBiometDataset } from '../../lib/envimet';
 import { useFlip } from '../../lib/useFlip';
 import { formatValue } from '../../lib/colormap';
 
@@ -114,9 +114,13 @@ export default function AnalysisView() {
   const terrainCutA = useTerrainCut(state.terrainA, state);
   const terrainCutB = useTerrainCut(state.terrainB, state);
 
+  // Fix biomet delle sezioni (vedi toggle nella toolbar): attivo solo se
+  // l'utente lo ha acceso e il dataset corrente è un output biomet.
+  const biometFixActive = state.fixBiometSections && isBiometDataset(state.dataGroup, state.dataset);
+
   const sliceArgs = [state.dataGroup, state.dataset, state.time, state.level, state.sectionX, state.sectionY, state.sectionAngle];
-  const slicesA = useSlices(state.filesetA, ...sliceArgs, terrainCutA);
-  const slicesB = useSlices(state.filesetB, ...sliceArgs, terrainCutB);
+  const slicesA = useSlices(state.filesetA, ...sliceArgs, terrainCutA, biometFixActive);
+  const slicesB = useSlices(state.filesetB, ...sliceArgs, terrainCutB, biometFixActive);
   const slicesDiff = useMemo(() => {
     if (state.compareMode !== 'abdiff') return { plan: null, sectionX: null, sectionY: null };
     return {
@@ -208,9 +212,12 @@ export default function AnalysisView() {
   const rotationA = useInxRotation(state.filesetA);
   const rotationB = useInxRotation(state.filesetB);
   const isPlan = state.viewType === 'plan';
-  const compassA = state.showNorthArrow ? { type: state.viewType, rotation: rotationA, sectionAngle: state.sectionAngle } : null;
-  const compassB = state.showNorthArrow ? { type: state.viewType, rotation: rotationB, sectionAngle: state.sectionAngle } : null;
-  const compassDiff = state.showNorthArrow ? { type: state.viewType, rotation: (rotationA ?? rotationB), sectionAngle: state.sectionAngle } : null;
+  // Sempre presente (non solo quando il toggle è attivo): "visible" pilota la
+  // transizione CSS di comparsa/scomparsa, che altrimenti non potrebbe animare
+  // l'uscita (l'elemento andrebbe smontato di scatto insieme al toggle).
+  const compassA = { type: state.viewType, rotation: rotationA, sectionAngle: state.sectionAngle, visible: state.showNorthArrow };
+  const compassB = { type: state.viewType, rotation: rotationB, sectionAngle: state.sectionAngle, visible: state.showNorthArrow };
+  const compassDiff = { type: state.viewType, rotation: (rotationA ?? rotationB), sectionAngle: state.sectionAngle, visible: state.showNorthArrow };
 
   // Calcolo dei range (min/max) per ciascuna vista in base allo scaleType
   const minOf = (...slices) => {
@@ -534,6 +541,12 @@ export default function AnalysisView() {
                       <IconToggle icon={IconBuilding} label={tr('toggle_obj_buildings')} on={state.objOverlayBuildings} onToggle={() => toggle('objOverlayBuildings')} />
                       <IconToggle icon={IconTerrain} label={tr('toggle_obj_terrain')} on={state.objOverlayTerrain} onToggle={() => toggle('objOverlayTerrain')} />
                       <IconToggle icon={IconTree} label={tr('toggle_obj_vegetation')} on={state.objOverlayVegetation} onToggle={() => toggle('objOverlayVegetation')} />
+                    </>
+                  )}
+                  {isBiometDataset(state.dataGroup, state.dataset) && (
+                    <>
+                      <div className="vertical-divider" />
+                      <IconToggle icon={IconTerrainFix} label={tr('toggle_biomet_fix')} on={state.fixBiometSections} onToggle={() => toggle('fixBiometSections')} />
                     </>
                   )}
                   <div className="vertical-divider" />

@@ -12,13 +12,49 @@ import { createViewCube } from '../lib/viewCube';
 import { useI18n } from '../i18n/I18nContext';
 
 const DEG = Math.PI / 180;
+const UP_Y = new THREE.Vector3(0, 1, 0);
 
-export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOverlay, flags, wireframe, resetNonce, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange }) {
+// Risolve una custom property CSS (es. "--surface") in "rgb(r, g, b)" con
+// componenti 0-255, qualunque sia la sintassi con cui è definita nel tema
+// chiaro/scuro (hex, oklch, ...): serve per dare a scene.background lo stesso
+// colore del tema corrente senza doverlo duplicare/parsare a mano in JS.
+// getComputedStyle da solo non basta: sui browser con supporto CSS Color 4
+// il valore calcolato resta serializzato come "oklch(...)" (non convertito in
+// rgb), sintassi che THREE.Color.setStyle non riconosce. Il canvas 2D invece
+// rasterizza sempre in RGBA a 8 bit indipendentemente dallo spazio colore di
+// input, quindi leggere il pixel dopo un fillRect dà un rgb() sempre valido.
+function resolveCssColor(varName) {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;';
+  probe.style.color = `var(${varName})`;
+  document.body.appendChild(probe);
+  const cssColor = getComputedStyle(probe).color;
+  document.body.removeChild(probe);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = cssColor;
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+  return `rgb(${r}, ${g}, ${b})`;
+}
+// costante di tempo (s) dell'inseguimento morbido di rotazione/zoom ricevuti
+// in sincronizzazione: più basso = risposta più pronta, più alto = più lento.
+// A ~3×FOLLOW_TAU l'inseguimento è visivamente concluso (vedi loop sotto).
+const FOLLOW_TAU = 0.12;
+
+export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOverlay, flags, wireframe, resetNonce, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
   const { tr } = useI18n();
   const containerRef = useRef(null);
   const gizmoRef = useRef(null); // div overlay che intercetta i click del gizmo
   const stageRef = useRef(null); // { renderer, scene, camera, controls, layers, resetView, setProjection }
   const gizmoApiRef = useRef(null); // API del ViewCube (setNorthReference, ecc.)
+  // stato sempre fresco per il loop di rendering (registrato una sola volta al
+  // mount, vedi interactionRef sotto per lo stesso pattern)
+  const cameraSyncEnabledRef = useRef(cameraSyncEnabled);
+  useEffect(() => {
+    cameraSyncEnabledRef.current = cameraSyncEnabled;
+  }, [cameraSyncEnabled]);
   // stato dell'incrocio sezioni sempre fresco per i listener del canvas,
   // registrati una sola volta al mount (vedi effetto sotto)
   const interactionRef = useRef({ model, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange });
@@ -36,6 +72,18 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
+    // sfondo della scena = colore del tema (chiaro/scuro) corrente: prima si
+    // affidava alla trasparenza del canvas (alpha:true) che lasciava vedere la
+    // card CSS sottostante, ma nel "cielo" vuoto sopra il modello questo dava
+    // un riquadro bianco poco leggibile invece di adattarsi al tema. Disegnarlo
+    // dentro la scena three.js è affidabile in ogni caso, e non copre comunque
+    // il modello, che viene renderizzato sopra normalmente dove presente.
+    const applySceneBackground = () => {
+      scene.background = new THREE.Color().setStyle(resolveCssColor('--surface'));
+    };
+    applySceneBackground();
+    const themeObserver = new MutationObserver(applySceneBackground);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     // due camere condividono posizione/target: la prospettica è quella di
     // default, l'ortografica (parallela) riusa lo stesso punto di vista
     const perspCam = new THREE.PerspectiveCamera(45, 1, 0.5, 20000);
@@ -52,8 +100,61 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
     };
     stageRef.current = stage;
 
-    // gizmo di orientamento nell'angolo in alto a destra
-    const gizmo = createViewCube(stage, gizmoRef.current);
+    // "Quanto è zoomato" il pannello, in un'unica unità comparabile tra le
+    // due proiezioni: per la prospettica è la distanza camera→target (più
+    // piccola = più vicino), per la parallela è camera.zoom convertito nella
+    // stessa unità di distanza con la formula già usata da setProjection per
+    // passare da ortografica a prospettica — permette di sincronizzare lo
+    // zoom anche in vista parallela, dove "zoom" non è affatto una distanza.
+    const halfFov = (perspCam.fov * DEG) / 2;
+    const currentZoomRadius = () => {
+      if (stage.camera.isOrthographicCamera) {
+        return (stage.camera.userData.viewHeight / stage.camera.zoom) / (2 * Math.tan(halfFov));
+      }
+      return stage.camera.position.distanceTo(stage.controls.target);
+    };
+    const applyZoomRadius = (radius) => {
+      if (stage.camera.isOrthographicCamera) {
+        stage.camera.zoom = stage.camera.userData.viewHeight / (2 * radius * Math.tan(halfFov));
+        stage.camera.updateProjectionMatrix();
+      } else {
+        const target = stage.controls.target;
+        const dir = stage.camera.position.clone().sub(target).normalize();
+        stage.camera.position.copy(target).addScaledVector(dir, radius);
+      }
+    };
+
+    // Rotazione/zoom/pan sincronizzati tra i due viewer 3D (vedi
+    // cameraSyncRef in ModelView): token identificativo di *questo*
+    // pannello, così ognuno ignora i propri stessi aggiornamenti nel
+    // riferimento condiviso e non ri-trasmette una vista appena ricevuta
+    // dall'altro (niente ping-pong). Zoom e pan viaggiano come rapporti
+    // relativi alla propria inquadratura di default (baseRadius/baseTarget),
+    // non come valori assoluti, così restano proporzionati anche fra
+    // modelli di dimensioni diverse.
+    const syncToken = {};
+    let syncRev = 0;
+    let syncLastAppliedRev = 0;
+    const broadcastSync = (payload) => {
+      if (!cameraSyncEnabledRef.current || !cameraSyncRef) return;
+      syncRev += 1;
+      cameraSyncRef.current = { ...payload, rev: syncRev, source: syncToken };
+      syncLastAppliedRev = syncRev; // non ri-applicare a sé stesso ciò che si è appena inviato
+    };
+
+    // gizmo di orientamento nell'angolo in alto a destra. onUserGoTo: un
+    // click su faccia/lettera/frecce di rotazione (mai una vista ricevuta in
+    // sincronizzazione, vedi silent in viewCube.js) viene rilanciato così
+    // com'è sul pannello gemello, che lo applica con lo stesso gizmo.goTo
+    // (stessa animazione, stessa gestione della vista assiale) invece di
+    // copiare a mano posizione/up della camera — l'unico modo corretto di
+    // riprodurre una vista dall'alto/cardinale, che in coordinate sferiche
+    // pure è un caso degenere (vedi note in viewCube.js su axialActive).
+    const gizmo = createViewCube(stage, gizmoRef.current, {
+      onUserGoTo: (dirWorld, upOverride) => {
+        broadcastSync({ kind: 'goto', dir: dirWorld.clone(), up: upOverride ? upOverride.clone() : null });
+      },
+    });
     gizmoApiRef.current = gizmo;
 
     // switch prospettica/parallela conservando orientamento, target e "zoom"
@@ -243,6 +344,49 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     renderer.domElement.addEventListener('pointermove', onHoverMove);
 
+    // stato per il trascinamento continuo: direzione (camera→target,
+    // normalizzata), up, rapporto di zoom (raggio / baseRadius) e pan (scarto
+    // del target da baseTarget, in frazioni di baseRadius, vedi sopra)
+    // correnti, per rilevare quando l'utente sta orbitando/zoomando/spostando
+    // a mano (vedi loop sotto). Un vettore direzione non ha il problema di
+    // gimbal-lock di theta/phi vicino ai poli (dove un piccolo movimento del
+    // mouse farebbe impazzire l'azimuth), quindi la vista sincronizzata non
+    // "sbanda" quando si passa quasi sopra la verticale.
+    const dragTmp = new THREE.Vector3();
+    const panTmp = new THREE.Vector3();
+    let syncLastDir = null;
+    let syncLastUp = null;
+    let syncLastZoomRatio = null;
+    let syncLastPan = null;
+    const DRAG_EPS_SQ = 1e-8; // ~0.006° di scarto minimo prima di ritrasmettere
+    const ZOOM_EPS = 0.0015; // ~0.15% di scarto minimo prima di ritrasmettere lo zoom
+    const PAN_EPS_SQ = 1e-8; // scarto minimo (in frazioni di baseRadius) prima di ritrasmettere il pan
+    // richiamato dopo ogni resetView "silenzioso" (caricamento/cambio modello,
+    // vedi sotto): dimentica il riferimento così il prossimo frame lo ricattura
+    // come nuova baseline invece di scambiarlo per un trascinamento dell'utente
+    stage.resyncDragBaseline = () => {
+      syncLastDir = null;
+      syncLastUp = null;
+      syncLastZoomRatio = null;
+      syncLastPan = null;
+    };
+
+    // Inseguimento morbido di una vista ricevuta in sincronizzazione
+    // (rotazione, zoom e pan): invece di scattare di colpo alla vista appena
+    // ricevuta, ogni frame la camera si avvicina un po' di più al bersaglio
+    // (target, rotazione, up e raggio), con un'attenuazione indipendente dal
+    // framerate. Copre sia il trascinamento continuo sull'altro pannello (il
+    // bersaglio si sposta ad ogni frame, quindi l'inseguimento resta sempre
+    // "un passo indietro" e appare fluido) sia un salto grande (es.
+    // sincronizzazione appena riattivata con viste molto diverse tra i due
+    // pannelli).
+    let followActive = false;
+    const followDir = new THREE.Vector3();
+    const followUp = new THREE.Vector3();
+    let followRadius = null;
+    const followTarget = new THREE.Vector3();
+    let followHasTarget = false;
+
     const timer = new THREE.Timer();
     let frame;
     const loop = () => {
@@ -251,9 +395,139 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
       // durante l'animazione del gizmo la camera è pilotata direttamente,
       // quindi si salta l'update (con damping) di OrbitControls
       const animating = gizmo.update(delta);
-      if (!animating) stage.controls.update();
+      // true quando in questo frame la camera si è mossa per raggiungere una
+      // vista sincronizzata (goto o inseguimento), non per un gesto
+      // dell'utente: in tal caso non va ritrasmessa (niente ping-pong, vedi
+      // broadcastSync sotto)
+      let appliedExternalSync = false;
+
+      // applica una vista sincronizzata ricevuta dall'altro pannello, se
+      // presente e non già applicata; mai mentre questo pannello ha una sua
+      // animazione del gizmo in corso, per non litigarci sopra
+      if (!animating) {
+        const sync = cameraSyncEnabledRef.current ? cameraSyncRef?.current : null;
+        if (sync && sync.source && sync.source !== syncToken && sync.rev !== syncLastAppliedRev) {
+          if (sync.kind === 'goto') {
+            // click su faccia/lettera/frecce sull'altro pannello: rifà lo
+            // stesso goTo qui, con la stessa animazione e la stessa gestione
+            // della vista assiale (mai copiare a mano posizione/up, vedi
+            // note in viewCube.js) — target e zoom restano i propri, e un
+            // eventuale inseguimento di zoom in corso resta valido (goTo non
+            // tocca il raggio)
+            followActive = false;
+            gizmo.goTo(sync.dir, sync.up ?? undefined);
+          } else if (sync.dir) {
+            // trascinamento/zoom/pan sull'altro pannello: stesso orientamento,
+            // stesso rapporto di zoom e stesso pan (relativi alla propria
+            // inquadratura di default, vedi baseRadius/baseTarget), ma la
+            // scala assoluta resta quella propria di questo pannello. Se
+            // questo pannello era rimasto in vista assiale per un proprio
+            // click (axialActive, up non verticale), va prima ripulito:
+            // altrimenti il rebase al prossimo drag userebbe uno stato ormai
+            // stantio (vedi resetGizmoState in viewCube.js)
+            gizmo.resetGizmoState();
+            followDir.copy(sync.dir);
+            followUp.copy(sync.up ?? UP_Y);
+            followRadius = sync.zoomRatio != null && stage.baseRadius ? sync.zoomRatio * stage.baseRadius : null;
+            followHasTarget = !!(sync.pan && stage.baseTarget && stage.baseRadius);
+            if (followHasTarget) followTarget.copy(stage.baseTarget).addScaledVector(sync.pan, stage.baseRadius);
+            followActive = true;
+          }
+          syncLastAppliedRev = sync.rev;
+        }
+        if (followActive) {
+          const t = 1 - Math.exp(-delta / FOLLOW_TAU);
+          // il pan trasla insieme target e camera prima di ri-orientare/
+          // zoomare intorno al nuovo target, così i tre inseguimenti
+          // compongono correttamente invece di litigarsi il pivot
+          let targetConverged = true;
+          if (followHasTarget) {
+            const target = stage.controls.target;
+            const prevTarget = target.clone();
+            target.lerp(followTarget, t);
+            stage.camera.position.add(target.clone().sub(prevTarget));
+            targetConverged = target.distanceToSquared(followTarget) < (stage.baseRadius || 1) ** 2 * 1e-10;
+          }
+          const target = stage.controls.target;
+          const offset = stage.camera.position.clone().sub(target);
+          const posRadius = offset.length();
+          const curDir = offset.normalize();
+          const nextDir = curDir.lerp(followDir, t).normalize();
+          stage.camera.up.lerp(followUp, t).normalize();
+          // la rotazione si applica sempre in posizione (vale per entrambe le
+          // proiezioni); lo zoom è gestito a parte da applyZoomRadius, che sa
+          // se tradurlo in distanza (prospettica) o in camera.zoom (parallela,
+          // dove la distanza non incide affatto sulla dimensione visibile)
+          stage.camera.position.copy(target).addScaledVector(nextDir, posRadius);
+          if (followRadius != null) applyZoomRadius(THREE.MathUtils.lerp(currentZoomRadius(), followRadius, t));
+          stage.camera.lookAt(target);
+          appliedExternalSync = true;
+          // inseguimento concluso (vicinissimo al bersaglio): ferma il lerp
+          // (altrimenti non converge mai del tutto) e scatta all'esatto valore
+          const zoomConverged = followRadius == null || Math.abs(currentZoomRadius() - followRadius) < followRadius * 1e-5;
+          if (nextDir.distanceToSquared(followDir) < 1e-9 && zoomConverged && targetConverged) {
+            if (followHasTarget) stage.controls.target.copy(followTarget);
+            stage.camera.up.copy(followUp);
+            stage.camera.position.copy(stage.controls.target).addScaledVector(followDir, posRadius);
+            if (followRadius != null) applyZoomRadius(followRadius);
+            stage.camera.lookAt(stage.controls.target);
+            followActive = false;
+          }
+        }
+        // Fuori dall'animazione del gizmo, OrbitControls.update() è sicuro
+        // solo con camera.up verticale: in vista assiale (up ruotato in
+        // pianta, vedi axialActive in viewCube.js) l'orbit-controls interno
+        // non sa nulla di quella rotazione e ricalcolerebbe uno spherical
+        // degenere (azimuth indefinito), "collassando" la vista verso una
+        // direzione qualunque. Si salta l'update finché il primo drag non
+        // fa il rebase (vedi rebase() in viewCube.js).
+        if (stage.camera.up.y > 0.999) stage.controls.update();
+      }
       renderer.render(stage.scene, stage.camera);
       gizmo.render(renderer);
+
+      // trasmette il trascinamento/zoom/pan manuale (mai durante l'animazione
+      // del gizmo, che trasmette da sé via onUserGoTo, né mentre si sta
+      // applicando una vista appena ricevuta, né in vista assiale, dove "up"
+      // non è verticale e va sempre gestito con gizmo.goTo)
+      if (!animating && !appliedExternalSync && stage.camera.up.y > 0.999) {
+        const target = stage.controls.target;
+        dragTmp.copy(stage.camera.position).sub(target).normalize();
+        const zoomRatio = stage.baseRadius ? currentZoomRadius() / stage.baseRadius : null;
+        const havePan = stage.baseTarget && stage.baseRadius;
+        if (havePan) panTmp.copy(target).sub(stage.baseTarget).divideScalar(stage.baseRadius);
+        const changed =
+          !syncLastDir ||
+          dragTmp.distanceToSquared(syncLastDir) > DRAG_EPS_SQ ||
+          stage.camera.up.distanceToSquared(syncLastUp) > DRAG_EPS_SQ ||
+          (zoomRatio != null && syncLastZoomRatio != null && Math.abs(zoomRatio / syncLastZoomRatio - 1) > ZOOM_EPS) ||
+          (havePan && syncLastPan && panTmp.distanceToSquared(syncLastPan) > PAN_EPS_SQ);
+        if (changed) {
+          // la primissima lettura (o quella dopo resyncDragBaseline, vedi
+          // sotto) fissa solo il riferimento: non è un movimento dell'utente,
+          // quindi non va trasmessa, altrimenti aprire/ricaricare un fileset
+          // farebbe scattare la sincronizzazione e ruoterebbe/zoomerebbe/
+          // sposterebbe anche l'altro pannello senza che nessuno abbia
+          // toccato nulla
+          const isBaseline = !syncLastDir;
+          syncLastDir = syncLastDir ?? new THREE.Vector3();
+          syncLastUp = syncLastUp ?? new THREE.Vector3();
+          syncLastPan = syncLastPan ?? new THREE.Vector3();
+          syncLastDir.copy(dragTmp);
+          syncLastUp.copy(stage.camera.up);
+          syncLastZoomRatio = zoomRatio;
+          if (havePan) syncLastPan.copy(panTmp);
+          if (!isBaseline) {
+            broadcastSync({
+              kind: 'drag',
+              dir: dragTmp.clone(),
+              up: stage.camera.up.clone(),
+              zoomRatio,
+              pan: havePan ? panTmp.clone() : null,
+            });
+          }
+        }
+      }
       frame = requestAnimationFrame(loop);
     };
     loop();
@@ -261,6 +535,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
+      themeObserver.disconnect();
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointermove', onHoverMove);
       window.removeEventListener('pointermove', onWindowMove);
@@ -292,8 +567,21 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
     stage.sunLayer = sunLayer;
 
     const radius = Math.max(size.W, size.H, maxHeight * 2);
+    // distanza di riferimento per lo zoom sincronizzato (vedi broadcastSync/
+    // "zoomRatio" nel loop sotto): permette di confrontare lo zoom fra due
+    // modelli di dimensioni diverse come rapporto rispetto alla propria
+    // inquadratura di default, invece che come distanza assoluta (altrimenti
+    // un fileset più grande apparirebbe sempre "più lontano" dell'altro anche
+    // a parità di inquadratura percepita)
+    stage.baseRadius = radius;
     const resetPos = new THREE.Vector3(radius * 0.65, radius * 0.75, radius * 0.95);
     const resetTarget = new THREE.Vector3(0, maxHeight / 4, 0);
+    // punto di riferimento per il pan sincronizzato (vedi "pan" nel loop
+    // sotto): lo spostamento del target viene condiviso come scarto da questo
+    // punto, in frazioni di baseRadius, così resta proporzionato anche fra
+    // modelli di dimensioni diverse invece di essere una posizione assoluta
+    // (che non avrebbe senso confrontare fra due griglie diverse)
+    stage.baseTarget = resetTarget.clone();
     // animate=false per lo snap iniziale al caricamento del modello (nessun
     // "volo" dall'origine); animate=true per Home/"Reimposta vista", che
     // deleghano al gizmo un'animazione fluida (vedi animateReset/flyTo in
@@ -322,6 +610,12 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
           stage.camera.updateProjectionMatrix();
         }
         stage.controls.update();
+        // snap silenzioso (caricamento/cambio modello, animate=false): non è
+        // un gesto dell'utente, quindi non deve ruotare l'altro pannello
+        // sincronizzato (vedi resyncDragBaseline) — a differenza di un
+        // Home/"Reimposta vista" (animate=true) finito qui solo perché la
+        // proiezione è parallela, che va invece sincronizzato normalmente
+        if (!animate) stage.resyncDragBaseline?.();
         return;
       }
       gizmoApiRef.current?.animateReset(resetPos, resetTarget, new THREE.Vector3(0, 1, 0));

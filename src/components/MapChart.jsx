@@ -379,9 +379,9 @@ function drawArrow(ctx, x, y, angle, len, isThumb) {
 // Freccia del nord per le piante: north è modelRotation dell'INX, positivo in
 // senso antiorario (0 = nord in alto, +5° = nord verso nord-ovest), quindi la
 // rotazione CSS (oraria) va negata.
-function NorthArrow({ rotation }) {
+function NorthArrow({ rotation, visible }) {
   return (
-    <span className="map-north">
+    <span className={`map-north${visible ? '' : ' map-widget-hidden'}`}>
       <svg viewBox="0 0 24 24" style={{ transform: `rotate(${-rotation}deg)` }} fill="currentColor">
         <text x="12" y="9.5" textAnchor="middle" fill="currentColor">N</text>
         <path d="M12 11.5 L15.4 21 L12 18.4 L8.6 21 Z" fill="currentColor" />
@@ -390,7 +390,7 @@ function NorthArrow({ rotation }) {
   );
 }
 
-function MapCalendar({ timeLabel }) {
+export function MapCalendar({ timeLabel }) {
   if (!timeLabel) return null;
   const parts = timeLabel.split(' · ');
   const dateStr = parts[0];
@@ -410,7 +410,7 @@ function MapCalendar({ timeLabel }) {
   );
 }
 
-function MapClock({ timeLabel, withCalendar }) {
+export function MapClock({ timeLabel, withCalendar }) {
   if (!timeLabel) return null;
   const parts = timeLabel.split(' · ');
   const timeStr = parts.length > 1 ? parts[1] : '--:--';
@@ -424,19 +424,19 @@ function MapClock({ timeLabel, withCalendar }) {
   );
 }
 
-function SectionCompass({ type, rotation, sectionAngle = 0 }) {
+function SectionCompass({ type, rotation, sectionAngle = 0, visible }) {
   if (rotation == null) return null;
   const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  
+
   const baseAzimuth = type === 'sectionX' ? rotation : (rotation + 90);
   const rightAzimuth = baseAzimuth - sectionAngle;
   const leftAzimuth = rightAzimuth + 180;
-  
+
   const leftStr = dirs[Math.round(((leftAzimuth % 360 + 360) % 360) / 45) % 8];
   const rightStr = dirs[Math.round(((rightAzimuth % 360 + 360) % 360) / 45) % 8];
 
   return (
-    <span className="map-section-compass">
+    <span className={`map-section-compass${visible ? '' : ' map-widget-hidden'}`}>
       <span>{leftStr}</span>
       <svg width="24" height="12" viewBox="0 0 24 12" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M4 6 L20 6 M7 3 L4 6 L7 9 M17 3 L20 6 L17 9" strokeLinecap="round" strokeLinejoin="round" />
@@ -785,8 +785,8 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
             {Math.round(sectionControl.angle)}°
           </button>
         )}
-        {compass != null && compass.type === 'plan' && <NorthArrow rotation={compass.rotation} />}
-        {compass != null && compass.type !== 'plan' && <SectionCompass type={compass.type} rotation={compass.rotation} sectionAngle={compass.sectionAngle} />}
+        {compass != null && compass.type === 'plan' && <NorthArrow rotation={compass.rotation} visible={compass.visible} />}
+        {compass != null && compass.type !== 'plan' && <SectionCompass type={compass.type} rotation={compass.rotation} sectionAngle={compass.sectionAngle} visible={compass.visible} />}
         {showCalendar && <MapCalendar timeLabel={timeLabel} />}
         {showClock && <MapClock timeLabel={timeLabel} withCalendar={showCalendar} />}
         {hover && (

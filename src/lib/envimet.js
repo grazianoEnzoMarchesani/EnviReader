@@ -241,17 +241,58 @@ function getDataView(file) {
   return promise;
 }
 
-// config: { level, terrain } | { sectionX } | { sectionY } | { line }
+// config: { level, terrain } | { sectionX, biometFix?, objectsVarIndex? } |
+// { sectionY, biometFix?, objectsVarIndex? } | { line, biometFix?, objectsVarIndex? }
+// biometFix corregge il bug storico di ENVI-met sui dataset biomet (PMV/PET/
+// SET/UTCI) in sezione: l'export non tiene conto di dove sono edifici/
+// terreno, "schiacciando" la sezione contro il fondo del dominio. Per
+// colonna: si conta quante celle sono occupate da edificio/terreno partendo
+// dal basso (layer Objects, stesso file, objectsVarIndex — non una formula
+// sul terreno, ma la verità già disponibile) e si trasla l'intera colonna
+// grezza in alto di quella quantità; quello che esce dal dominio in alto
+// viene tagliato, lo spazio liberato in basso resta vuoto (NaN).
 export function extractSlice(dataView, dims, varIndex, config) {
   const { x: dimX, y: dimY, z: dimZ } = dims;
-  const { level = null, sectionX = null, sectionY = null, terrain = null, line = null } = config;
+  const { level = null, sectionX = null, sectionY = null, terrain = null, line = null, biometFix = false, objectsVarIndex = null } = config;
   const BYTES = 4;
   const varOffset = varIndex * dimX * dimY * dimZ * BYTES;
+  const objectsOffset = objectsVarIndex != null ? objectsVarIndex * dimX * dimY * dimZ * BYTES : null;
 
   const read = (offset) => {
     if (offset + BYTES > dataView.byteLength) return NaN;
     const value = dataView.getFloat32(offset, true);
     return value === NO_DATA || Number.isNaN(value) ? NaN : value;
+  };
+
+  // 1 = edificio, 2 = terreno/suolo (vedi objectsToImageData in colormap.js):
+  // le uniche categorie "solide" che bloccano il posto del dato biomet.
+  const isOccupied = (x, y, z) => {
+    if (objectsOffset === null) return false;
+    const rv = Math.round(read(objectsOffset + ((z * dimY + y) * dimX + x) * BYTES));
+    return rv === 1 || rv === 2;
+  };
+  const freeZ = (x, y) => {
+    let z = 0;
+    while (z < dimZ - 1 && isOccupied(x, y, z)) z++;
+    return z;
+  };
+  // Trasla in alto le celle grezze con un valore reale, saltando i NaN già
+  // presenti nel dato grezzo (non li si trascina posizionalmente, altrimenti
+  // i vuoti interni alla colonna aprono voragini che risalgono il dominio):
+  // shift = quante celle sono occupate da edificio/terreno partendo dal
+  // basso; da lì impila solo i valori reali, di seguito, senza buchi tra
+  // loro; quello che esce dal dominio in alto viene tagliato.
+  const compactColumn = (readAt, x, y) => {
+    const shift = freeZ(x, y);
+    const out = new Array(dimZ).fill(NaN);
+    let z = shift;
+    for (let s = 0; s < dimZ && z < dimZ; s++) {
+      const v = readAt(s);
+      if (Number.isNaN(v)) continue;
+      out[z] = v;
+      z++;
+    }
+    return out;
   };
 
   if (level !== null) {
@@ -267,19 +308,19 @@ export function extractSlice(dataView, dims, varIndex, config) {
   }
   if (sectionX !== null) {
     const out = new Float32Array(dimY * dimZ);
-    for (let i = 0; i < out.length; i++) {
-      const y = i % dimY;
-      const z = (i / dimY) | 0;
-      out[i] = read(varOffset + ((z * dimY + y) * dimX + sectionX) * BYTES);
+    for (let y = 0; y < dimY; y++) {
+      const readAt = (z) => read(varOffset + ((z * dimY + y) * dimX + sectionX) * BYTES);
+      const col = biometFix ? compactColumn(readAt, sectionX, y) : null;
+      for (let z = 0; z < dimZ; z++) out[z * dimY + y] = col ? col[z] : readAt(z);
     }
     return out;
   }
   if (sectionY !== null) {
     const out = new Float32Array(dimX * dimZ);
-    for (let i = 0; i < out.length; i++) {
-      const x = i % dimX;
-      const z = (i / dimX) | 0;
-      out[i] = read(varOffset + ((z * dimY + sectionY) * dimX + x) * BYTES);
+    for (let x = 0; x < dimX; x++) {
+      const readAt = (z) => read(varOffset + ((z * dimY + sectionY) * dimX + x) * BYTES);
+      const col = biometFix ? compactColumn(readAt, x, sectionY) : null;
+      for (let z = 0; z < dimZ; z++) out[z * dimX + x] = col ? col[z] : readAt(z);
     }
     return out;
   }
@@ -290,13 +331,24 @@ export function extractSlice(dataView, dims, varIndex, config) {
     for (let i = 0; i < line.n; i++) {
       const x = Math.min(dimX - 1, Math.max(0, Math.round(line.x0 + line.dx * i)));
       const y = Math.min(dimY - 1, Math.max(0, Math.round(line.y0 + line.dy * i)));
-      for (let z = 0; z < dimZ; z++) {
-        out[z * line.n + i] = read(varOffset + ((z * dimY + y) * dimX + x) * BYTES);
-      }
+      const readAt = (z) => read(varOffset + ((z * dimY + y) * dimX + x) * BYTES);
+      const col = biometFix ? compactColumn(readAt, x, y) : null;
+      for (let z = 0; z < dimZ; z++) out[z * line.n + i] = col ? col[z] : readAt(z);
     }
     return out;
   }
   return null;
+}
+
+// true se il dataset corrente è un output biomet (PMV/PET/SET/UTCI): quei
+// campi sono validi solo alla quota pedonale, vedi la nota su extractSlice.
+// Il nome del gruppo dati ("biomet1", "biomet/UTCI", ...) non è standardizzato
+// tra le versioni/esportazioni di ENVI-met, quindi il segnale primario è il
+// nome della variabile stessa (sempre presente e visibile in UI); il gruppo
+// resta un fallback per i casi in cui il nome variabile non bastasse.
+const BIOMET_DATASET_PATTERN = /utci|\bpet\b|\bset\b|\bpmv\b/i;
+export function isBiometDataset(dataGroup, datasetName) {
+  return BIOMET_DATASET_PATTERN.test(datasetName || '') || /^biomet/i.test(dataGroup || '');
 }
 
 // Estrae uno slice e lo confeziona con dimensioni, estensioni fisiche e range
@@ -305,7 +357,12 @@ export async function loadSlice(edtFile, edxInfo, variableName, config) {
   if (varIndex === -1) return null;
 
   const dataView = await getDataView(edtFile);
-  const data = extractSlice(dataView, edxInfo.dimensions, varIndex, config);
+  let effectiveConfig = config;
+  if (config.biometFix) {
+    const objIdx = edxInfo.variableNames.findIndex((n) => /objects/i.test(n));
+    effectiveConfig = { ...config, objectsVarIndex: objIdx === -1 ? null : objIdx };
+  }
+  const data = extractSlice(dataView, edxInfo.dimensions, varIndex, effectiveConfig);
   if (!data) return null;
 
   const { dimensions: dims, extent } = edxInfo;

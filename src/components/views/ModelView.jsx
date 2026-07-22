@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { useI18n } from '../../i18n/I18nContext';
-import { MODEL_LAYERS } from '../../data/constants';
+import { MODEL_LAYERS, SCALE_TYPES_3D } from '../../data/constants';
 import { findInxFile, readINX } from '../../lib/inx';
-import { loadObjectsVolume } from '../../lib/envimet';
+import { loadObjectsVolume, isBiometDataset } from '../../lib/envimet';
 import { sunPosition, sunPathSamples, sunDiagramCurves, estimateTimezoneOffset } from '../../lib/sunPosition';
-import { getSunSample, formatDateLabel, formatHourLabel } from '../../lib/sunLink';
+import { getSunSample } from '../../lib/sunLink';
 import Model3DViewer from '../Model3DViewer';
+import { MapCalendar, MapClock } from '../MapChart';
 import TimeSeriesChart from '../TimeSeriesChart';
 import Segmented from '../controls/Segmented';
-import Slider from '../controls/Slider';
 import IconToggle from '../controls/IconToggle';
-import { IconBuilding, IconTree, IconTerrain, IconReceptor, IconGrid, IconWireframe, IconSun, IconLayers3D, IconSectionX, IconSectionY, IconSmoothSurface } from '../icons/ToolbarIcons';
+import { IconBuilding, IconTree, IconTerrain, IconTerrainFix, IconReceptor, IconGrid, IconWireframe, IconSun, IconLayers3D, IconSectionX, IconSectionY, IconSmoothSurface, IconSyncRotate, IconCalendar, IconClock } from '../icons/ToolbarIcons';
 import { useFlip } from '../../lib/useFlip';
 import { usePointSeries, useSlices, useTerrainCut } from '../../lib/useSlice';
 import { findPalette } from '../../data/palettes';
@@ -24,6 +24,34 @@ const LAYER_ICONS = {
   showReceptors: IconReceptor,
   showGrid: IconGrid,
 };
+
+function formatTime(time) {
+  const h = String(Math.floor(time / 4)).padStart(2, '0');
+  const m = String((time % 4) * 15).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+// Azimuth/altitudine del sole: stesso linguaggio visivo dei badge calendario/
+// orologio 2D (icona + valore), ma affiancati a destra invece che sotto, così
+// non si spostano quando calendario/orologio vengono attivati o disattivati.
+function SunAnglesBadge({ azimuth, altitude }) {
+  return (
+    <div className="model-sun-widgets">
+      <span className="model-sun-badge">
+        <IconSun />
+        <span>{azimuth.toFixed(1)}°</span>
+      </span>
+      <span className="model-sun-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 18h18" />
+          <path d="M4 18a10 10 0 0 1 10-10" />
+          <circle cx="14" cy="8" r="1.4" fill="currentColor" stroke="none" />
+        </svg>
+        <span>{altitude.toFixed(1)}°</span>
+      </span>
+    </div>
+  );
+}
 
 // Carica e parsa l'INX (inputData/*.INX) del fileset, se presente
 function useInxModel(fileset) {
@@ -65,7 +93,7 @@ function useModelSun(model, state) {
   const sunSample = useMemo(
     () => getSunSample(state),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.seriesLabels, state.time, state.sunTimeOverride],
+    [state.seriesLabels, state.time],
   );
   const location = model?.location;
   const hasLocation = Number.isFinite(location?.latitude) && Number.isFinite(location?.longitude);
@@ -97,34 +125,55 @@ function useModelSun(model, state) {
   return { sunSample, hasLocation, sunActive, sunPathPoints, sunDiagram, sunInfo };
 }
 
+const VOXEL_VIEW_KEYS = ['plan', 'sectionX', 'sectionY'];
+
+const minOf = (...slices) => {
+  let m = Infinity;
+  for (const s of slices) if (s && s.min < m) m = s.min;
+  return m === Infinity ? 0 : m;
+};
+const maxOf = (...slices) => {
+  let m = -Infinity;
+  for (const s of slices) if (s && s.max > m) m = s.max;
+  return m === -Infinity ? 0 : m;
+};
+
+// Range (min/max) dell'overlay voxel di un fileset in base allo scaleType
+// scelto in "Legend bounds" (SCALE_TYPES_3D, sottoinsieme di quello della 2D):
+// qui ogni fileset ha una sola legenda condivisa da tutti i piani attivi, quindi
+// ha senso solo lo scope per fileset, quello unificato tra i due filesets, o
+// quello manuale — non "singolo grafico"/"tra viste", che presuppongono una
+// vista alla volta come in 2D.
+function overlayRange(scaleType, customRanges, filesetKey, slices, otherSlices) {
+  if (scaleType === 'custom') {
+    const override = customRanges[`${filesetKey}-3d`];
+    if (override) return override;
+  }
+  if (scaleType === 'allFilesets') {
+    const candidates = [...VOXEL_VIEW_KEYS.map((k) => slices[k]), ...VOXEL_VIEW_KEYS.map((k) => otherSlices[k])];
+    return { min: minOf(...candidates), max: maxOf(...candidates) };
+  }
+  // 'filesetGlobal', e fallback di 'custom' finché non c'è un override salvato
+  const candidates = VOXEL_VIEW_KEYS.map((k) => slices[k]);
+  return { min: minOf(...candidates), max: maxOf(...candidates) };
+}
+
 // Confeziona l'overlay voxel di un fileset per il viewer 3D: stesso dato e
 // stessa palette della vista 2D, con un range unico condiviso tra i piani
 // attivi (pianta/sezioni) così i colori restano confrontabili quando più piani
 // sono visibili insieme. null se non c'è nulla da mostrare (overlay spento,
 // nessun piano attivo, o dataset non ancora caricato).
-function useDataOverlay(slices, terrainCut, views, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ) {
+function useDataOverlay(slices, terrainCut, views, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ, range) {
   return useMemo(() => {
     if (!dimZ || (!views.plan && !views.sectionX && !views.sectionY)) return null;
-    const active = [
-      views.plan && slices.plan,
-      views.sectionX && slices.sectionX,
-      views.sectionY && slices.sectionY,
-    ].filter(Boolean);
-    if (!active.length) return null;
-    let min = Infinity;
-    let max = -Infinity;
-    for (const s of active) {
-      if (s.min < min) min = s.min;
-      if (s.max > max) max = s.max;
-    }
-    if (min === Infinity) { min = 0; max = 0; }
+    if (!(views.plan && slices.plan) && !(views.sectionX && slices.sectionX) && !(views.sectionY && slices.sectionY)) return null;
     return {
       views: {
         plan: views.plan ? slices.plan : null,
         sectionX: views.sectionX ? slices.sectionX : null,
         sectionY: views.sectionY ? slices.sectionY : null,
       },
-      range: { min, max },
+      range,
       colors,
       reversed,
       pivot: { sectionX, sectionY },
@@ -134,7 +183,7 @@ function useDataOverlay(slices, terrainCut, views, colors, reversed, sectionX, s
       smooth,
       spacingZ,
     };
-  }, [slices.plan, slices.sectionX, slices.sectionY, terrainCut, views.plan, views.sectionX, views.sectionY, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ]);
+  }, [slices.plan, slices.sectionX, slices.sectionY, terrainCut, views.plan, views.sectionX, views.sectionY, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ, range]);
 }
 
 function computeStats(model) {
@@ -151,11 +200,11 @@ function computeStats(model) {
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
-function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverlay, datasetLabel, flags, wireframe, resetNonce, projection, gizmoNorthMode, sun, sunPathEnabled, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, emptyHint }) {
+function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverlay, flags, wireframe, resetNonce, projection, gizmoNorthMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled }) {
   const { tr } = useI18n();
   const model = loaded?.model;
   const stats = computeStats(model);
-  const { hasLocation, sunActive, sunInfo, sunPathPoints, sunDiagram, sunSample } = sun;
+  const { hasLocation, sunActive, sunInfo, sunPathPoints, sunDiagram } = sun;
 
   return (
     <div className="model-panel" data-flip-key={flipKey}>
@@ -190,38 +239,12 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverl
               sectionAngle={sectionAngle}
               onPivotChange={onPivotChange}
               onAngleChange={onAngleChange}
+              cameraSyncRef={cameraSyncRef}
+              cameraSyncEnabled={cameraSyncEnabled}
             />
-            {dataOverlay && (
-              <div className="data-voxel-legend">
-                <span className="data-voxel-legend-title">{datasetLabel}</span>
-                <span className="map-legend-label">{formatValue(dataOverlay.range.min, dataOverlay.range.max - dataOverlay.range.min)}</span>
-                <span
-                  className="map-legend-bar"
-                  style={{ background: `linear-gradient(90deg, ${orientColors(dataOverlay.colors, dataOverlay.reversed).join(',')})` }}
-                />
-                <span className="map-legend-label">{formatValue(dataOverlay.range.max, dataOverlay.range.max - dataOverlay.range.min)}</span>
-              </div>
-            )}
-            {sunActive && sunInfo && (
-              <div className="sun-info-panel">
-                <div className="sun-info-row">
-                  <span>{tr('sun_time')}</span>
-                  <strong>
-                    {sunSample.hasSeries
-                      ? sunSample.label
-                      : `${formatDateLabel(sunSample.date)} · ${formatHourLabel(sunSample.hour)} (${tr('sun_fallback_date')})`}
-                  </strong>
-                </div>
-                {sunSample.hasSeries && (
-                  <div className="sun-info-row">
-                    <span>{tr('sun_timestep')}</span>
-                    <strong>{sunSample.index + 1} / {sunSample.count}</strong>
-                  </div>
-                )}
-                <div className="sun-info-row"><span>{tr('sun_azimuth')}</span><strong>{sunInfo.azimuth.toFixed(1)}°</strong></div>
-                <div className="sun-info-row"><span>{tr('sun_altitude')}</span><strong>{sunInfo.altitude.toFixed(1)}°</strong></div>
-              </div>
-            )}
+            {showCalendarWidget && <MapCalendar timeLabel={timeLabel} />}
+            {showClockWidget && <MapClock timeLabel={timeLabel} withCalendar={showCalendarWidget} />}
+            {sunActive && sunInfo && <SunAnglesBadge azimuth={sunInfo.azimuth} altitude={sunInfo.altitude} />}
             {sunPathEnabled && !hasLocation && (
               <div className="sun-info-panel sun-info-warning">{tr('sun_no_location')}</div>
             )}
@@ -234,6 +257,16 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverl
           </>
         )}
       </div>
+      {model && dataOverlay && (
+        <div className="map-legend" onClick={() => onLegendClick?.(dataOverlay.range)}>
+          <span className="map-legend-label">{formatValue(dataOverlay.range.min, dataOverlay.range.max - dataOverlay.range.min)}</span>
+          <span
+            className="map-legend-bar"
+            style={{ background: `linear-gradient(90deg, ${orientColors(dataOverlay.colors, dataOverlay.reversed).join(',')})` }}
+          />
+          <span className="map-legend-label">{formatValue(dataOverlay.range.max, dataOverlay.range.max - dataOverlay.range.min)}</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -258,6 +291,9 @@ export default function ModelView() {
   const pointSeriesB = usePointSeries(state.filesetB, ...pointArgs, terrainCutB);
   const loaded = !!state.edxMeta;
   const datasetLabel = loaded ? state.dataset : tr(state.dataset);
+  // Stessa etichetta data/ora dei badge calendario/orologio della vista 2D
+  // (AnalysisView), qui condivisa dai pannelli 3D per restare coerente col resto dell'app.
+  const timeLabel = state.seriesLabels[state.time] ?? `t · ${formatTime(state.time)}`;
 
   // Overlay voxel del dataset corrente nel viewer 3D: stesso dato/palette
   // della vista 2D Data Analysis, disegnato in pianta e/o nelle sezioni a
@@ -266,9 +302,13 @@ export default function ModelView() {
   const draftPalette = draft && { id: '__draft', name: draft.name.trim() || tr('custom_default_name'), colors: draft.colors };
   const activePalette = draft?.target === 'main' ? draftPalette : findPalette(state.palette, 'main', state.customPalettes);
   const mainReversed = draft?.target === 'main' ? false : state.paletteReversed;
+  // Fix biomet delle sezioni (vedi toggle "Data overlay" nella toolbar):
+  // stesso meccanismo e stesso stato condiviso della vista 2D (AnalysisView).
+  const biometFixActive = state.fixBiometSections && isBiometDataset(state.dataGroup, state.dataset);
+
   const sliceArgs = [state.dataGroup, state.dataset, state.time, state.level, state.sectionX, state.sectionY, state.sectionAngle];
-  const slicesA = useSlices(state.filesetA, ...sliceArgs, terrainCutA);
-  const slicesB = useSlices(state.filesetB, ...sliceArgs, terrainCutB);
+  const slicesA = useSlices(state.filesetA, ...sliceArgs, terrainCutA, biometFixActive);
+  const slicesB = useSlices(state.filesetB, ...sliceArgs, terrainCutB, biometFixActive);
   const voxelViews = {
     plan: state.showDataVoxels && state.dataVoxelPlan,
     sectionX: state.showDataVoxels && state.dataVoxelSectionX,
@@ -280,14 +320,10 @@ export default function ModelView() {
   // invece di ricalcolarla ciascuno per conto proprio (vedi resolveZLevels in
   // inxScene.js), eliminando lo sfasamento tra le due geometrie.
   const spacingZ = state.edxMeta?.spacing?.z;
-  const dataOverlayA = useDataOverlay(slicesA, terrainCutA, voxelViews, activePalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ);
-  const dataOverlayB = useDataOverlay(slicesB, terrainCutB, voxelViews, activePalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ);
-
-  const sunSample = useMemo(
-    () => getSunSample(state),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.seriesLabels, state.time, state.sunTimeOverride],
-  );
+  const overlayRangeA = overlayRange(state.scaleType3D, state.customRanges, 'A', slicesA, slicesB);
+  const overlayRangeB = overlayRange(state.scaleType3D, state.customRanges, 'B', slicesB, slicesA);
+  const dataOverlayA = useDataOverlay(slicesA, terrainCutA, voxelViews, activePalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ, overlayRangeA);
+  const dataOverlayB = useDataOverlay(slicesB, terrainCutB, voxelViews, activePalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ, overlayRangeB);
 
   const flags = useMemo(
     () => ({
@@ -307,6 +343,19 @@ export default function ModelView() {
     const base = tr(key === 'A' ? 'chart_fileset_a' : 'chart_fileset_b');
     return name ? `${base} · ${name}` : base;
   };
+  // Click sulla legenda 3D: stesso modale "Legend bounds" della vista 2D,
+  // ma con una chiave dedicata (`${key}-3d`) perché qui il range copre tutti
+  // i piani attivi insieme invece di una singola vista pianta/sezione.
+  const handleLegendClick = (key, currentRange) => {
+    set({
+      customRangeModal: {
+        key: `${key}-3d`,
+        title: `${filesetLabel(key)} · ${datasetLabel}`,
+        min: currentRange?.min,
+        max: currentRange?.max,
+      },
+    });
+  };
   const compareOptions = [
     { key: 'single', label: tr('compare_single') },
     { key: 'b', label: tr('compare_b'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined },
@@ -315,10 +364,17 @@ export default function ModelView() {
   const panelKeys = state.compareMode3D === 'ab' ? ['A', 'B'] : state.compareMode3D === 'b' ? ['B'] : ['A'];
 
   const panelProps = {
-    A: { title: filesetLabel('A'), loaded: loadedA, objectsVolume: objectsVolumeA, spacingZ, dataOverlay: dataOverlayA, datasetLabel, sun: sunA },
-    B: { title: filesetLabel('B'), loaded: loadedB, objectsVolume: objectsVolumeB, spacingZ, dataOverlay: dataOverlayB, datasetLabel, sun: sunB },
+    A: { title: filesetLabel('A'), loaded: loadedA, objectsVolume: objectsVolumeA, spacingZ, dataOverlay: dataOverlayA, sun: sunA, onLegendClick: (range) => handleLegendClick('A', range) },
+    B: { title: filesetLabel('B'), loaded: loadedB, objectsVolume: objectsVolumeB, spacingZ, dataOverlay: dataOverlayB, sun: sunB, onLegendClick: (range) => handleLegendClick('B', range) },
   };
   const flipRef = useFlip();
+
+  // Riferimento condiviso tra i due viewer 3D per la rotazione sincronizzata
+  // (vedi Model3DViewer): quando l'utente ruota un pannello, questo scrive qui
+  // il proprio orientamento (theta/phi), l'altro lo applica al frame successivo
+  // mantenendo il proprio target e zoom. Un solo oggetto stabile per l'intera
+  // vita del componente, non ricreato ai re-render.
+  const cameraSyncRef = useRef({ theta: 0, phi: 0, rev: 0, source: null });
 
   const viewBarTopRef = useRef(null);
   const viewBarPanelRef = useRef(null);
@@ -379,10 +435,31 @@ export default function ModelView() {
                         <IconToggle icon={IconSectionY} label={tr('toggle_data_voxel_sectiony')} on={state.dataVoxelSectionY} onToggle={() => toggle('dataVoxelSectionY')} />
                         <div className="vertical-divider" />
                         <IconToggle icon={IconSmoothSurface} label={tr('toggle_data_voxel_smooth')} on={state.dataVoxelSmooth} onToggle={() => toggle('dataVoxelSmooth')} />
+                        {isBiometDataset(state.dataGroup, state.dataset) && (
+                          <>
+                            <div className="vertical-divider" />
+                            <IconToggle icon={IconTerrainFix} label={tr('toggle_biomet_fix')} on={state.fixBiometSections} onToggle={() => toggle('fixBiometSections')} />
+                          </>
+                        )}
                       </>
                     )}
                   </div>
                 </div>
+                {state.showDataVoxels && (
+                  <>
+                    <div className="vertical-divider" />
+                    <div className="view-bar-group">
+                      <span className="control-label" style={{ marginBottom: 0 }}>{tr('group_legend')}</span>
+                      <select className="select" style={{ width: 'auto' }} value={state.scaleType3D} onChange={(e) => set({ scaleType3D: e.target.value })}>
+                        {SCALE_TYPES_3D.map((s) => (
+                          <option key={s.value} value={s.value}>
+                            {tr(s.labelKey)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
                   <button
@@ -393,6 +470,7 @@ export default function ModelView() {
                   >
                     {tr('btn_reset_view')}
                   </button>
+                  <IconToggle icon={IconSyncRotate} label={tr('toggle_sync_camera_3d')} on={state.syncCamera3D} onToggle={() => toggle('syncCamera3D')} />
                   <Segmented
                     options={[
                       { key: 'perspective', label: tr('proj_perspective') },
@@ -413,46 +491,11 @@ export default function ModelView() {
                 </div>
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
-                  <IconToggle icon={IconSun} label={tr('toggle_sun_path')} on={state.sunPathEnabled} onToggle={() => toggle('sunPathEnabled')} />
-                  {state.sunPathEnabled && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      {sunSample.hasSeries ? (
-                        <Slider
-                          label={`${tr('slider_sun_timestep')} (${sunSample.index + 1}/${sunSample.count})`}
-                          value={sunSample.index}
-                          min={0}
-                          max={Math.max(0, sunSample.count - 1)}
-                          step={1}
-                          onChange={(v) => set({ sunTimeOverride: v })}
-                        />
-                      ) : (
-                        <Slider
-                          label={tr('slider_sun_hour')}
-                          value={Math.round(sunSample.hour * 4) / 4}
-                          min={0}
-                          max={24}
-                          step={0.25}
-                          unit="h"
-                          onChange={(v) => set({ sunTimeOverride: v })}
-                        />
-                      )}
-                      <span className="muted-inline" style={{ marginLeft: 0 }}>
-                        {sunSample.hasSeries
-                          ? (sunSample.isLinked ? tr('sun_linked_date') : tr('sun_custom_time'))
-                          : `${tr('sun_fallback_date')}: ${formatDateLabel(sunSample.date)}`}
-                      </span>
-                      {state.sunTimeOverride != null && (
-                        <button
-                          type="button"
-                          className="ghost-btn"
-                          style={{ width: 'auto', marginBottom: 0 }}
-                          onClick={() => set({ sunTimeOverride: null })}
-                        >
-                          {tr('btn_sync_sun_time')}
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  <div className="icon-toggle-row">
+                    <IconToggle icon={IconSun} label={tr('toggle_sun_path')} on={state.sunPathEnabled} onToggle={() => toggle('sunPathEnabled')} />
+                    <IconToggle icon={IconCalendar} label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} />
+                    <IconToggle icon={IconClock} label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} />
+                  </div>
                 </div>
               </div>
 
@@ -490,6 +533,11 @@ export default function ModelView() {
             projection={state.cameraProjection}
             gizmoNorthMode={state.gizmoNorthMode}
             sunPathEnabled={state.sunPathEnabled}
+            showCalendarWidget={state.showCalendarWidget}
+            showClockWidget={state.showClockWidget}
+            timeLabel={timeLabel}
+            cameraSyncRef={cameraSyncRef}
+            cameraSyncEnabled={state.syncCamera3D && panelKeys.length === 2}
             sectionX={state.sectionX}
             sectionY={state.sectionY}
             sectionAngle={state.sectionAngle}

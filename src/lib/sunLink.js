@@ -22,14 +22,13 @@ export function parseSeriesLabel(label) {
 }
 
 // Campione solare corrente: legge alla lettera il timestep dei risultati
-// (index = state.sunTimeOverride se l'utente ha scostato lo slider dedicato,
-// altrimenti segue state.time come calendario/orologio dell'Analisi), oppure
+// (index = state.time, lo stesso slider del timer usato nell'Analisi), oppure
 // "adesso" come singola giornata di anteprima se non ci sono risultati.
 export function getSunSample(state) {
   const labels = state.seriesLabels;
   if (labels?.length) {
     const max = labels.length - 1;
-    const index = Math.max(0, Math.min(state.sunTimeOverride ?? state.time, max));
+    const index = Math.max(0, Math.min(state.time, max));
     const parsed = parseSeriesLabel(labels[index]);
     if (parsed) {
       return {
@@ -38,19 +37,17 @@ export function getSunSample(state) {
         index,
         count: labels.length,
         label: labels[index],
-        isLinked: state.sunTimeOverride == null,
       };
     }
   }
   const now = new Date();
   return {
     date: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
-    hour: state.sunTimeOverride ?? now.getHours() + now.getMinutes() / 60,
+    hour: now.getHours() + now.getMinutes() / 60,
     hasSeries: false,
     index: 0,
     count: 0,
     label: null,
-    isLinked: state.sunTimeOverride == null,
   };
 }
 
