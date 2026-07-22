@@ -7,13 +7,13 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildModelScene, setLayerVisibility, setWireframe, disposeGroup, updateSunLayer, setSunDiagram, setShadowCasting } from '../lib/inxScene';
+import { buildModelScene, setLayerVisibility, setWireframe, disposeGroup, updateSunLayer, setSunDiagram, setShadowCasting, buildDataOverlay } from '../lib/inxScene';
 import { createViewCube } from '../lib/viewCube';
 import { useI18n } from '../i18n/I18nContext';
 
 const DEG = Math.PI / 180;
 
-export default function Model3DViewer({ model, objectsVolume, flags, wireframe, resetNonce, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode }) {
+export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOverlay, flags, wireframe, resetNonce, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode }) {
   const { tr } = useI18n();
   const containerRef = useRef(null);
   const gizmoRef = useRef(null); // div overlay che intercetta i click del gizmo
@@ -149,7 +149,7 @@ export default function Model3DViewer({ model, objectsVolume, flags, wireframe, 
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage || !model) return;
-    const { group, layers, size, maxHeight, hemisphereLight, decorativeLight, sunLayer } = buildModelScene(model, objectsVolume);
+    const { group, layers, size, maxHeight, hemisphereLight, decorativeLight, sunLayer } = buildModelScene(model, objectsVolume, spacingZ);
     stage.scene.add(group);
     stage.layers = layers;
     stage.hemisphereLight = hemisphereLight;
@@ -201,7 +201,7 @@ export default function Model3DViewer({ model, objectsVolume, flags, wireframe, 
       stage.decorativeLight = null;
       stage.sunLayer = null;
     };
-  }, [model, objectsVolume]);
+  }, [model, objectsVolume, spacingZ]);
 
   // toggle dei livelli e wireframe, senza ricostruire
   useEffect(() => {
@@ -213,6 +213,41 @@ export default function Model3DViewer({ model, objectsVolume, flags, wireframe, 
     const stage = stageRef.current;
     if (stage?.layers) setWireframe(stage.layers, wireframe);
   }, [model, wireframe]);
+
+  // Overlay voxel del dataset corrente: si ricostruisce a parte dal resto della
+  // scena (dipende da slice/palette/tempo, che cambiano molto più spesso del
+  // modello), ma vive nello stesso group così eredita gratis pan/zoom/rotazione.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage?.scene || !model) return;
+    if (stage.dataOverlayLayer) {
+      stage.scene.remove(stage.dataOverlayLayer);
+      disposeGroup(stage.dataOverlayLayer);
+      stage.dataOverlayLayer = null;
+    }
+    const layer = buildDataOverlay(model, dataOverlay);
+    if (layer) {
+      stage.scene.add(layer);
+      stage.dataOverlayLayer = layer;
+    }
+    return () => {
+      if (stage.dataOverlayLayer) {
+        stage.scene.remove(stage.dataOverlayLayer);
+        disposeGroup(stage.dataOverlayLayer);
+        stage.dataOverlayLayer = null;
+      }
+    };
+  }, [model, dataOverlay]);
+
+  // wireframe sull'overlay voxel: effetto separato (l'overlay non fa parte di
+  // stage.layers) ma nell'ordine di dichiarazione gira sempre dopo la sua
+  // (ri)costruzione qui sopra, quindi vede sempre il layer aggiornato
+  useEffect(() => {
+    const layer = stageRef.current?.dataOverlayLayer;
+    layer?.traverse((obj) => {
+      if (obj.material && 'wireframe' in obj.material) obj.material.wireframe = wireframe;
+    });
+  }, [wireframe, dataOverlay]);
 
   // "Reimposta vista" dalla sidebar
   useEffect(() => {

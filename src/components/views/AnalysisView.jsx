@@ -11,7 +11,7 @@ import { IconLayers3D, IconBuilding, IconTerrain, IconTree, IconCompass, IconCal
 import ViewSettingsModal from '../ViewSettingsModal';
 import MapChart, { MapThumb, niceCeil } from '../MapChart';
 import TimeSeriesChart from '../TimeSeriesChart';
-import { useSlice, usePointSeries, useInxRotation, useWindField, useTerrainCut } from '../../lib/useSlice';
+import { useSlices, usePointSeries, useInxRotation, useWindField, useTerrainCut } from '../../lib/useSlice';
 import { terrainCutProfile } from '../../lib/envimet';
 import { useFlip } from '../../lib/useFlip';
 import { formatValue } from '../../lib/colormap';
@@ -25,16 +25,6 @@ function formatTime(time) {
 // Valore mostrato dal color picker quando sectionLineColor è null (colore di
 // tema): un grigio neutro, dato che l'input nativo non sa rendere "auto"
 export const DEFAULT_SECTION_LINE_COLOR = '#808080';
-
-// Tutte e tre le viste di un fileset: la principale a piena risoluzione,
-// le altre due alimentano le anteprime di cambio vista
-function useSlices(fileset, group, dataset, time, level, sectionX, sectionY, sectionAngle, terrain) {
-  return {
-    plan: useSlice(fileset, group, dataset, time, 'plan', level, sectionX, sectionY, sectionAngle, terrain),
-    sectionX: useSlice(fileset, group, dataset, time, 'sectionX', level, sectionX, sectionY, sectionAngle, terrain),
-    sectionY: useSlice(fileset, group, dataset, time, 'sectionY', level, sectionX, sectionY, sectionAngle, terrain),
-  };
-}
 
 function useWindFields(enabled, fileset, group, time, level, sectionX, sectionY, sectionAngle, terrain) {
   return {

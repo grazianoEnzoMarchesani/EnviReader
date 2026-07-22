@@ -12,8 +12,8 @@
 // dall'ID del materiale tramite una palette deterministica di fallback.
 
 import * as THREE from 'three';
-import { buildZLevels } from './inx';
-import { VEGETATION_COLORS as VEGETATION_HEX } from './colormap';
+import { buildZLevels, zLevelsFromSpacing } from './inx';
+import { VEGETATION_COLORS as VEGETATION_HEX, buildLUT } from './colormap';
 
 const VEGETATION_COLORS = VEGETATION_HEX.map((hex) => Number(`0x${hex.slice(1)}`));
 const VEGETATION_RV_MIN = 11;
@@ -31,6 +31,17 @@ const SOIL_COLORS = {
 const SOIL_DEFAULT = 0x97927f;
 const RECEPTOR_COLOR = 0xe0a83c;
 
+// Livelli verticali da usare per un dato K: se lo spacing_z reale del file EDX
+// dei risultati correnti copre almeno K livelli, si usa quello (stessa quota
+// che ENVI-met ha davvero scritto nei dati, vedi zLevelsFromSpacing) invece di
+// ricalcolare splitting/telescoping da zero con buildZLevels. Così edifici,
+// terreno, vegetazione e overlay dati condividono la stessa griglia verticale
+// e non si sfasano tra loro quando lo spacingZ è disponibile.
+function resolveZLevels(geometry, K, spacingZ) {
+  if (spacingZ && spacingZ.length >= K) return zLevelsFromSpacing(spacingZ.slice(0, K));
+  return buildZLevels(geometry, K);
+}
+
 function hashPick(id, palette) {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
@@ -42,7 +53,7 @@ function soilColor(id) {
   return SOIL_COLORS[id.slice(-2).toUpperCase()] ?? SOIL_DEFAULT;
 }
 
-export function buildModelScene(model, objectsVolume = null) {
+export function buildModelScene(model, objectsVolume = null, spacingZ = null) {
   const { I, J, dx, dy } = model.geometry;
   const W = I * dx;
   const H = J * dy;
@@ -52,11 +63,11 @@ export function buildModelScene(model, objectsVolume = null) {
 
   const group = new THREE.Group();
   const layers = {
-    terrain: buildTerrain(model, { toX, toZ }),
+    terrain: buildTerrain(model, { toX, toZ }, spacingZ),
     buildings: model.buildings3D?.entries.length
-      ? buildVoxelBuildings(model, { toX, toZ })
-      : buildExtrudedBuildings(model, { toX, toZ, terrainAt }),
-    vegetation: buildVegetation(model, objectsVolume, { toX, toZ }),
+      ? buildVoxelBuildings(model, { toX, toZ }, spacingZ)
+      : buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ),
+    vegetation: buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ),
     receptors: buildReceptors(model, { toX, toZ, terrainAt }),
     grid: buildGrid(model, { W, H }),
   };
@@ -403,9 +414,9 @@ export function setShadowCasting(layers, on) {
 // Terreno: pila di voxel per colonna, dal livello 0 fino alla quota di
 // terrainheight (metri, arrotondata al confine di griglia più vicino) — stessa
 // logica voxel-per-voxel usata per i building, invece di una superficie continua.
-function buildTerrain(model, { toX, toZ }) {
+function buildTerrain(model, { toX, toZ }, spacingZ) {
   const { I, J, dx, dy, Z } = model.geometry;
-  const zLevels = buildZLevels(model.geometry, Z);
+  const zLevels = resolveZLevels(model.geometry, Z, spacingZ);
   const boundaries = levelBoundaries(zLevels);
   const cells = [];
   let maxHeight = 0;
@@ -481,12 +492,12 @@ function nearestBoundaryIndex(boundaries, value) {
 // Modello 2.5D: un voxel per ogni livello della griglia verticale (buildZLevels)
 // compreso tra gli indici di zBottom e zTop arrotondati, invece di un unico box
 // estruso. Rispetta lo splitting/telescoping dichiarato nella modelGeometry.
-function buildExtrudedBuildings(model, { toX, toZ, terrainAt }) {
+function buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ) {
   const { I, J, dx, dy, Z } = model.geometry;
   const { zTop, zBottom, buildingNr, fixedheight } = model.buildings2D;
   if (!zTop) return null;
   const demReference = model.demReference ?? 0;
-  const zLevels = buildZLevels(model.geometry, Z);
+  const zLevels = resolveZLevels(model.geometry, Z, spacingZ);
   const boundaries = levelBoundaries(zLevels);
   const walls = [];
   const roofs = [];
@@ -541,10 +552,10 @@ function buildExtrudedBuildings(model, { toX, toZ, terrainAt }) {
 // La matrice sparsa usa la convenzione "nativa" di riga (come i dati EDT,
 // riga 0 = sud), diversa da quella delle matrici dense zTop/zBottom (riga 0 =
 // nord): stesso specchiamento già applicato alla vegetazione.
-function buildVoxelBuildings(model, { toX, toZ }) {
+function buildVoxelBuildings(model, { toX, toZ }, spacingZ) {
   const { J, dx, dy } = model.geometry;
   const K = model.geometry3D?.K ?? model.buildings3D.K;
-  const zLevels = buildZLevels(model.geometry, K);
+  const zLevels = resolveZLevels(model.geometry, K, spacingZ);
   const occupied = new Set(model.buildings3D.entries.map((e) => `${e.i},${e.j},${e.k}`));
   const walls = [];
   const roofs = [];
@@ -576,12 +587,12 @@ function buildVoxelBuildings(model, { toX, toZ }) {
 // "Objects" dei risultati (EDT/EDX) su tutti i livelli k, quota assoluta come
 // per terreno e building (nessun "segui il terreno"). rv 11-15 = vegetazione,
 // con le stesse tonalità di verde dell'overlay 2D "Objects".
-function buildVegetation(model, objectsVolume, { toX, toZ }) {
+function buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ) {
   if (!objectsVolume) return null;
   const { I, J, dx, dy } = model.geometry;
   const { dims, data } = objectsVolume;
   if (dims.x !== I || dims.y !== J) return null;
-  const zLevels = buildZLevels(model.geometry, dims.z);
+  const zLevels = resolveZLevels(model.geometry, dims.z, spacingZ);
   const cells = [];
   let maxHeight = 0;
   for (let k = 0; k < dims.z; k++) {
@@ -604,6 +615,272 @@ function buildVegetation(model, objectsVolume, { toX, toZ }) {
   if (!cells.length) return null;
   const layer = new THREE.Group();
   layer.add(instancedBoxes(cells, new THREE.MeshLambertMaterial()));
+  layer.userData.maxHeight = maxHeight;
+  return layer;
+}
+
+/* ---------- overlay dati (voxel) ---------- */
+
+// L'overlay drappeggia esattamente sul terreno/edifici sottostanti (stessa
+// quota), quindi le facce coincidono nel depth buffer e sfarfallano (z-fighting).
+// Il polygon offset dell'hardware risolve il conflitto solo nel depth test,
+// senza spostare i vertici: l'utente non vede alcuno scostamento, la geometria
+// resta esattamente quella del dato.
+function overlayMaterial(opts) {
+  return new THREE.MeshLambertMaterial({ ...opts, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+}
+
+// Colore LUT per un valore dato min/max del range attivo; null per NaN (cella
+// senza dato, coerente col "trasparente" della mappa 2D: nessun voxel).
+function lutColor(lut, value, min, max) {
+  if (Number.isNaN(value)) return null;
+  const range = max - min || 1;
+  let t = (value - min) / range;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  const k = Math.min(255, (t * 255) | 0);
+  return (lut[k * 3] << 16) | (lut[k * 3 + 1] << 8) | lut[k * 3 + 2];
+}
+
+// Voxel della pianta: un cubo per cella (i, j) del dataset corrente. Con
+// "segui il terreno" attivo (terrainCut presente) il livello k è quello
+// calcolato per quella cella (stessa formula di extractSlice/terrainCut in
+// envimet.js), quindi lo strato "drappeggia" sul terreno come in 2D; altrimenti
+// resta piatto alla quota di `level`. Riga 0 dei dati è a sud (convenzione EDT),
+// va specchiata sull'indice j (convenzione INX, riga 0 a nord) come per la vegetazione.
+function addPlanCells(cells, slice, dimZ, range, lut, level, terrainCut, I, J, dx, dy, zLevels, toX, toZ) {
+  if (!slice || slice.w !== I || slice.h !== J) return;
+  const { data, w } = slice;
+  for (let row = 0; row < J; row++) {
+    for (let col = 0; col < I; col++) {
+      const idx = row * w + col;
+      const color = lutColor(lut, data[idx], range.min, range.max);
+      if (color == null) continue;
+      let k = level;
+      if (terrainCut) k = Math.min(dimZ - 1, Math.max(0, Math.floor(terrainCut.data[idx] * terrainCut.gain + terrainCut.base)));
+      const lvl = zLevels[Math.min(k, zLevels.length - 1)];
+      const j = J - 1 - row;
+      cells.push({ x: toX(col), z: toZ(j), y: lvl.base + lvl.height / 2, sx: dx, sz: dy, sy: lvl.height, color });
+    }
+  }
+}
+
+// Voxel di una sezione (X o Y, eventualmente ruotata): una colonna verticale
+// di celle lungo la traccia in pianta della sezione, un cubo per (colonna,
+// livello k). Con angolo ≠ 0 la traccia è quella di slice.line (stesso
+// nearest-neighbour di extractSlice); ad angolo 0 la colonna corrisponde
+// direttamente a sectionX (fisso) + riga, o riga + sectionY (fisso).
+function addSectionCells(cells, slice, range, lut, viewType, pivotX, pivotY, I, J, dx, dy, zLevels, toX, toZ) {
+  if (!slice) return;
+  const { data, w, h, line } = slice;
+  for (let row = 0; row < h; row++) {
+    const lvl = zLevels[Math.min(row, zLevels.length - 1)];
+    for (let col = 0; col < w; col++) {
+      const color = lutColor(lut, data[row * w + col], range.min, range.max);
+      if (color == null) continue;
+      let gridX, gridY;
+      if (line) {
+        gridX = Math.round(line.x0 + line.dx * col);
+        gridY = Math.round(line.y0 + line.dy * col);
+      } else if (viewType === 'sectionX') {
+        gridX = pivotX;
+        gridY = col;
+      } else {
+        gridX = col;
+        gridY = pivotY;
+      }
+      const i = Math.min(I - 1, Math.max(0, gridX));
+      const j = Math.min(J - 1, Math.max(0, J - 1 - Math.min(Math.max(0, gridY), J - 1)));
+      cells.push({ x: toX(i), z: toZ(j), y: lvl.base + lvl.height / 2, sx: dx, sz: dy, sy: lvl.height, color });
+    }
+  }
+}
+
+// Quota continua (non arrotondata) al livello frazionario kf, interpolando
+// linearmente dentro il livello k=floor(kf): la stessa formula del taglio
+// "segui il terreno" ma senza il floor() che genera i gradoni. boundaries[k] è
+// la quota alla base del livello k (vedi levelBoundaries).
+function continuousHeight(zLevels, boundaries, kf) {
+  const kMax = zLevels.length - 1;
+  const k = Math.min(kMax, Math.max(0, Math.floor(kf)));
+  const frac = Math.min(1, Math.max(0, kf - k));
+  return boundaries[k] + frac * zLevels[k].height;
+}
+
+// Superficie continua della pianta ("piani inclinati"): stessa quota di
+// drappeggio di addPlanCells ma senza il floor() al livello di griglia, e con
+// gli angoli delle celle condivisi (media delle celle adiacenti) invece di un
+// box indipendente per cella — così due celle vicine con quote diverse sono
+// unite da un piano inclinato invece che da una parete verticale a gradino.
+// Il colore resta quello proprio di ciascuna cella (nessuna media): a cambiare
+// è solo la geometria, il dato mostrato è sempre quello esatto della cella.
+function buildPlanSurface(slice, range, lut, level, terrainCut, I, J, dx, dy, zLevels, boundaries) {
+  if (!slice || slice.w !== I || slice.h !== J) return null;
+  const { data, w } = slice;
+  const kMax = zLevels.length - 1;
+  const cellY = new Float32Array(I * J);
+  for (let row = 0; row < J; row++) {
+    for (let col = 0; col < I; col++) {
+      const idx = row * w + col;
+      const kf = terrainCut ? Math.min(kMax, Math.max(0, terrainCut.data[idx] * terrainCut.gain + terrainCut.base)) : level;
+      cellY[idx] = continuousHeight(zLevels, boundaries, kf);
+    }
+  }
+  // quota di ciascun angolo = media delle (fino a 4) celle che lo condividono:
+  // così ogni cella diventa un quadrilatero i cui 4 angoli si saldano esattamente
+  // con quelli delle celle vicine, niente scalini tra celle a quote diverse
+  const cornerY = new Float32Array((I + 1) * (J + 1));
+  for (let r2 = 0; r2 <= J; r2++) {
+    for (let c2 = 0; c2 <= I; c2++) {
+      let sum = 0;
+      let count = 0;
+      for (const [dr, dc] of [[-1, -1], [-1, 0], [0, -1], [0, 0]]) {
+        const r = r2 + dr;
+        const c = c2 + dc;
+        if (r < 0 || r >= J || c < 0 || c >= I) continue;
+        sum += cellY[r * I + c];
+        count++;
+      }
+      cornerY[r2 * (I + 1) + c2] = count ? sum / count : 0;
+    }
+  }
+  const worldX = (gx) => (I * dx) / 2 - gx * dx;
+  const worldZ = (gy) => gy * dy - (J * dy) / 2;
+  const positions = [];
+  const colors = [];
+  const c = new THREE.Color();
+  let maxHeight = 0;
+  for (let row = 0; row < J; row++) {
+    for (let col = 0; col < I; col++) {
+      const color = lutColor(lut, data[row * w + col], range.min, range.max);
+      if (color == null) continue;
+      c.setHex(color);
+      const x0 = worldX(col);
+      const x1 = worldX(col + 1);
+      const z0 = worldZ(row);
+      const z1 = worldZ(row + 1);
+      const y00 = cornerY[row * (I + 1) + col];
+      const y01 = cornerY[row * (I + 1) + col + 1];
+      const y10 = cornerY[(row + 1) * (I + 1) + col];
+      const y11 = cornerY[(row + 1) * (I + 1) + col + 1];
+      maxHeight = Math.max(maxHeight, y00, y01, y10, y11);
+      // due triangoli, CCW visti dall'alto (normale verso +Y)
+      const quad = [
+        [x0, y00, z0], [x1, y11, z1], [x0, y10, z1],
+        [x0, y00, z0], [x1, y01, z0], [x1, y11, z1],
+      ];
+      for (const p of quad) {
+        positions.push(p[0], p[1], p[2]);
+        colors.push(c.r, c.g, c.b);
+      }
+    }
+  }
+  if (!positions.length) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  const mesh = new THREE.Mesh(geometry, overlayMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  return { mesh, maxHeight };
+}
+
+// Superficie continua di una sezione (eventualmente ruotata): stessa idea di
+// buildPlanSurface ma per il piano verticale. La traccia in pianta segue la
+// posizione frazionaria esatta di slice.line (o il pivot fisso), senza
+// arrotondare alla cella più vicina come fa addSectionCells: così una sezione
+// ruotata resta un nastro dritto invece di una parete a gradini in orizzontale.
+// In verticale i confini sono già quelli esatti della griglia (zLevels), niente
+// da smussare lì. Colore per cella, nessuna media, come per la pianta.
+function buildSectionSurface(slice, range, lut, viewType, pivotX, pivotY, I, J, dx, dy, boundaries) {
+  if (!slice) return null;
+  const { data, w, h, line } = slice;
+  const worldX = (gx) => (I * dx) / 2 - (gx + 0.5) * dx;
+  const worldZ = (gy) => (gy + 0.5) * dy - (J * dy) / 2;
+  const colPos = (col) => {
+    if (line) return [line.x0 + line.dx * col, line.y0 + line.dy * col];
+    return viewType === 'sectionX' ? [pivotX, col] : [col, pivotY];
+  };
+  const positions = [];
+  const colors = [];
+  const c = new THREE.Color();
+  let maxHeight = 0;
+  for (let row = 0; row < h; row++) {
+    const y0 = boundaries[row];
+    const y1 = boundaries[row + 1];
+    maxHeight = Math.max(maxHeight, y1);
+    for (let col = 0; col < w; col++) {
+      const color = lutColor(lut, data[row * w + col], range.min, range.max);
+      if (color == null) continue;
+      c.setHex(color);
+      const [gx0, gy0] = colPos(col - 0.5);
+      const [gx1, gy1] = colPos(col + 0.5);
+      const x0 = worldX(gx0);
+      const z0 = worldZ(gy0);
+      const x1 = worldX(gx1);
+      const z1 = worldZ(gy1);
+      const quad = [
+        [x0, y0, z0], [x1, y0, z1], [x1, y1, z1],
+        [x0, y0, z0], [x1, y1, z1], [x0, y1, z0],
+      ];
+      for (const p of quad) {
+        positions.push(p[0], p[1], p[2]);
+        colors.push(c.r, c.g, c.b);
+      }
+    }
+  }
+  if (!positions.length) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  const mesh = new THREE.Mesh(geometry, overlayMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  return { mesh, maxHeight };
+}
+
+// Overlay 3D del dataset corrente (stesso dato/palette della vista 2D Data
+// Analysis): voxel colorati in pianta e/o nelle sezioni trasversali/longitudinali,
+// a scelta dell'utente (overlay.views). Un'unica LUT/range condivisi tra i piani
+// attivi, così i colori restano confrontabili quando più piani sono visibili insieme.
+// overlay.smooth sceglie tra i voxel a gradino (default, un box per cella) e una
+// superficie continua a piani inclinati (niente pareti verticali a gradino con
+// "segui il terreno" o con sezioni ruotate).
+export function buildDataOverlay(model, overlay) {
+  if (!overlay?.colors?.length || !overlay.dimZ) return null;
+  const { views, range, colors, reversed, pivot, terrainCut, level, dimZ, smooth, spacingZ } = overlay;
+  if (!views.plan && !views.sectionX && !views.sectionY) return null;
+  const { I, J, dx, dy } = model.geometry;
+  const toX = (i) => (I * dx) / 2 - (i + 0.5) * dx;
+  const toZ = (j) => (J * dy) / 2 - (j + 0.5) * dy;
+  const zLevels = resolveZLevels(model.geometry, dimZ, spacingZ);
+  const boundaries = levelBoundaries(zLevels);
+  const lut = buildLUT(colors, reversed);
+  const layer = new THREE.Group();
+  layer.name = 'dataOverlay';
+  let maxHeight = 0;
+  let any = false;
+
+  if (smooth) {
+    if (views.plan) {
+      const built = buildPlanSurface(views.plan, range, lut, level, terrainCut, I, J, dx, dy, zLevels, boundaries);
+      if (built) { layer.add(built.mesh); maxHeight = Math.max(maxHeight, built.maxHeight); any = true; }
+    }
+    for (const key of ['sectionX', 'sectionY']) {
+      if (!views[key]) continue;
+      const built = buildSectionSurface(views[key], range, lut, key, pivot.sectionX, pivot.sectionY, I, J, dx, dy, boundaries);
+      if (built) { layer.add(built.mesh); maxHeight = Math.max(maxHeight, built.maxHeight); any = true; }
+    }
+  } else {
+    const cells = [];
+    if (views.plan) addPlanCells(cells, views.plan, dimZ, range, lut, level, terrainCut, I, J, dx, dy, zLevels, toX, toZ);
+    if (views.sectionX) addSectionCells(cells, views.sectionX, range, lut, 'sectionX', pivot.sectionX, pivot.sectionY, I, J, dx, dy, zLevels, toX, toZ);
+    if (views.sectionY) addSectionCells(cells, views.sectionY, range, lut, 'sectionY', pivot.sectionX, pivot.sectionY, I, J, dx, dy, zLevels, toX, toZ);
+    if (cells.length) {
+      for (const cell of cells) maxHeight = Math.max(maxHeight, cell.y + cell.sy / 2);
+      layer.add(instancedBoxes(cells, overlayMaterial()));
+      any = true;
+    }
+  }
+
+  if (!any) return null;
   layer.userData.maxHeight = maxHeight;
   return layer;
 }

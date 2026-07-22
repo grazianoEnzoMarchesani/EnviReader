@@ -19,6 +19,16 @@ function sliceConfig(viewType, dims, level, sectionX, sectionY, angle, terrain) 
   return { level: clamp(level, dims.z - 1), terrain };
 }
 
+// Le tre viste (pianta, sezione X, sezione Y) di un fileset in un colpo solo:
+// usata sia dalla vista 2D (le card A/B/Diff) sia dal viewer 3D (overlay voxel).
+export function useSlices(fileset, group, dataset, time, level, sectionX, sectionY, sectionAngle, terrain) {
+  return {
+    plan: useSlice(fileset, group, dataset, time, 'plan', level, sectionX, sectionY, sectionAngle, terrain),
+    sectionX: useSlice(fileset, group, dataset, time, 'sectionX', level, sectionX, sectionY, sectionAngle, terrain),
+    sectionY: useSlice(fileset, group, dataset, time, 'sectionY', level, sectionX, sectionY, sectionAngle, terrain),
+  };
+}
+
 // Carica in modo asincrono lo slice corrente (pianta o sezione) di un fileset.
 export function useSlice(fileset, groupPath, variableName, timeIndex, viewType, level, sectionX, sectionY, sectionAngle, terrain) {
   const [slice, setSlice] = useState(null);

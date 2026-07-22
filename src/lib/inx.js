@@ -189,6 +189,20 @@ export function buildZLevels(geometry, K) {
   return levels;
 }
 
+// Livelli reali letti dallo spacing_z del file EDX dei risultati: nessuna
+// riformulazione di splitting/telescoping, stessa fonte usata dalla vista 2D
+// (loadSlice in envimet.js). Preferita a buildZLevels quando disponibile,
+// perché è la quota che ENVI-met ha effettivamente usato per scrivere i dati.
+export function zLevelsFromSpacing(spacingZ) {
+  const levels = [];
+  let z = 0;
+  for (const height of spacingZ) {
+    levels.push({ base: z, height });
+    z += height;
+  }
+  return levels;
+}
+
 /* ---------- lettura da file ---------- */
 
 export async function readINX(file) {

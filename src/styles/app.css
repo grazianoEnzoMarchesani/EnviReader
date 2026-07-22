@@ -1232,6 +1232,28 @@ button { font-family: inherit; }
 .sun-info-row span { color: var(--text-faint); }
 .sun-info-row strong { color: var(--text); font-family: var(--mono); font-weight: 600; }
 .sun-info-warning { color: var(--text-faint); font-style: italic; font-size: 11px; max-width: 220px; }
+
+/* Legenda dell'overlay voxel del dataset nel viewer 3D: stessa struttura
+   (etichette + barra a gradiente) della legenda delle mappe 2D. */
+.data-voxel-legend {
+  position: absolute;
+  bottom: 10px;
+  left: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 11px;
+  opacity: 0.94;
+  max-width: calc(100% - 28px);
+  pointer-events: none;
+}
+.data-voxel-legend-title { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.data-voxel-legend .map-legend-bar { width: 90px; min-width: 0; }
 .sun-linked-date { display: block; margin: -4px 0 8px; }
 .sun-timeline-label {
   display: block;

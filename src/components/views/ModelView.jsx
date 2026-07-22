@@ -11,9 +11,11 @@ import TimeSeriesChart from '../TimeSeriesChart';
 import Segmented from '../controls/Segmented';
 import Slider from '../controls/Slider';
 import IconToggle from '../controls/IconToggle';
-import { IconBuilding, IconTree, IconTerrain, IconReceptor, IconGrid, IconWireframe, IconSun } from '../icons/ToolbarIcons';
+import { IconBuilding, IconTree, IconTerrain, IconReceptor, IconGrid, IconWireframe, IconSun, IconLayers3D, IconSectionX, IconSectionY, IconSmoothSurface } from '../icons/ToolbarIcons';
 import { useFlip } from '../../lib/useFlip';
-import { usePointSeries, useTerrainCut } from '../../lib/useSlice';
+import { usePointSeries, useSlices, useTerrainCut } from '../../lib/useSlice';
+import { findPalette } from '../../data/palettes';
+import { formatValue, orientColors } from '../../lib/colormap';
 
 const LAYER_ICONS = {
   showBuildings: IconBuilding,
@@ -95,6 +97,46 @@ function useModelSun(model, state) {
   return { sunSample, hasLocation, sunActive, sunPathPoints, sunDiagram, sunInfo };
 }
 
+// Confeziona l'overlay voxel di un fileset per il viewer 3D: stesso dato e
+// stessa palette della vista 2D, con un range unico condiviso tra i piani
+// attivi (pianta/sezioni) così i colori restano confrontabili quando più piani
+// sono visibili insieme. null se non c'è nulla da mostrare (overlay spento,
+// nessun piano attivo, o dataset non ancora caricato).
+function useDataOverlay(slices, terrainCut, views, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ) {
+  return useMemo(() => {
+    if (!dimZ || (!views.plan && !views.sectionX && !views.sectionY)) return null;
+    const active = [
+      views.plan && slices.plan,
+      views.sectionX && slices.sectionX,
+      views.sectionY && slices.sectionY,
+    ].filter(Boolean);
+    if (!active.length) return null;
+    let min = Infinity;
+    let max = -Infinity;
+    for (const s of active) {
+      if (s.min < min) min = s.min;
+      if (s.max > max) max = s.max;
+    }
+    if (min === Infinity) { min = 0; max = 0; }
+    return {
+      views: {
+        plan: views.plan ? slices.plan : null,
+        sectionX: views.sectionX ? slices.sectionX : null,
+        sectionY: views.sectionY ? slices.sectionY : null,
+      },
+      range: { min, max },
+      colors,
+      reversed,
+      pivot: { sectionX, sectionY },
+      terrainCut,
+      level,
+      dimZ,
+      smooth,
+      spacingZ,
+    };
+  }, [slices.plan, slices.sectionX, slices.sectionY, terrainCut, views.plan, views.sectionX, views.sectionY, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ]);
+}
+
 function computeStats(model) {
   if (!model) return null;
   const { I, J, Z, dx, dy } = model.geometry;
@@ -109,7 +151,7 @@ function computeStats(model) {
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
-function ModelPanel({ flipKey, title, loaded, objectsVolume, flags, wireframe, resetNonce, projection, gizmoNorthMode, sun, sunPathEnabled, emptyHint }) {
+function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverlay, datasetLabel, flags, wireframe, resetNonce, projection, gizmoNorthMode, sun, sunPathEnabled, emptyHint }) {
   const { tr } = useI18n();
   const model = loaded?.model;
   const stats = computeStats(model);
@@ -131,6 +173,8 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, flags, wireframe, r
             <Model3DViewer
               model={model}
               objectsVolume={objectsVolume}
+              spacingZ={spacingZ}
+              dataOverlay={dataOverlay}
               flags={flags}
               wireframe={wireframe}
               resetNonce={resetNonce}
@@ -142,6 +186,17 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, flags, wireframe, r
               sunDiagram={sunDiagram}
               gizmoNorthMode={gizmoNorthMode}
             />
+            {dataOverlay && (
+              <div className="data-voxel-legend">
+                <span className="data-voxel-legend-title">{datasetLabel}</span>
+                <span className="map-legend-label">{formatValue(dataOverlay.range.min, dataOverlay.range.max - dataOverlay.range.min)}</span>
+                <span
+                  className="map-legend-bar"
+                  style={{ background: `linear-gradient(90deg, ${orientColors(dataOverlay.colors, dataOverlay.reversed).join(',')})` }}
+                />
+                <span className="map-legend-label">{formatValue(dataOverlay.range.max, dataOverlay.range.max - dataOverlay.range.min)}</span>
+              </div>
+            )}
             {sunActive && sunInfo && (
               <div className="sun-info-panel">
                 <div className="sun-info-row">
@@ -199,6 +254,30 @@ export default function ModelView() {
   const loaded = !!state.edxMeta;
   const datasetLabel = loaded ? state.dataset : tr(state.dataset);
 
+  // Overlay voxel del dataset corrente nel viewer 3D: stesso dato/palette
+  // della vista 2D Data Analysis, disegnato in pianta e/o nelle sezioni a
+  // scelta dell'utente (vedi toggle "Data overlay" nella toolbar).
+  const draft = state.paletteDraft;
+  const draftPalette = draft && { id: '__draft', name: draft.name.trim() || tr('custom_default_name'), colors: draft.colors };
+  const activePalette = draft?.target === 'main' ? draftPalette : findPalette(state.palette, 'main', state.customPalettes);
+  const mainReversed = draft?.target === 'main' ? false : state.paletteReversed;
+  const sliceArgs = [state.dataGroup, state.dataset, state.time, state.level, state.sectionX, state.sectionY, state.sectionAngle];
+  const slicesA = useSlices(state.filesetA, ...sliceArgs, terrainCutA);
+  const slicesB = useSlices(state.filesetB, ...sliceArgs, terrainCutB);
+  const voxelViews = {
+    plan: state.showDataVoxels && state.dataVoxelPlan,
+    sectionX: state.showDataVoxels && state.dataVoxelSectionX,
+    sectionY: state.showDataVoxels && state.dataVoxelSectionY,
+  };
+  const dimZ = state.edxMeta?.dimensions?.z;
+  // spacing_z reale del file EDX corrente: quando disponibile, edifici/terreno/
+  // vegetazione e overlay dati condividono questa stessa griglia verticale
+  // invece di ricalcolarla ciascuno per conto proprio (vedi resolveZLevels in
+  // inxScene.js), eliminando lo sfasamento tra le due geometrie.
+  const spacingZ = state.edxMeta?.spacing?.z;
+  const dataOverlayA = useDataOverlay(slicesA, terrainCutA, voxelViews, activePalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ);
+  const dataOverlayB = useDataOverlay(slicesB, terrainCutB, voxelViews, activePalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ);
+
   const sunSample = useMemo(
     () => getSunSample(state),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -231,8 +310,8 @@ export default function ModelView() {
   const panelKeys = state.compareMode3D === 'ab' ? ['A', 'B'] : state.compareMode3D === 'b' ? ['B'] : ['A'];
 
   const panelProps = {
-    A: { title: filesetLabel('A'), loaded: loadedA, objectsVolume: objectsVolumeA, sun: sunA },
-    B: { title: filesetLabel('B'), loaded: loadedB, objectsVolume: objectsVolumeB, sun: sunB },
+    A: { title: filesetLabel('A'), loaded: loadedA, objectsVolume: objectsVolumeA, spacingZ, dataOverlay: dataOverlayA, datasetLabel, sun: sunA },
+    B: { title: filesetLabel('B'), loaded: loadedB, objectsVolume: objectsVolumeB, spacingZ, dataOverlay: dataOverlayB, datasetLabel, sun: sunB },
   };
   const flipRef = useFlip();
 
@@ -281,6 +360,22 @@ export default function ModelView() {
                     {MODEL_LAYERS.map((l) => (
                       <IconToggle key={l.key} icon={LAYER_ICONS[l.key]} label={tr(l.labelKey)} on={state[l.key]} onToggle={() => toggle(l.key)} />
                     ))}
+                  </div>
+                </div>
+                <div className="vertical-divider" />
+                <div className="view-bar-group">
+                  <span className="control-label" style={{ marginBottom: 0 }}>{tr('model_group_data_overlay')}</span>
+                  <div className="icon-toggle-row">
+                    <IconToggle icon={IconLayers3D} label={tr('toggle_data_voxels')} on={state.showDataVoxels} onToggle={() => toggle('showDataVoxels')} />
+                    {state.showDataVoxels && (
+                      <>
+                        <IconToggle icon={IconGrid} label={tr('toggle_data_voxel_plan')} on={state.dataVoxelPlan} onToggle={() => toggle('dataVoxelPlan')} />
+                        <IconToggle icon={IconSectionX} label={tr('toggle_data_voxel_sectionx')} on={state.dataVoxelSectionX} onToggle={() => toggle('dataVoxelSectionX')} />
+                        <IconToggle icon={IconSectionY} label={tr('toggle_data_voxel_sectiony')} on={state.dataVoxelSectionY} onToggle={() => toggle('dataVoxelSectionY')} />
+                        <div className="vertical-divider" />
+                        <IconToggle icon={IconSmoothSurface} label={tr('toggle_data_voxel_smooth')} on={state.dataVoxelSmooth} onToggle={() => toggle('dataVoxelSmooth')} />
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="vertical-divider" />

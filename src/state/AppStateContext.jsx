@@ -71,6 +71,15 @@ const initialState = {
   showCalendarWidget: true,
   showClockWidget: true,
   wireframe: false,
+  // Overlay voxel del dataset corrente nel viewer 3D: stesso dato/palette della
+  // vista 2D, disegnato come voxel colorati in pianta e/o nelle sezioni.
+  showDataVoxels: false,
+  dataVoxelPlan: true,
+  dataVoxelSectionX: true,
+  dataVoxelSectionY: true,
+  // false = un box per cella (a gradino con "segui il terreno" o sezioni
+  // ruotate); true = superficie continua a piani inclinati, stesso dato/colore
+  dataVoxelSmooth: true,
   cameraProjection: 'perspective', // 'perspective' | 'parallel' (viewer 3D)
   gizmoNorthMode: 'true', // riferimento cardinali del ViewCube: 'true' (nord vero) | 'grid' (lato piatto del modello)
   resetViewNonce: 0, // incrementato da "Reimposta vista": il viewer 3D lo osserva

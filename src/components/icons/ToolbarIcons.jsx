@@ -108,6 +108,33 @@ export function IconWireframe(props) {
   );
 }
 
+export function IconSectionX(props) {
+  return (
+    <svg {...base} width="18" height="18" {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="1.5" />
+      <path d="M12 4v16" />
+    </svg>
+  );
+}
+
+export function IconSectionY(props) {
+  return (
+    <svg {...base} width="18" height="18" {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="1.5" />
+      <path d="M4 12h16" />
+    </svg>
+  );
+}
+
+export function IconSmoothSurface(props) {
+  return (
+    <svg {...base} width="18" height="18" {...props}>
+      <path d="M3 15c2.5-5 5 5 7.5 0S15 10 17.5 15 21 9 21 9" />
+      <path d="M3 20h18" />
+    </svg>
+  );
+}
+
 export function IconSun(props) {
   return (
     <svg {...base} width="18" height="18" {...props}>
