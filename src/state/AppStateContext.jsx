@@ -243,12 +243,20 @@ export function AppStateProvider({ children }) {
       // la sovrapposizione dei due layer).
       toggle: (key) => set((s) => {
         const next = !s[key];
-        if (key === 'showWindField' && next) return { showWindField: true, showWindVolume: false };
-        if (key === 'showWindVolume' && next) return { showWindVolume: true, showWindField: false };
         // "Wind field" richiede sia "Data overlay" (showDataVoxels) acceso sia
         // i voxel smussati (dataVoxelSmooth): in modalità a box il vento sulle
-        // fette viene coperto materialmente. Se uno dei due si spegne mentre
-        // era acceso, lo sospendiamo (spento + segnato); torna acceso da solo
+        // fette viene coperto materialmente. Se l'utente accende il vento
+        // mentre una delle due condizioni è spenta, le accendiamo entrambe
+        // insieme al vento invece di lasciare il toggle senza effetto visibile.
+        if (key === 'showWindField' && next) {
+          const patch = { showWindField: true, showWindVolume: false, windFieldAutoSuspended: false };
+          if (!s.showDataVoxels) patch.showDataVoxels = true;
+          if (!s.dataVoxelSmooth) patch.dataVoxelSmooth = true;
+          return patch;
+        }
+        if (key === 'showWindVolume' && next) return { showWindVolume: true, showWindField: false };
+        // Se "Data overlay" o "voxel smussati" si spengono mentre il vento era
+        // acceso, lo sospendiamo (spento + segnato); torna acceso da solo
         // solo quando ENTRAMBE le condizioni sono di nuovo soddisfatte — se
         // resta bloccato dall'altra condizione, la sospensione resta in
         // attesa. Un toggle spento a mano dall'utente mentre nulla lo blocca
@@ -331,8 +339,13 @@ export function AppStateProvider({ children }) {
         for (const k of ['sectionAngle', 'followTerrain', 'fixBiometSections', 'levelOut', 'showWindField', 'showObjectsOverlay', 'windStyle', 'windOpacity', 'windSize', 'windDensity', 'scaleType', 'palette', 'paletteReversed', 'diffPalette', 'diffPaletteReversed']) {
           if (s[k] != null) patch[k] = s[k];
         }
-        // showWindField e showWindVolume sono mutuamente esclusivi (vedi toggle)
-        if (patch.showWindField) patch.showWindVolume = false;
+        // showWindField e showWindVolume sono mutuamente esclusivi (vedi toggle);
+        // il vento richiede anche "Data overlay" acceso e voxel smussati (vedi toggle)
+        if (patch.showWindField) {
+          patch.showWindVolume = false;
+          patch.showDataVoxels = true;
+          patch.dataVoxelSmooth = true;
+        }
         set(patch);
       },
       openPaletteDropdown: (which) =>

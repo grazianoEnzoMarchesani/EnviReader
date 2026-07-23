@@ -267,8 +267,13 @@ function makeGlowTexture() {
 // quello, stringhe più lunghe di un paio di caratteri (es. "22.5 m") uscivano
 // dal bordo del canvas e venivano tagliate. `rotation` (radianti) ruota il
 // testo nel piano dello schermo, per le quote verticali che devono leggersi
-// dal basso verso l'alto come nel riferimento fornito dall'utente.
-function makeLabelSprite(text, { color, size = 64, weight = '700', scale, rotation = 0 }) {
+// dal basso verso l'alto come nel riferimento fornito dall'utente. `anchor`
+// (coppia [x,y] in coordinate 0..1 dello sprite, stesso significato di
+// Sprite.center) sposta il punto di ancoraggio dal centro di default: serve
+// per allineare il testo alla linea di quota invece di lasciarlo centrato
+// nel vuoto attorno a `position` (es. [0.5,0] = ancorato al bordo inferiore,
+// così il testo cresce verso l'alto a partire dalla linea).
+function makeLabelSprite(text, { color, size = 64, weight = '700', scale, rotation = 0, anchor }) {
   const font = `${weight} ${size}px -apple-system, system-ui, sans-serif`;
   const measure = document.createElement('canvas').getContext('2d');
   measure.font = font;
@@ -289,6 +294,7 @@ function makeLabelSprite(text, { color, size = 64, weight = '700', scale, rotati
   const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, rotation });
   const sprite = new THREE.Sprite(material);
   sprite.scale.set(scale * (canvas.width / canvas.height), scale, 1);
+  if (anchor) sprite.center.set(anchor[0], anchor[1]);
   return sprite;
 }
 
@@ -1629,9 +1635,13 @@ function buildPlanDimensionCorner(W, H, top, xSign, zSign) {
   const material = new THREE.LineBasicMaterial({ color: 0x6b7278, transparent: true, opacity: 0.75 });
   const lines = new THREE.LineSegments(geometry, material);
 
+  // Quota orizzontale: il testo sta sempre al di sopra della linea, appoggiato
+  // con il bordo inferiore a un piccolo distacco da essa (ancora [0.5,0],
+  // non centrato sul punto) — mai fluttuante a mezz'aria come con il vecchio
+  // gap ampio e sprite centrato.
   const labelScale = Math.max(scaleRef * 0.05, 1);
-  const labelGap = labelScale * 0.55;
-  const labelOpts = { color: '#4a5158', size: 60, scale: labelScale };
+  const labelGap = labelScale * 0.12;
+  const labelOpts = { color: '#4a5158', size: 60, scale: labelScale, anchor: [0.5, 0] };
   const widthLabel = makeLabelSprite(formatMeters(W), labelOpts);
   widthLabel.position.set(0, labelGap, oz);
   const depthLabel = makeLabelSprite(formatMeters(H), labelOpts);
@@ -1670,11 +1680,18 @@ function buildHeightCorner(W, H, top, xSign, zSign) {
 
   const labelScale = Math.max(scaleRef * 0.05, 1);
   const label = makeLabelSprite(formatMeters(top), { color: '#4a5158', size: 60, scale: labelScale, rotation: Math.PI / 2 });
-  const labelGap = labelScale * 0.6;
-  label.position.set(cx + dirX * labelGap, top / 2, cz + dirZ * labelGap);
+  // Il posizionamento definitivo (a sinistra della linea, in coordinate
+  // schermo) dipende dall'orientamento della camera e viene applicato ad
+  // ogni frame da updateGridWallVisibility — qui si salva solo il punto
+  // sulla linea e il distacco desiderato; la posizione iniziale è un
+  // fallback prima del primo update.
+  label.userData.linePoint = new THREE.Vector3(cx, top / 2, cz);
+  label.userData.gap = labelScale * 0.6;
+  label.position.set(cx + dirX * label.userData.gap, top / 2, cz + dirZ * label.userData.gap);
 
   const corner = new THREE.Group();
   corner.add(line, label);
+  corner.userData.label = label;
   return corner;
 }
 
@@ -1787,6 +1804,18 @@ export function updateGridWallVisibility(layers, camera) {
     const heightKey = scoreA >= scoreB ? `${mixedA.x}_${mixedA.z}` : `${mixedB.x}_${mixedB.z}`;
     for (const [key, corner] of Object.entries(dimensions.heightCorners)) {
       corner.visible = key === heightKey;
+    }
+    // Il testo della quota verticale deve stare a sinistra della linea come
+    // vuole la convenzione (vedi riferimento utente), non semplicemente
+    // "verso l'esterno del box": essendo la linea verticale (asse Y) e la
+    // camera con up ≈ mondo-Y, "sinistra" in schermo corrisponde sempre a
+    // -right in coordinate mondo, qualunque sia l'azimuth della camera —
+    // per questo va ricalcolato ad ogni frame invece che fissato una volta
+    // sola in buildHeightCorner.
+    const heightLabel = dimensions.heightCorners[heightKey]?.userData.label;
+    if (heightLabel) {
+      const { linePoint, gap } = heightLabel.userData;
+      heightLabel.position.set(linePoint.x - right.x * gap, linePoint.y, linePoint.z - right.z * gap);
     }
   }
 }
