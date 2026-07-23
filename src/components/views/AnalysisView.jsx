@@ -7,12 +7,13 @@ import Segmented from '../controls/Segmented';
 import Slider from '../controls/Slider';
 import Select from '../controls/Select';
 import IconToggle from '../controls/IconToggle';
+import HelpTooltip from '../controls/HelpTooltip';
 import { IconLayers3D, IconBuilding, IconTerrain, IconTerrainFix, IconTree, IconCompass, IconCalendar, IconClock, IconSettings } from '../icons/ToolbarIcons';
 import ViewSettingsModal from '../ViewSettingsModal';
 import MapChart, { MapThumb } from '../MapChart';
 import TimeSeriesChart from '../TimeSeriesChart';
 import { useSlices, usePointSeries, useInxRotation, useWindFields, useTerrainCut } from '../../lib/useSlice';
-import { terrainCutProfile, isBiometDataset } from '../../lib/envimet';
+import { terrainCutProfile, isBiometDataset, hasVerticalExtent } from '../../lib/envimet';
 import { useFlip } from '../../lib/useFlip';
 import { formatValue } from '../../lib/colormap';
 import { niceCeil } from '../../lib/windField';
@@ -41,9 +42,9 @@ function computeDiff(a, b, orderAB) {
   return { ...a, data, min: -maxAbs || 0, max: maxAbs || 0 };
 }
 
-function ChartCard({ flipKey, title, stats, body, stripe, caption, thumbs, objectsThumbs, objectsOpts, thumbRanges, thumbShowLegend, thumbWinds, colors, reversed, currentViewType, onSelectViewType, onThumbLegendClick }) {
+function ChartCard({ flipKey, title, stats, body, stripe, caption, thumbs, objectsThumbs, objectsOpts, thumbRanges, thumbShowLegend, thumbWinds, colors, reversed, viewTypes, currentViewType, onSelectViewType, onThumbLegendClick }) {
   const { tr } = useI18n();
-  const otherViews = VIEW_TYPES.filter((v) => v.key !== currentViewType);
+  const otherViews = viewTypes.filter((v) => v.key !== currentViewType);
   return (
     <div className="chart-card" data-flip-key={flipKey}>
       <div className="chart-header">
@@ -55,6 +56,7 @@ function ChartCard({ flipKey, title, stats, body, stripe, caption, thumbs, objec
           <span className="chart-caption">{caption}</span>
         </div>
       )}
+      {otherViews.length > 0 && (
       <div className="thumb-row">
         {otherViews.map((v) => (
           <div key={v.key} className="thumb" onClick={() => onSelectViewType(v.key)}>
@@ -81,6 +83,7 @@ function ChartCard({ flipKey, title, stats, body, stripe, caption, thumbs, objec
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }
@@ -98,6 +101,11 @@ export default function AnalysisView() {
   const activeDiffPalette = draft?.target === 'diff' ? draftPalette : findPalette(state.diffPalette, 'diff', state.customPalettes);
   const diffReversed = draft?.target === 'diff' ? false : state.diffPaletteReversed;
   const activeViewType = VIEW_TYPES.find((v) => v.key === state.viewType) || VIEW_TYPES[0];
+  // Le sezioni Longitudinal/Transverse tagliano in altezza: su un gruppo dati
+  // senza estensione verticale (es. Surface, un solo livello Z) non
+  // mostrerebbero altro che una linea piatta, quindi restano nascoste.
+  const showSections = hasVerticalExtent(state.edxMeta?.dimensions);
+  const visibleViewTypes = showSections ? VIEW_TYPES : VIEW_TYPES.filter((v) => v.key === 'plan');
 
   const loaded = !!state.edxMeta;
   const datasetLabel = loaded ? state.dataset : tr(state.dataset);
@@ -457,12 +465,18 @@ export default function AnalysisView() {
   const flipRef = useFlip();
 
   const compareOptions = [
-    { key: 'single', label: tr('compare_single') },
-    { key: 'b', label: tr('compare_b'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined },
-    { key: 'ab', label: tr('compare_ab'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined },
-    { key: 'abdiff', label: tr('compare_abdiff'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined },
+    { key: 'single', label: tr('compare_single'), help: { title: tr('help_compare_single_title'), body: tr('help_compare_single_body') } },
+    { key: 'b', label: tr('compare_b'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined, help: { title: tr('help_compare_b_title'), body: tr('help_compare_b_body') } },
+    { key: 'ab', label: tr('compare_ab'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined, help: { title: tr('help_compare_ab_title'), body: tr('help_compare_ab_body') } },
+    { key: 'abdiff', label: tr('compare_abdiff'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined, help: { title: tr('help_compare_abdiff_title'), body: tr('help_compare_abdiff_body') } },
   ];
-  const viewTypeOptions = VIEW_TYPES.map((v) => ({ key: v.key, label: tr(v.labelKey) }));
+  const viewTypeOptions = visibleViewTypes.map((v) => ({ key: v.key, label: tr(v.labelKey) }));
+
+  // Se il gruppo dati cambia e perde l'estensione verticale mentre una sezione
+  // era selezionata, si torna alla pianta (unica vista che resta visibile).
+  useEffect(() => {
+    if (!showSections && state.viewType !== 'plan') set({ viewType: 'plan' });
+  }, [showSections, state.viewType]);
 
   const viewBarTopRef = useRef(null);
   const viewBarPanelRef = useRef(null);
@@ -517,7 +531,9 @@ export default function AnalysisView() {
                 </div>
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
-                  <span className="control-label" style={{ marginBottom: 0 }}>{tr('group_legend')}</span>
+                  <HelpTooltip content={{ title: tr('help_legend_bounds_title'), body: tr('help_legend_bounds_body') }}>
+                    <span className="control-label" style={{ marginBottom: 0 }}>{tr('group_legend')}</span>
+                  </HelpTooltip>
                   <select className="select" style={{ width: 'auto' }} value={state.scaleType} onChange={(e) => set({ scaleType: e.target.value })}>
                     {SCALE_TYPES.map((s) => (
                       <option key={s.value} value={s.value}>
@@ -528,58 +544,60 @@ export default function AnalysisView() {
                 </div>
                 <div className="vertical-divider" />
                 <div className="icon-toggle-row">
-                  <IconToggle icon={IconLayers3D} label={tr('toggle_objects_overlay')} on={state.showObjectsOverlay} onToggle={() => toggle('showObjectsOverlay')} />
+                  <IconToggle icon={IconLayers3D} label={tr('toggle_objects_overlay')} on={state.showObjectsOverlay} onToggle={() => toggle('showObjectsOverlay')} help={{ title: tr('help_objects_overlay_title'), body: tr('help_objects_overlay_body'), note: tr('help_objects_overlay_note') }} />
                   {state.showObjectsOverlay && (
                     <>
-                      <IconToggle icon={IconBuilding} label={tr('toggle_obj_buildings')} on={state.objOverlayBuildings} onToggle={() => toggle('objOverlayBuildings')} />
-                      <IconToggle icon={IconTerrain} label={tr('toggle_obj_terrain')} on={state.objOverlayTerrain} onToggle={() => toggle('objOverlayTerrain')} />
-                      <IconToggle icon={IconTree} label={tr('toggle_obj_vegetation')} on={state.objOverlayVegetation} onToggle={() => toggle('objOverlayVegetation')} />
+                      <IconToggle icon={IconBuilding} label={tr('toggle_obj_buildings')} on={state.objOverlayBuildings} onToggle={() => toggle('objOverlayBuildings')} help={{ title: tr('help_obj_buildings_title'), body: tr('help_obj_buildings_body') }} />
+                      <IconToggle icon={IconTerrain} label={tr('toggle_obj_terrain')} on={state.objOverlayTerrain} onToggle={() => toggle('objOverlayTerrain')} help={{ title: tr('help_obj_terrain_title'), body: tr('help_obj_terrain_body') }} />
+                      <IconToggle icon={IconTree} label={tr('toggle_obj_vegetation')} on={state.objOverlayVegetation} onToggle={() => toggle('objOverlayVegetation')} help={{ title: tr('help_obj_vegetation_title'), body: tr('help_obj_vegetation_body') }} />
                     </>
                   )}
                   {isBiometDataset(state.dataGroup, state.dataset) && (
                     <>
                       <div className="vertical-divider" />
-                      <IconToggle icon={IconTerrainFix} label={tr('toggle_biomet_fix')} on={state.fixBiometSections} onToggle={() => toggle('fixBiometSections')} />
+                      <IconToggle icon={IconTerrainFix} label={tr('toggle_biomet_fix')} on={state.fixBiometSections} onToggle={() => toggle('fixBiometSections')} help={{ title: tr('help_biomet_fix_title'), body: tr('help_biomet_fix_body'), note: tr('help_biomet_fix_note') }} />
                     </>
                   )}
                   <div className="vertical-divider" />
-                  <IconToggle icon={IconCompass} label={tr('toggle_compass')} on={state.showNorthArrow} onToggle={() => toggle('showNorthArrow')} />
-                  <IconToggle icon={IconCalendar} label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} />
-                  <IconToggle icon={IconClock} label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} />
+                  <IconToggle icon={IconCompass} label={tr('toggle_compass')} on={state.showNorthArrow} onToggle={() => toggle('showNorthArrow')} help={{ title: tr('help_compass_arrow_title'), body: tr('help_compass_arrow_body') }} />
+                  <IconToggle icon={IconCalendar} label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} help={{ title: tr('help_calendar_widget_title'), body: tr('help_calendar_widget_body') }} />
+                  <IconToggle icon={IconClock} label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} help={{ title: tr('help_clock_widget_title'), body: tr('help_clock_widget_body') }} />
                 </div>
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
-                  <button
-                    type="button"
-                    className="icon-toggle"
-                    title={tr('btn_view_settings')}
-                    aria-label={tr('btn_view_settings')}
-                    onClick={() => toggle('viewSettingsOpen')}
-                  >
-                    <IconSettings />
-                  </button>
+                  <HelpTooltip content={{ title: tr('help_view_settings_title'), body: tr('help_view_settings_body') }}>
+                    <button
+                      type="button"
+                      className="icon-toggle"
+                      aria-label={tr('btn_view_settings')}
+                      onClick={() => toggle('viewSettingsOpen')}
+                    >
+                      <IconSettings />
+                    </button>
+                  </HelpTooltip>
                 </div>
               </div>
 
               <div className={`view-bar-modes view-bar-modes--${modesLayout}`} ref={viewBarModesRef}>
                 <Segmented options={compareOptions} value={state.compareMode} onSelect={setCompareMode} variant="accent" />
-                <Segmented options={viewTypeOptions} value={state.viewType} onSelect={(v) => set({ viewType: v })} variant="dark" />
+                {showSections && <Segmented options={viewTypeOptions} value={state.viewType} onSelect={(v) => set({ viewType: v })} variant="dark" />}
               </div>
             </div>
           </div>
         </div>
 
+        <HelpTooltip content={{ title: tr('help_collapse_toolbar_title'), body: tr('help_collapse_toolbar_body') }}>
         <button
           type="button"
           className="view-bar-toggle"
           onClick={() => setViewBarCollapsed((v) => !v)}
-          title={tr(viewBarCollapsed ? 'btn_expand_toolbar' : 'btn_collapse_toolbar')}
           aria-label={tr(viewBarCollapsed ? 'btn_expand_toolbar' : 'btn_collapse_toolbar')}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="18 15 12 9 6 15"></polyline>
           </svg>
         </button>
+        </HelpTooltip>
       </div>
 
       <ViewSettingsModal />
@@ -602,6 +620,7 @@ export default function AnalysisView() {
             thumbWinds={c.thumbWinds}
             colors={c.colors}
             reversed={c.reversed}
+            viewTypes={visibleViewTypes}
             currentViewType={state.viewType}
             onSelectViewType={(v) => set({ viewType: v })}
             onThumbLegendClick={c.onThumbLegendClick}

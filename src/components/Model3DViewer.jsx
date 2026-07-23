@@ -7,9 +7,10 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildModelScene, setLayerVisibility, setWireframe, disposeGroup, updateSunLayer, setSunDiagram, setShadowCasting, buildDataOverlay, buildWindOnSlices, buildWindVolume, worldToGrid, gridToWorld } from '../lib/inxScene';
+import { buildModelScene, setLayerVisibility, setWireframe, disposeGroup, updateSunLayer, setSunDiagram, setShadowCasting, buildDataOverlay, buildWindOnSlices, buildWindVolume, applyWindTheme, worldToGrid, gridToWorld, updateGridWallVisibility } from '../lib/inxScene';
 import { createViewCube } from '../lib/viewCube';
 import { useI18n } from '../i18n/I18nContext';
+import HelpTooltip from './controls/HelpTooltip';
 
 const DEG = Math.PI / 180;
 const UP_Y = new THREE.Vector3(0, 1, 0);
@@ -61,6 +62,18 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
   useEffect(() => {
     interactionRef.current = { model, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange };
   });
+  // flag sempre fresco per applicare subito la visibilità dei livelli alla
+  // (ri)costruzione della scena qui sotto: senza questo, ogni volta che
+  // objectsVolume/spacingZ cambiano (es. al primo caricamento dei risultati)
+  // la scena viene ricostruita da zero con tutti i livelli visibili di
+  // default (i Group di three.js nascono visible=true), e l'effetto separato
+  // che applica i toggle non riparte perché non dipende da objectsVolume —
+  // risultato: ricettori (e altri livelli spenti) visibili finché non si
+  // tocca manualmente un toggle.
+  const flagsRef = useRef(flags);
+  useEffect(() => {
+    flagsRef.current = flags;
+  }, [flags]);
 
   // setup del renderer: una volta sola per montaggio
   useEffect(() => {
@@ -80,6 +93,11 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
     // il modello, che viene renderizzato sopra normalmente dove presente.
     const applySceneBackground = () => {
       scene.background = new THREE.Color().setStyle(resolveCssColor('--surface'));
+      // frecce/streamline del vento: nero su sfondo chiaro si legge, ma si
+      // perde su sfondo scuro, quindi seguono lo stesso cambio di tema
+      // (vedi applyWindTheme in inxScene.js) senza ricostruire le mesh.
+      applyWindTheme(stageRef.current?.windOverlayLayer);
+      applyWindTheme(stageRef.current?.windVolumeLayer);
     };
     applySceneBackground();
     const themeObserver = new MutationObserver(applySceneBackground);
@@ -483,6 +501,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
         // fa il rebase (vedi rebase() in viewCube.js).
         if (stage.camera.up.y > 0.999) stage.controls.update();
       }
+      if (stage.layers) updateGridWallVisibility(stage.layers, stage.camera);
       renderer.render(stage.scene, stage.camera);
       gizmo.render(renderer);
 
@@ -565,6 +584,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
     stage.hemisphereLight = hemisphereLight;
     stage.decorativeLight = decorativeLight;
     stage.sunLayer = sunLayer;
+    setLayerVisibility(layers, flagsRef.current);
 
     const radius = Math.max(size.W, size.H, maxHeight * 2);
     // distanza di riferimento per lo zoom sincronizzato (vedi broadcastSync/
@@ -790,42 +810,45 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
       <div ref={containerRef} className="model-canvas" />
       <div className="view-gizmo-wrap">
         <div ref={gizmoRef} className="view-gizmo" />
-        <button
-          type="button"
-          className="view-gizmo-btn view-gizmo-home"
-          title={tr('gizmo_home_title')}
-          aria-label={tr('gizmo_home_title')}
-          onClick={() => stageRef.current?.resetView()}
-        >
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3.5 11.5 12 4l8.5 7.5" />
-            <path d="M5.5 10v9a1 1 0 0 0 1 1h4V14h3v6h4a1 1 0 0 0 1-1v-9" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          className="view-gizmo-btn view-gizmo-rotate view-gizmo-rotate-ccw"
-          title={tr('gizmo_rotate_ccw_title')}
-          aria-label={tr('gizmo_rotate_ccw_title')}
-          onClick={() => gizmoApiRef.current?.rotate(90)}
-        >
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 4a8 8 0 1 0 7.75 6" transform="scale(-1,1) translate(-24,0)" />
-            <path d="M19 2v5h-5" transform="scale(-1,1) translate(-24,0)" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          className="view-gizmo-btn view-gizmo-rotate view-gizmo-rotate-cw"
-          title={tr('gizmo_rotate_cw_title')}
-          aria-label={tr('gizmo_rotate_cw_title')}
-          onClick={() => gizmoApiRef.current?.rotate(-90)}
-        >
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 4a8 8 0 1 0 7.75 6" />
-            <path d="M19 2v5h-5" />
-          </svg>
-        </button>
+        <HelpTooltip content={{ title: tr('help_gizmo_home_title'), body: tr('help_gizmo_home_body') }}>
+          <button
+            type="button"
+            className="view-gizmo-btn view-gizmo-home"
+            aria-label={tr('gizmo_home_title')}
+            onClick={() => stageRef.current?.resetView()}
+          >
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3.5 11.5 12 4l8.5 7.5" />
+              <path d="M5.5 10v9a1 1 0 0 0 1 1h4V14h3v6h4a1 1 0 0 0 1-1v-9" />
+            </svg>
+          </button>
+        </HelpTooltip>
+        <HelpTooltip content={{ title: tr('help_gizmo_rotate_ccw_title'), body: tr('help_gizmo_rotate_ccw_body') }}>
+          <button
+            type="button"
+            className="view-gizmo-btn view-gizmo-rotate view-gizmo-rotate-ccw"
+            aria-label={tr('gizmo_rotate_ccw_title')}
+            onClick={() => gizmoApiRef.current?.rotate(90)}
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 4a8 8 0 1 0 7.75 6" transform="scale(-1,1) translate(-24,0)" />
+              <path d="M19 2v5h-5" transform="scale(-1,1) translate(-24,0)" />
+            </svg>
+          </button>
+        </HelpTooltip>
+        <HelpTooltip content={{ title: tr('help_gizmo_rotate_cw_title'), body: tr('help_gizmo_rotate_cw_body') }}>
+          <button
+            type="button"
+            className="view-gizmo-btn view-gizmo-rotate view-gizmo-rotate-cw"
+            aria-label={tr('gizmo_rotate_cw_title')}
+            onClick={() => gizmoApiRef.current?.rotate(-90)}
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 4a8 8 0 1 0 7.75 6" />
+              <path d="M19 2v5h-5" />
+            </svg>
+          </button>
+        </HelpTooltip>
       </div>
     </>
   );

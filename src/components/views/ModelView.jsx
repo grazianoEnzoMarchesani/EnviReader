@@ -3,7 +3,7 @@ import { useAppState } from '../../state/AppStateContext';
 import { useI18n } from '../../i18n/I18nContext';
 import { MODEL_LAYERS, SCALE_TYPES_3D } from '../../data/constants';
 import { findInxFile, readINX } from '../../lib/inx';
-import { loadObjectsVolume, isBiometDataset } from '../../lib/envimet';
+import { loadObjectsVolume, isBiometDataset, hasVerticalExtent } from '../../lib/envimet';
 import { sunPosition, sunPathSamples, sunDiagramCurves, estimateTimezoneOffset } from '../../lib/sunPosition';
 import { getSunSample } from '../../lib/sunLink';
 import Model3DViewer from '../Model3DViewer';
@@ -11,6 +11,7 @@ import { MapCalendar, MapClock } from '../MapChart';
 import TimeSeriesChart from '../TimeSeriesChart';
 import Segmented from '../controls/Segmented';
 import IconToggle from '../controls/IconToggle';
+import HelpTooltip from '../controls/HelpTooltip';
 import { IconBuilding, IconTree, IconTerrain, IconTerrainFix, IconReceptor, IconGrid, IconWireframe, IconSun, IconLayers3D, IconSectionX, IconSectionY, IconSmoothSurface, IconSyncRotate, IconCalendar, IconClock, IconSettings } from '../icons/ToolbarIcons';
 import ViewSettingsModal from '../ViewSettingsModal';
 import { useFlip } from '../../lib/useFlip';
@@ -26,6 +27,14 @@ const LAYER_ICONS = {
   showTerrain: IconTerrain,
   showReceptors: IconReceptor,
   showGrid: IconGrid,
+};
+
+const LAYER_HELP_IDS = {
+  showBuildings: 'layer_buildings',
+  showVegetation: 'layer_vegetation',
+  showTerrain: 'layer_terrain',
+  showReceptors: 'layer_receptors',
+  showGrid: 'layer_grid',
 };
 
 function formatTime(time) {
@@ -242,9 +251,10 @@ function computeStats(model) {
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
-function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, resetNonce, projection, gizmoNorthMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled }) {
+function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, resetNonce, projection, gizmoNorthMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
   const { tr } = useI18n();
   const model = loaded?.model;
+  const showModel = model && !blockedNoVerticalExtent;
   const stats = computeStats(model);
   const { hasLocation, sunActive, sunInfo, sunPathPoints, sunDiagram } = sun;
 
@@ -258,8 +268,13 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverl
           </div>
         )}
       </div>
-      <div className={`model-viewer${model ? ' is-3d' : ''}`}>
-        {model ? (
+      <div className={`model-viewer${showModel ? ' is-3d' : ''}`}>
+        {model && blockedNoVerticalExtent ? (
+          <>
+            <span className="chart-caption">{tr('model_no_vertical_caption')}</span>
+            <span className="model-hint">{tr('model_no_vertical_hint')}</span>
+          </>
+        ) : model ? (
           <>
             <Model3DViewer
               model={model}
@@ -301,7 +316,7 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverl
           </>
         )}
       </div>
-      {model && dataOverlay && (
+      {showModel && dataOverlay && (
         <div className="map-legend" onClick={() => onLegendClick?.(dataOverlay.range)}>
           <span className="map-legend-label">{formatValue(dataOverlay.range.min, dataOverlay.range.max - dataOverlay.range.min)}</span>
           <span
@@ -335,6 +350,11 @@ export default function ModelView() {
   const pointSeriesB = usePointSeries(state.filesetB, ...pointArgs, terrainCutB);
   const loaded = !!state.edxMeta;
   const datasetLabel = loaded ? state.dataset : tr(state.dataset);
+  // Il gruppo dati corrente non ha estensione verticale (es. Surface, un solo
+  // livello Z): la vista 3D esiste per esplorare la verticalità, quindi in
+  // questo caso il modello resta nascosto e si chiede di scegliere un altro
+  // gruppo dati invece di mostrare un modello "piatto" fuorviante.
+  const blockedNoVerticalExtent = loaded && !hasVerticalExtent(state.edxMeta?.dimensions);
   // Stessa etichetta data/ora dei badge calendario/orologio della vista 2D
   // (AnalysisView), qui condivisa dai pannelli 3D per restare coerente col resto dell'app.
   const timeLabel = state.seriesLabels[state.time] ?? `t · ${formatTime(state.time)}`;
@@ -453,9 +473,9 @@ export default function ModelView() {
     });
   };
   const compareOptions = [
-    { key: 'single', label: tr('compare_single') },
-    { key: 'b', label: tr('compare_b'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined },
-    { key: 'ab', label: tr('compare_ab'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined },
+    { key: 'single', label: tr('compare_single'), help: { title: tr('help_compare_single_title'), body: tr('help_compare_single_body') } },
+    { key: 'b', label: tr('compare_b'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined, help: { title: tr('help_compare_b_title'), body: tr('help_compare_b_body') } },
+    { key: 'ab', label: tr('compare_ab'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined, help: { title: tr('help_compare_ab_title'), body: tr('help_compare_ab_body') } },
   ];
   const panelKeys = state.compareMode3D === 'ab' ? ['A', 'B'] : state.compareMode3D === 'b' ? ['B'] : ['A'];
 
@@ -515,7 +535,7 @@ export default function ModelView() {
                   <span className="control-label" style={{ marginBottom: 0 }}>{tr('model_group_layers')}</span>
                   <div className="icon-toggle-row">
                     {MODEL_LAYERS.map((l) => (
-                      <IconToggle key={l.key} icon={LAYER_ICONS[l.key]} label={tr(l.labelKey)} on={state[l.key]} onToggle={() => toggle(l.key)} />
+                      <IconToggle key={l.key} icon={LAYER_ICONS[l.key]} label={tr(l.labelKey)} on={state[l.key]} onToggle={() => toggle(l.key)} help={{ title: tr(`help_${LAYER_HELP_IDS[l.key]}_title`), body: tr(`help_${LAYER_HELP_IDS[l.key]}_body`) }} />
                     ))}
                   </div>
                 </div>
@@ -523,18 +543,18 @@ export default function ModelView() {
                 <div className="view-bar-group">
                   <span className="control-label" style={{ marginBottom: 0 }}>{tr('model_group_data_overlay')}</span>
                   <div className="icon-toggle-row">
-                    <IconToggle icon={IconLayers3D} label={tr('toggle_data_voxels')} on={state.showDataVoxels} onToggle={() => toggle('showDataVoxels')} />
+                    <IconToggle icon={IconLayers3D} label={tr('toggle_data_voxels')} on={state.showDataVoxels} onToggle={() => toggle('showDataVoxels')} help={{ title: tr('help_data_voxels_title'), body: tr('help_data_voxels_body'), note: tr('help_data_voxels_note') }} />
                     {state.showDataVoxels && (
                       <>
-                        <IconToggle icon={IconGrid} label={tr('toggle_data_voxel_plan')} on={state.dataVoxelPlan} onToggle={() => toggle('dataVoxelPlan')} />
-                        <IconToggle icon={IconSectionX} label={tr('toggle_data_voxel_sectionx')} on={state.dataVoxelSectionX} onToggle={() => toggle('dataVoxelSectionX')} />
-                        <IconToggle icon={IconSectionY} label={tr('toggle_data_voxel_sectiony')} on={state.dataVoxelSectionY} onToggle={() => toggle('dataVoxelSectionY')} />
+                        <IconToggle icon={IconGrid} label={tr('toggle_data_voxel_plan')} on={state.dataVoxelPlan} onToggle={() => toggle('dataVoxelPlan')} help={{ title: tr('help_data_voxel_plan_title'), body: tr('help_data_voxel_plan_body') }} />
+                        <IconToggle icon={IconSectionX} label={tr('toggle_data_voxel_sectionx')} on={state.dataVoxelSectionX} onToggle={() => toggle('dataVoxelSectionX')} help={{ title: tr('help_data_voxel_sectionx_title'), body: tr('help_data_voxel_sectionx_body') }} />
+                        <IconToggle icon={IconSectionY} label={tr('toggle_data_voxel_sectiony')} on={state.dataVoxelSectionY} onToggle={() => toggle('dataVoxelSectionY')} help={{ title: tr('help_data_voxel_sectiony_title'), body: tr('help_data_voxel_sectiony_body') }} />
                         <div className="vertical-divider" />
-                        <IconToggle icon={IconSmoothSurface} label={tr('toggle_data_voxel_smooth')} on={state.dataVoxelSmooth} onToggle={() => toggle('dataVoxelSmooth')} />
+                        <IconToggle icon={IconSmoothSurface} label={tr('toggle_data_voxel_smooth')} on={state.dataVoxelSmooth} onToggle={() => toggle('dataVoxelSmooth')} help={{ title: tr('help_data_voxel_smooth_title'), body: tr('help_data_voxel_smooth_body'), note: tr('help_data_voxel_smooth_note') }} />
                         {isBiometDataset(state.dataGroup, state.dataset) && (
                           <>
                             <div className="vertical-divider" />
-                            <IconToggle icon={IconTerrainFix} label={tr('toggle_biomet_fix')} on={state.fixBiometSections} onToggle={() => toggle('fixBiometSections')} />
+                            <IconToggle icon={IconTerrainFix} label={tr('toggle_biomet_fix')} on={state.fixBiometSections} onToggle={() => toggle('fixBiometSections')} help={{ title: tr('help_biomet_fix_title'), body: tr('help_biomet_fix_body'), note: tr('help_biomet_fix_note') }} />
                           </>
                         )}
                       </>
@@ -545,7 +565,9 @@ export default function ModelView() {
                   <>
                     <div className="vertical-divider" />
                     <div className="view-bar-group">
-                      <span className="control-label" style={{ marginBottom: 0 }}>{tr('group_legend')}</span>
+                      <HelpTooltip content={{ title: tr('help_legend_bounds_title'), body: tr('help_legend_bounds_body') }}>
+                        <span className="control-label" style={{ marginBottom: 0 }}>{tr('group_legend')}</span>
+                      </HelpTooltip>
                       <select className="select" style={{ width: 'auto' }} value={state.scaleType3D} onChange={(e) => set({ scaleType3D: e.target.value })}>
                         {SCALE_TYPES_3D.map((s) => (
                           <option key={s.value} value={s.value}>
@@ -558,28 +580,30 @@ export default function ModelView() {
                 )}
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
-                  <button
-                    type="button"
-                    className="ghost-btn"
-                    style={{ width: 'auto', marginBottom: 0 }}
-                    onClick={() => set((s) => ({ resetViewNonce: s.resetViewNonce + 1 }))}
-                  >
-                    {tr('btn_reset_view')}
-                  </button>
-                  <IconToggle icon={IconSyncRotate} label={tr('toggle_sync_camera_3d')} on={state.syncCamera3D} onToggle={() => toggle('syncCamera3D')} />
+                  <HelpTooltip content={{ title: tr('help_reset_view_title'), body: tr('help_reset_view_body') }}>
+                    <button
+                      type="button"
+                      className="ghost-btn"
+                      style={{ width: 'auto', marginBottom: 0 }}
+                      onClick={() => set((s) => ({ resetViewNonce: s.resetViewNonce + 1 }))}
+                    >
+                      {tr('btn_reset_view')}
+                    </button>
+                  </HelpTooltip>
+                  <IconToggle icon={IconSyncRotate} label={tr('toggle_sync_camera_3d')} on={state.syncCamera3D} onToggle={() => toggle('syncCamera3D')} help={{ title: tr('help_sync_camera_3d_title'), body: tr('help_sync_camera_3d_body'), note: tr('help_sync_camera_3d_note') }} />
                   <Segmented
                     options={[
-                      { key: 'perspective', label: tr('proj_perspective') },
-                      { key: 'parallel', label: tr('proj_parallel') },
+                      { key: 'perspective', label: tr('proj_perspective'), help: { title: tr('help_proj_perspective_title'), body: tr('help_proj_perspective_body') } },
+                      { key: 'parallel', label: tr('proj_parallel'), help: { title: tr('help_proj_parallel_title'), body: tr('help_proj_parallel_body') } },
                     ]}
                     value={state.cameraProjection}
                     onSelect={(key) => set({ cameraProjection: key })}
                   />
-                  <IconToggle icon={IconWireframe} label={tr('btn_wireframe')} on={state.wireframe} onToggle={() => toggle('wireframe')} />
+                  <IconToggle icon={IconWireframe} label={tr('btn_wireframe')} on={state.wireframe} onToggle={() => toggle('wireframe')} help={{ title: tr('help_wireframe_title'), body: tr('help_wireframe_body') }} />
                   <Segmented
                     options={[
-                      { key: 'true', label: tr('north_ref_true') },
-                      { key: 'grid', label: tr('north_ref_grid') },
+                      { key: 'true', label: tr('north_ref_true'), help: { title: tr('help_north_true_title'), body: tr('help_north_true_body') } },
+                      { key: 'grid', label: tr('north_ref_grid'), help: { title: tr('help_north_grid_title'), body: tr('help_north_grid_body') } },
                     ]}
                     value={state.gizmoNorthMode}
                     onSelect={(key) => set({ gizmoNorthMode: key })}
@@ -588,22 +612,23 @@ export default function ModelView() {
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
                   <div className="icon-toggle-row">
-                    <IconToggle icon={IconSun} label={tr('toggle_sun_path')} on={state.sunPathEnabled} onToggle={() => toggle('sunPathEnabled')} />
-                    <IconToggle icon={IconCalendar} label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} />
-                    <IconToggle icon={IconClock} label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} />
+                    <IconToggle icon={IconSun} label={tr('toggle_sun_path')} on={state.sunPathEnabled} onToggle={() => toggle('sunPathEnabled')} help={{ title: tr('help_sun_path_title'), body: tr('help_sun_path_body') }} />
+                    <IconToggle icon={IconCalendar} label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} help={{ title: tr('help_calendar_widget_title'), body: tr('help_calendar_widget_body') }} />
+                    <IconToggle icon={IconClock} label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} help={{ title: tr('help_clock_widget_title'), body: tr('help_clock_widget_body') }} />
                   </div>
                 </div>
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
-                  <button
-                    type="button"
-                    className="icon-toggle"
-                    title={tr('btn_view_settings')}
-                    aria-label={tr('btn_view_settings')}
-                    onClick={() => toggle('viewSettingsOpen')}
-                  >
-                    <IconSettings />
-                  </button>
+                  <HelpTooltip content={{ title: tr('help_view_settings_title'), body: tr('help_view_settings_body') }}>
+                    <button
+                      type="button"
+                      className="icon-toggle"
+                      aria-label={tr('btn_view_settings')}
+                      onClick={() => toggle('viewSettingsOpen')}
+                    >
+                      <IconSettings />
+                    </button>
+                  </HelpTooltip>
                 </div>
               </div>
 
@@ -616,17 +641,18 @@ export default function ModelView() {
           </div>
         </div>
 
+        <HelpTooltip content={{ title: tr('help_collapse_toolbar_title'), body: tr('help_collapse_toolbar_body') }}>
         <button
           type="button"
           className="view-bar-toggle"
           onClick={() => setViewBarCollapsed((v) => !v)}
-          title={tr(viewBarCollapsed ? 'btn_expand_toolbar' : 'btn_collapse_toolbar')}
           aria-label={tr(viewBarCollapsed ? 'btn_expand_toolbar' : 'btn_collapse_toolbar')}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="18 15 12 9 6 15"></polyline>
           </svg>
         </button>
+        </HelpTooltip>
       </div>
 
       <ViewSettingsModal />
@@ -649,6 +675,7 @@ export default function ModelView() {
             timeLabel={timeLabel}
             cameraSyncRef={cameraSyncRef}
             cameraSyncEnabled={state.syncCamera3D && panelKeys.length === 2}
+            blockedNoVerticalExtent={blockedNoVerticalExtent}
             sectionX={state.sectionX}
             sectionY={state.sectionY}
             sectionAngle={state.sectionAngle}

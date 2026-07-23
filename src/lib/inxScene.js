@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import { buildZLevels, zLevelsFromSpacing } from './inx';
 import { VEGETATION_COLORS as VEGETATION_HEX, buildLUT } from './colormap';
-import { sampleField, traceStreamlines2D } from './windField';
+import { traceStreamlines2D } from './windField';
 
 const VEGETATION_COLORS = VEGETATION_HEX.map((hex) => Number(`0x${hex.slice(1)}`));
 const VEGETATION_RV_MIN = 11;
@@ -100,7 +100,7 @@ export function buildModelScene(model, objectsVolume = null, spacingZ = null) {
       : buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ)),
     vegetation: buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ),
     receptors: buildReceptors(model, { toX, toZ, terrainAt }),
-    grid: buildGrid(model, { W, H }),
+    grid: buildGrid(model, { W, H }, spacingZ),
   };
   let maxHeight = 0;
   for (const [name, layer] of Object.entries(layers)) {
@@ -997,29 +997,58 @@ export function buildDataOverlay(model, overlay) {
 
 /* ---------- campo di vento 3D (frecce/streamline) ---------- */
 
-// Nero pieno: massimo contrasto su qualunque palette dati/terreno/edificio
-// sottostante (a differenza del canvas 2D, che usa un alone bianco + nucleo
-// scuro per restare leggibile su sfondo qualunque, qui un colore chiaro come
-// il teal iniziale si perdeva su troppe combinazioni di colori).
-const WIND_COLOR = 0x000000;
-
-// Asta e punta della freccia come geometrie UNITARIE separate (lunghezza 1,
-// centrate sull'origine, lungo +X): a differenza della versione precedente
-// (un'unica geometria asta+cono con la punta pari a una frazione fissa della
-// lunghezza totale), qui le due parti vengono scalate indipendentemente per
-// istanza in instancedArrows. Con la geometria unica, scalare l'intera
-// freccia in X per la lunghezza (proporzionale alla velocità) allungava
-// anche la punta nella stessa proporzione: con vento forte il cono diventava
-// una lunga punta aguzza — una lancia, non una freccia. Tenendo la punta
-// separata se ne può capare la lunghezza a un multiplo del suo stesso
-// raggio, indipendente da quanto è lunga l'asta.
-let _shaftGeometry = null;
-function shaftGeometry() {
-  if (_shaftGeometry) return _shaftGeometry;
-  _shaftGeometry = new THREE.CylinderGeometry(0.12, 0.12, 1, 6, 1);
-  _shaftGeometry.rotateZ(-Math.PI / 2);
-  return _shaftGeometry;
+// Nero pieno in tema chiaro (massimo contrasto su qualunque palette
+// dati/terreno/edificio sottostante: a differenza del canvas 2D, che usa un
+// alone bianco + nucleo scuro per restare leggibile su sfondo qualunque, qui
+// un colore chiaro come il teal iniziale si perdeva su troppe combinazioni di
+// colori), bianco in tema scuro (dove il nero si confonde con lo sfondo).
+// Letto al momento della costruzione del materiale; l'aggiornamento a caldo
+// quando l'utente cambia tema è gestito da Model3DViewer (vedi
+// applyWindTheme), che aggiorna material.color senza ricostruire la mesh.
+function windColor() {
+  return document.documentElement.dataset.theme === 'dark' ? 0xffffff : 0x000000;
 }
+
+// Riallinea al tema corrente i materiali già costruiti da buildWindOnSlices/
+// buildWindVolume (frecce e streamline condividono un unico THREE.Material
+// per layer, vedi sopra): chiamata da Model3DViewer quando data-theme cambia,
+// così il colore del vento segue il tema senza dover ricostruire la mesh.
+export function applyWindTheme(layer) {
+  if (!layer) return;
+  const hex = windColor();
+  layer.traverse((obj) => {
+    obj.material?.color?.setHex(hex);
+  });
+}
+
+// Freccia isolata come UNICA geometria affusolata (coda→punta, lunghezza 1,
+// centrata sull'origine, lungo +X), non più asta cilindrica + cono separato:
+// quella versione, isolata (a differenza della vista "combined" dove tante
+// teste coniche ravvicinate si fondono in un nastro e il raggio della testa
+// nasconde la giunzione), leggeva come un lecca-lecca — capocchia tozza su
+// un gambo sottile. Qui il raggio lungo l'asse segue un profilo CONCAVO
+// (esponente < 1: r(t) = (1-t)^ARROW_TAPER_EXPONENT) che si restringe piano
+// vicino alla coda e si affila di scatto vicino alla punta, invece di un
+// cono a raggio lineare. headGeometry() (sotto) resta invariata: è condivisa
+// con le testine di direzione della vista "combined" (pushArrowhead), che
+// non vanno toccate.
+let _arrowGeometry = null;
+function arrowGeometry() {
+  if (_arrowGeometry) return _arrowGeometry;
+  const points = [];
+  for (let i = 0; i <= ARROW_PROFILE_SEGMENTS; i++) {
+    const t = i / ARROW_PROFILE_SEGMENTS;
+    const radius = Math.pow(1 - t, ARROW_TAPER_EXPONENT);
+    points.push(new THREE.Vector2(radius, t - 0.5));
+  }
+  _arrowGeometry = new THREE.LatheGeometry(points, 8);
+  _arrowGeometry.rotateZ(-Math.PI / 2);
+  return _arrowGeometry;
+}
+const ARROW_TAPER_EXPONENT = 0.5; // <1 = concavo (piano alla coda, brusco in punta); 1 = cono dritto
+const ARROW_PROFILE_SEGMENTS = 20; // risoluzione della curva lungo l'asse
+const ARROW_BASE_RADIUS_RATIO = 1.3; // raggio alla coda = c.radius × questo fattore
+
 let _headGeometry = null;
 function headGeometry() {
   if (_headGeometry) return _headGeometry;
@@ -1027,15 +1056,13 @@ function headGeometry() {
   _headGeometry.rotateZ(-Math.PI / 2);
   return _headGeometry;
 }
-// Raggio punta / raggio asta (stesso rapporto della vecchia geometria unica,
-// 0.28/0.12) e "snellezza" della punta (lunghezza ≤ raggio × questo fattore,
-// un cono un po' più lungo che largo resta leggibile come freccia senza
-// diventare un ago). HEAD_LEN_RATIO limita la punta anche in proporzione
-// all'intera freccia, per le frecce corte/lente dove il tetto sul raggio
-// non è ancora il vincolo stringente.
-const HEAD_RADIUS_RATIO = 2.3;
-const HEAD_ASPECT = 1.15;
-const HEAD_LEN_RATIO = 0.35;
+
+// Dimensione dei marcatori di direzione "combined" (solo punta, vedi
+// pushArrowhead): raggio come frazione della lunghezza, per un cono tozzo
+// (largo quasi quanto lungo) che legge bene la direzione da qualunque
+// angolo di vista senza somigliare a un ago.
+const COMBINED_MARKER_LEN_FACTOR = 0.42;
+const COMBINED_MARKER_ASPECT = 0.4;
 
 // Segmento canonico (cilindro) lungo 1, lungo +X, CENTRATO sull'origine (a
 // differenza della freccia, che ha la coda a x=0): usato per le streamline
@@ -1076,15 +1103,11 @@ function instancedFromCells(geometry, cells, material) {
   });
   return mesh;
 }
-// Frecce = asta + punta come due InstancedMesh separate (vedi shaftGeometry/
-// headGeometry): a differenza di instancedFromCells, `c.x/y/z` è qui la CODA
-// della freccia (non il centro, convenzione storica di planWindArrows &co.),
-// e la lunghezza della punta è capata a HEAD_ASPECT × il suo raggio così non
-// si allunga in una lancia sulle frecce lunghe (vento forte/size alta).
+// Frecce = un solo InstancedMesh di arrowGeometry() (coda→punta, profilo
+// concavo): a differenza di instancedFromCells, `c.x/y/z` è qui la CODA
+// della freccia (non il centro, convenzione storica di planWindArrows &co.).
 function instancedArrows(cells, material) {
-  const group = new THREE.Group();
-  const shaftMesh = new THREE.InstancedMesh(shaftGeometry(), material, cells.length);
-  const headMesh = new THREE.InstancedMesh(headGeometry(), material, cells.length);
+  const mesh = new THREE.InstancedMesh(arrowGeometry(), material, cells.length);
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const dir = new THREE.Vector3();
@@ -1097,22 +1120,13 @@ function instancedArrows(cells, material) {
     dir.normalize();
     q.setFromUnitVectors(UNIT_X, len > 1e-6 ? dir : UNIT_X);
     tail.set(c.x, c.y, c.z);
-    const headRadius = c.radius * HEAD_RADIUS_RATIO;
-    const headLen = Math.min(c.length * HEAD_LEN_RATIO, headRadius * HEAD_ASPECT);
-    const shaftLen = Math.max(0, c.length - headLen);
-
-    pos.copy(tail).addScaledVector(dir, shaftLen / 2);
-    scale.set(shaftLen, c.radius, c.radius);
+    pos.copy(tail).addScaledVector(dir, c.length / 2);
+    const baseRadius = c.radius * ARROW_BASE_RADIUS_RATIO;
+    scale.set(c.length, baseRadius, baseRadius);
     m.compose(pos, q, scale);
-    shaftMesh.setMatrixAt(idx, m);
-
-    pos.copy(tail).addScaledVector(dir, shaftLen + headLen / 2);
-    scale.set(headLen, headRadius, headRadius);
-    m.compose(pos, q, scale);
-    headMesh.setMatrixAt(idx, m);
+    mesh.setMatrixAt(idx, m);
   });
-  group.add(shaftMesh, headMesh);
-  return group;
+  return mesh;
 }
 function instancedSegments(cells, material) {
   return instancedFromCells(segmentGeometry(), cells, material);
@@ -1235,6 +1249,28 @@ function planWindArrows(field, level, terrainCut, I, J, zLevels, boundaries, toX
   return cells;
 }
 
+// Testina di direzione "combined": SOLO punta (nessuna asta, vedi
+// instancedFromCells(headGeometry(), ...) nei chiamanti), centrata sul punto
+// points[p] (mondo) — non ancorata alla coda e proiettata in avanti come
+// nella versione precedente, che per una freccia (asta+punta) rigida su una
+// streamline che rigida non è finiva quasi sempre per staccarsene
+// visibilmente, specie nei tratti più curvi. headGeometry() è già centrata
+// (spanna -length/2..+length/2 lungo la tangente), quindi punta e base
+// sporgono dal punto della curva in egual misura e di poco: bastano a
+// leggere il verso del flusso senza mai "uscire" dalla linea. La tangente è
+// presa dai vertici REALI già proiettati in mondo (p-1 → p+1), gli stessi di
+// lineToSegmentCells, non da un campo ricampionato in un punto isolato.
+function pushArrowhead(headCells, points, p, headLen, headRadius) {
+  const [x0, y0, z0] = points[p - 1];
+  const [x1, y1, z1] = points[p + 1];
+  const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+  const segLen = Math.hypot(dx, dy, dz);
+  if (segLen < 1e-6) return;
+  const nx = dx / segLen, ny = dy / segLen, nz = dz / segLen;
+  const [cx, cy, cz] = points[p];
+  headCells.push({ x: cx, y: cy, z: cz, dirX: nx, dirY: ny, dirZ: nz, length: headLen, radius: headRadius });
+}
+
 // Streamline del vento in pianta: traccia con lo stesso tracciatore 2D dei
 // grafici (traceStreamlines2D), poi rimappa ogni punto [gx,gy,speed] in
 // mondo con la stessa altezza/direzione delle frecce. Restituisce celle di
@@ -1244,6 +1280,8 @@ function planWindLines(field, level, terrainCut, I, J, zLevels, boundaries, toX,
   const step = windStep(field.w, field.h, density);
   const lines = traceStreamlines2D(field, step, refValue);
   const radius = cellSize * (0.035 + 0.07 * (size / 100));
+  const headLen = cellSize * COMBINED_MARKER_LEN_FACTOR;
+  const headRadius = headLen * COMBINED_MARKER_ASPECT;
   const segCells = [];
   const headCells = [];
   const headSpacing = Math.max(2, step * 1.4);
@@ -1254,27 +1292,16 @@ function planWindLines(field, level, terrainCut, I, J, zLevels, boundaries, toX,
       const gy0 = Math.min(field.h - 1, Math.max(0, gy));
       const idx = Math.round(gy0) * field.w + Math.round(gx0);
       const j = J - 1 - gy;
-      points.push([toX(gx), planWindHeight(idx, level, terrainCut, zLevels, boundaries), toZ(j)]);
+      points.push([toX(gx), planWindHeight(idx, level, terrainCut, zLevels, boundaries) + cellSize * 0.01, toZ(j)]);
     }
     segCells.push(...lineToSegmentCells(points, radius));
     if (arrowheads) {
       let acc = headSpacing / 2;
-      for (let p = 1; p < line.length; p++) {
-        const uv = sampleField(field, line[p][0], line[p][1]);
-        if (!uv) continue;
+      for (let p = 1; p < points.length - 1; p++) {
         acc += 1;
         if (acc < headSpacing) continue;
         acc = 0;
-        const speed = Math.hypot(uv[0], uv[1]);
-        if (speed < 1e-4) continue;
-        const gx = line[p][0];
-        const gy = line[p][1];
-        const idx = Math.round(Math.min(field.h - 1, Math.max(0, gy))) * field.w + Math.round(Math.min(field.w - 1, Math.max(0, gx)));
-        const j = J - 1 - gy;
-        headCells.push({
-          x: toX(gx), y: planWindHeight(idx, level, terrainCut, zLevels, boundaries) + cellSize * 0.01, z: toZ(j),
-          dirX: -uv[0], dirY: 0, dirZ: uv[1], length: cellSize * 0.7, radius: cellSize * 0.06,
-        });
+        pushArrowhead(headCells, points, p, headLen, headRadius);
       }
     }
   }
@@ -1297,7 +1324,7 @@ function buildPlanWind(field, level, terrainCut, I, J, dx, dy, zLevels, boundari
   if (style === 'streamlines' || style === 'combined') {
     const { segCells, headCells } = planWindLines(field, level, terrainCut, I, J, zLevels, boundaries, toX, toZ, refValue, size, density, style === 'combined', cellSize);
     if (segCells.length) group.add(instancedSegments(segCells, material));
-    if (headCells.length) group.add(instancedArrows(headCells, material));
+    if (headCells.length) group.add(instancedFromCells(headGeometry(), headCells, material));
   }
   return group;
 }
@@ -1343,6 +1370,8 @@ function buildSectionWind(field, viewType, pivotX, pivotY, I, J, dx, dy, zLevels
     const step = windStep(field.w, field.h, density);
     const lines = traceStreamlines2D(field, step, refValue);
     const radius = cellSize * (0.035 + 0.07 * (size / 100));
+    const headLen = cellSize * COMBINED_MARKER_LEN_FACTOR;
+    const headRadius = headLen * COMBINED_MARKER_ASPECT;
     const segCells = [];
     const headCells = [];
     const headSpacing = Math.max(2, step * 1.4);
@@ -1350,29 +1379,21 @@ function buildSectionWind(field, viewType, pivotX, pivotY, I, J, dx, dy, zLevels
       const points = [];
       for (const [col, row] of flowLine) {
         const [x, z] = sectionColumnXZ(col, line, viewType, pivotX, pivotY, I, J, toX, toZ);
-        points.push([x, rowY(row), z]);
+        points.push([x, rowY(row) + cellSize * 0.01, z]);
       }
       segCells.push(...lineToSegmentCells(points, radius));
       if (style === 'combined') {
         let acc = headSpacing / 2;
-        for (let p = 1; p < flowLine.length; p++) {
-          const uv = sampleField(field, flowLine[p][0], flowLine[p][1]);
-          if (!uv) continue;
+        for (let p = 1; p < points.length - 1; p++) {
           acc += 1;
           if (acc < headSpacing) continue;
           acc = 0;
-          const speed = Math.hypot(uv[0], uv[1]);
-          if (speed < 1e-4) continue;
-          const [x, z] = sectionColumnXZ(flowLine[p][0], line, viewType, pivotX, pivotY, I, J, toX, toZ);
-          headCells.push({
-            x, y: rowY(flowLine[p][1]) + cellSize * 0.01, z,
-            dirX: tx * uv[0], dirY: uv[1], dirZ: tz * uv[0], length: cellSize * 0.7, radius: cellSize * 0.06,
-          });
+          pushArrowhead(headCells, points, p, headLen, headRadius);
         }
       }
     }
     if (segCells.length) group.add(instancedSegments(segCells, material));
-    if (headCells.length) group.add(instancedArrows(headCells, material));
+    if (headCells.length) group.add(instancedFromCells(headGeometry(), headCells, material));
   }
   return group;
 }
@@ -1396,7 +1417,7 @@ export function buildWindOnSlices(model, windOverlay) {
   const boundaries = levelBoundaries(zLevels);
   const alpha = Math.min(1, Math.max(0, opacity / 100));
   const material = new THREE.MeshBasicMaterial({
-    color: WIND_COLOR, transparent: true, opacity: alpha,
+    color: windColor(), transparent: true, opacity: alpha,
     polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
   });
   const layer = new THREE.Group();
@@ -1453,7 +1474,7 @@ export function buildWindVolume(windVolumeOverlay) {
   if (!windVolumeOverlay?.cells) return null;
   const { cells, opacity } = windVolumeOverlay;
   const alpha = Math.min(1, Math.max(0, opacity / 100));
-  const material = new THREE.MeshBasicMaterial({ color: WIND_COLOR, transparent: true, opacity: alpha });
+  const material = new THREE.MeshBasicMaterial({ color: windColor(), transparent: true, opacity: alpha });
   const layer = new THREE.Group();
   layer.name = 'windVolume';
   let any = false;
@@ -1463,7 +1484,7 @@ export function buildWindVolume(windVolumeOverlay) {
   const headCells = unpackCells(cells.headCells);
   if (arrowCells.length) { layer.add(instancedArrows(arrowCells, material)); any = true; }
   if (segCells.length) { layer.add(instancedSegments(segCells, material)); any = true; }
-  if (headCells.length) { layer.add(instancedArrows(headCells, material)); any = true; }
+  if (headCells.length) { layer.add(instancedFromCells(headGeometry(), headCells, material)); any = true; }
 
   if (!any) return null;
   layer.traverse((obj) => {
@@ -1524,18 +1545,75 @@ function buildReceptors(model, { toX, toZ, terrainAt }) {
 
 /* ---------- griglia di calcolo ---------- */
 
-function buildGrid(model, { W, H }) {
-  const { I, J, dx, dy } = model.geometry;
+// Griglia di calcolo: pianta a terra + le 4 pareti verticali del dominio, una
+// per lato. Le pareti usano gli stessi confini reali dei livelli Z
+// (boundaries, non equispaziati — splitting/telescoping, vedi resolveZLevels)
+// del resto della scena, così la "scansione" verticale rispecchia quella
+// usata da ENVI-met invece di un passo verticale fisso. Ogni parete è un
+// oggetto separato (non un'unica mesh): il viewer nasconde a runtime le due
+// più vicine alla camera in base al lato del dominio su cui si trova (vedi
+// updateGridWallVisibility), lasciando visibili solo quelle sullo sfondo.
+function buildWallGeometry(count, step, boundaries, spanIsX) {
+  const span = count * step;
+  const top = boundaries[boundaries.length - 1];
+  const pts = [];
+  for (let n = 0; n <= count; n++) {
+    const p = n * step - span / 2;
+    if (spanIsX) pts.push(p, boundaries[0], 0, p, top, 0);
+    else pts.push(0, boundaries[0], p, 0, top, p);
+  }
+  for (const b of boundaries) {
+    if (spanIsX) pts.push(-span / 2, b, 0, span / 2, b, 0);
+    else pts.push(0, b, -span / 2, 0, b, span / 2);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  return geometry;
+}
+
+function buildGrid(model, { W, H }, spacingZ) {
+  const { I, J, Z, dx, dy } = model.geometry;
   const points = [];
   for (let i = 0; i <= I; i++) points.push(i * dx - W / 2, 0, -H / 2, i * dx - W / 2, 0, H / 2);
   for (let j = 0; j <= J; j++) points.push(-W / 2, 0, j * dy - H / 2, W / 2, 0, j * dy - H / 2);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
-  const lines = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.35 }));
-  lines.position.y = 0.05;
+  const gridMaterial = () => new THREE.LineBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.35 });
+  const ground = new THREE.LineSegments(geometry, gridMaterial());
+  ground.position.y = 0.05;
+
+  const boundaries = levelBoundaries(resolveZLevels(model.geometry, Z, spacingZ));
+  const wallXGeo = buildWallGeometry(J, dy, boundaries, false); // fissa in x, si estende su z
+  const wallZGeo = buildWallGeometry(I, dx, boundaries, true); // fissa in z, si estende su x
+
+  const wallXNeg = new THREE.LineSegments(wallXGeo, gridMaterial());
+  wallXNeg.position.x = -W / 2;
+  const wallXPos = new THREE.LineSegments(wallXGeo, gridMaterial());
+  wallXPos.position.x = W / 2;
+  const wallZNeg = new THREE.LineSegments(wallZGeo, gridMaterial());
+  wallZNeg.position.z = -H / 2;
+  const wallZPos = new THREE.LineSegments(wallZGeo, gridMaterial());
+  wallZPos.position.z = H / 2;
+
   const layer = new THREE.Group();
-  layer.add(lines);
+  layer.add(ground, wallXNeg, wallXPos, wallZNeg, wallZPos);
+  layer.userData.walls = { xNeg: wallXNeg, xPos: wallXPos, zNeg: wallZNeg, zPos: wallZPos };
   return layer;
+}
+
+// Nasconde le due pareti del dominio più vicine alla camera, lasciando visibili
+// solo le due sullo sfondo — evita che la griglia verticale copra il modello
+// dal punto di vista corrente. Il centro del dominio è l'origine mondo, quindi
+// basta il segno della posizione della camera sui due assi orizzontali.
+// Richiamata ad ogni frame dal loop di rendering del viewer.
+export function updateGridWallVisibility(layers, camera) {
+  const walls = layers.grid?.userData.walls;
+  if (!walls) return;
+  const { x, z } = camera.position;
+  walls.xNeg.visible = x >= 0;
+  walls.xPos.visible = x < 0;
+  walls.zNeg.visible = z >= 0;
+  walls.zPos.visible = z < 0;
 }
 
 /* ---------- utilità per il viewer ---------- */

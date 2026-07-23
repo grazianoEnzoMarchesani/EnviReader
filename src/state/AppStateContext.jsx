@@ -44,6 +44,12 @@ const initialState = {
   windSize: 50,
   windDensity: 50,
   showWindField: false,
+  // true quando "Wind field" è stato spento automaticamente perché "Data
+  // overlay" (showDataVoxels) è spento o perché i voxel non sono smussati
+  // (dataVoxelSmooth false, il vento sulle fette viene coperto dai box):
+  // serve a riaccenderlo da solo quando entrambe le condizioni tornano
+  // favorevoli (vedi toggle in basso).
+  windFieldAutoSuspended: false,
   showObjectsOverlay: false,
   objOverlayOpacity: 70,
   objOverlayBuildings: true,
@@ -203,7 +209,35 @@ export function AppStateProvider({ children }) {
     return {
       set,
       applyFileset,
-      toggle: (key) => set((s) => ({ [key]: !s[key] })),
+      // showWindField e showWindVolume sono mutuamente esclusivi nel 3D:
+      // accenderne uno spegne l'altro (vedi Model3DViewer, che non gestisce
+      // la sovrapposizione dei due layer).
+      toggle: (key) => set((s) => {
+        const next = !s[key];
+        if (key === 'showWindField' && next) return { showWindField: true, showWindVolume: false };
+        if (key === 'showWindVolume' && next) return { showWindVolume: true, showWindField: false };
+        // "Wind field" richiede sia "Data overlay" (showDataVoxels) acceso sia
+        // i voxel smussati (dataVoxelSmooth): in modalità a box il vento sulle
+        // fette viene coperto materialmente. Se uno dei due si spegne mentre
+        // era acceso, lo sospendiamo (spento + segnato); torna acceso da solo
+        // solo quando ENTRAMBE le condizioni sono di nuovo soddisfatte — se
+        // resta bloccato dall'altra condizione, la sospensione resta in
+        // attesa. Un toggle spento a mano dall'utente mentre nulla lo blocca
+        // non viene marcato e quindi non si riaccende da solo.
+        if (key === 'showDataVoxels' || key === 'dataVoxelSmooth') {
+          const nextShowDataVoxels = key === 'showDataVoxels' ? next : s.showDataVoxels;
+          const nextDataVoxelSmooth = key === 'dataVoxelSmooth' ? next : s.dataVoxelSmooth;
+          const blocked = !nextShowDataVoxels || !nextDataVoxelSmooth;
+          if (blocked && !s.windFieldAutoSuspended && s.showWindField) {
+            return { [key]: next, showWindField: false, windFieldAutoSuspended: true };
+          }
+          if (!blocked && s.windFieldAutoSuspended) {
+            return { [key]: next, showWindField: true, windFieldAutoSuspended: false };
+          }
+          return { [key]: next };
+        }
+        return { [key]: next };
+      }),
       toggleTheme: () => set((s) => ({ theme: s.theme === 'light' ? 'dark' : 'light' })),
       openFilesetA: () => openFileset('A'),
       // chiudere il fileset B riporta sempre il confronto a "single"
@@ -268,6 +302,8 @@ export function AppStateProvider({ children }) {
         for (const k of ['sectionAngle', 'followTerrain', 'fixBiometSections', 'levelOut', 'showWindField', 'showObjectsOverlay', 'windStyle', 'windOpacity', 'windSize', 'windDensity', 'scaleType', 'palette', 'paletteReversed', 'diffPalette', 'diffPaletteReversed']) {
           if (s[k] != null) patch[k] = s[k];
         }
+        // showWindField e showWindVolume sono mutuamente esclusivi (vedi toggle)
+        if (patch.showWindField) patch.showWindVolume = false;
         set(patch);
       },
       openPaletteDropdown: (which) =>

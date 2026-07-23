@@ -1415,3 +1415,36 @@ button { font-family: inherit; }
   cursor: pointer;
   margin-top: 6px;
 }
+
+/* ---------- help tooltip (tutorial-style, on hover-delay) ---------- */
+.help-tip-panel {
+  position: fixed;
+  z-index: 300;
+  width: 270px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  animation: help-tip-in 120ms ease-out;
+}
+@keyframes help-tip-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.help-tip-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.help-tip-body { font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); }
+.help-tip-body + .help-tip-body { margin-top: 6px; }
+.help-tip-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
+.help-tip-note svg { flex-shrink: 0; margin-top: 1px; }

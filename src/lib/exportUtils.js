@@ -1,6 +1,7 @@
 import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 import { generateBoundarySVGs } from './exportBoundary';
+import { hasVerticalExtent } from './envimet';
 
 // Ritorna il tempo di attesa come Promise
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -359,7 +360,9 @@ export async function exportCharts({ state, setState, exportMode, zipAll, groupF
       return ['A', 'B', 'Diff'];
     };
     const mapTypes = getMapTypes();
-    const allViewTypes = ['plan', 'sectionX', 'sectionY'];
+    // Gruppi dati senza estensione verticale (es. Surface, un solo livello Z)
+    // non hanno sezioni Longitudinal/Transverse sensate: si esporta solo la pianta.
+    const allViewTypes = hasVerticalExtent(state.edxMeta?.dimensions) ? ['plan', 'sectionX', 'sectionY'] : ['plan'];
 
     const captureCurrentMaps = async () => {
       // Find all chart cards and extract their map-bodies safely with their associated type

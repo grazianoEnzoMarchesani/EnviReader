@@ -78,9 +78,15 @@ function computeCells({ structure, groupPath, timeIndex, geometry, spacingZ, sty
       const sep = volumeStreamSep(dims, density);
       const lines = traceStreamlines3D(volume, sep, refValue);
       const radius = cellSize * (0.035 + 0.07 * (size / 100));
+      // Solo punta (nessuna asta, vedi headGeometry/instancedFromCells in
+      // inxScene.js), tozza e centrata sul punto della curva — non ancorata
+      // alla coda e proiettata in avanti, altrimenti su una streamline curva
+      // se ne stacca visibilmente (vedi pushArrowhead, inxScene.js).
+      const headLen = cellSize * 0.42;
+      const headRadius = headLen * 0.4;
       const headSpacing = Math.max(2, sep * 1.4);
       for (const line of lines) {
-        const points = line.map(([gi, gj, gk]) => [toX(gi), windCellHeight(zLevels, boundaries, gk), toZ(J - 1 - gj)]);
+        const points = line.map(([gi, gj, gk]) => [toX(gi), windCellHeight(zLevels, boundaries, gk) + cellSize * 0.01, toZ(J - 1 - gj)]);
         for (let p = 1; p < points.length; p++) {
           const [x0, y0, z0] = points[p - 1];
           const [x1, y1, z1] = points[p];
@@ -90,21 +96,25 @@ function computeCells({ structure, groupPath, timeIndex, geometry, spacingZ, sty
           segCells.push({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: (z0 + z1) / 2, dirX: ddx, dirY: ddy, dirZ: ddz, length, radius });
         }
         if (style === 'combined') {
+          // Testina centrata sul punto points[p] (mondo), tangente presa dai
+          // vertici REALI p-1→p+1 già usati per i segCells — non dal campo
+          // u/v/w ricampionato in un punto isolato — così coda e punta
+          // restano sulla curva anche dove questa flette parecchio, invece
+          // di proiettare una freccia rigida in avanti che se ne stacca
+          // visibilmente (vedi stessa logica in pushArrowhead, inxScene.js).
           let acc = headSpacing / 2;
-          for (let p = 1; p < line.length; p++) {
+          for (let p = 1; p < points.length - 1; p++) {
             acc += 1;
             if (acc < headSpacing) continue;
             acc = 0;
-            const [gi, gj, gk] = line[p];
-            const idx = (Math.round(Math.min(dims.z - 1, Math.max(0, gk))) * dims.y + Math.round(Math.min(J - 1, Math.max(0, J - 1 - gj)))) * dims.x + Math.round(Math.min(I - 1, Math.max(0, gi)));
-            const u = volume.u[idx], v = volume.v[idx], w = volume.w[idx];
-            if (!Number.isFinite(u) || !Number.isFinite(v) || !Number.isFinite(w)) continue;
-            const speed = Math.hypot(u, v, w);
-            if (speed < 1e-4) continue;
-            headCells.push({
-              x: toX(gi), y: windCellHeight(zLevels, boundaries, gk) + cellSize * 0.01, z: toZ(J - 1 - gj),
-              dirX: -u, dirY: w, dirZ: v, length: cellSize * 0.7, radius: cellSize * 0.06,
-            });
+            const [x0, y0, z0] = points[p - 1];
+            const [x1, y1, z1] = points[p + 1];
+            const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+            const segLen = Math.hypot(dx, dy, dz);
+            if (segLen < 1e-6) continue;
+            const nx = dx / segLen, ny = dy / segLen, nz = dz / segLen;
+            const [cx, cy, cz] = points[p];
+            headCells.push({ x: cx, y: cy, z: cz, dirX: nx, dirY: ny, dirZ: nz, length: headLen, radius: headRadius });
           }
         }
       }

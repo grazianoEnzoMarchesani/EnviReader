@@ -1,5 +1,7 @@
-export default function IconToggle({ icon: Icon, on, onToggle, label }) {
-  return (
+import HelpTooltip from './HelpTooltip';
+
+export default function IconToggle({ icon: Icon, on, onToggle, label, help }) {
+  const button = (
     <button
       type="button"
       className={`icon-toggle${on ? ' on' : ''}`}
@@ -7,9 +9,10 @@ export default function IconToggle({ icon: Icon, on, onToggle, label }) {
       role="switch"
       aria-checked={on}
       aria-label={label}
-      title={label}
+      title={help ? undefined : label}
     >
       <Icon />
     </button>
   );
+  return help ? <HelpTooltip content={help}>{button}</HelpTooltip> : button;
 }

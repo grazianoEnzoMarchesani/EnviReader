@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
-import { I18nProvider } from './i18n/I18nContext';
+import { I18nProvider, useI18n } from './i18n/I18nContext';
 import TopBar from './components/TopBar';
 import CreditsModal from './components/CreditsModal';
 import CustomRangeModal from './components/CustomRangeModal';
@@ -9,6 +9,7 @@ import BoundarySidebar from './components/sidebar/BoundarySidebar';
 import AnalysisView from './components/views/AnalysisView';
 import ModelView from './components/views/ModelView';
 import BoundaryView from './components/views/BoundaryView';
+import HelpTooltip from './components/controls/HelpTooltip';
 
 // La vista 3D condivide la sidebar dati di Data analysis: in prospettiva le
 // stesse viste 2D (dataset, quote, sezioni) arriveranno anche nello spazio 3D
@@ -20,6 +21,7 @@ const VIEWS = {
 
 function AppLayout() {
   const { state } = useAppState();
+  const { tr } = useI18n();
   const { Sidebar, Main } = VIEWS[state.appView] || VIEWS.analysis;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -35,15 +37,17 @@ function AppLayout() {
               </div>
             </aside>
 
-            <button
-              className="sidebar-toggle"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              title={sidebarCollapsed ? "Espandi sidebar" : "Riduci sidebar"}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6"></polyline>
-              </svg>
-            </button>
+            <HelpTooltip content={{ title: tr('help_sidebar_toggle_title'), body: tr('help_sidebar_toggle_body') }}>
+              <button
+                className="sidebar-toggle"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                aria-label={sidebarCollapsed ? "Espandi sidebar" : "Riduci sidebar"}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+              </button>
+            </HelpTooltip>
           </>
         )}
 

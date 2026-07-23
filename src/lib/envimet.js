@@ -371,6 +371,14 @@ export function isBiometDataset(dataGroup, datasetName) {
   return BIOMET_DATASET_PATTERN.test(datasetName || '') || /^biomet/i.test(dataGroup || '');
 }
 
+// true se il gruppo dati corrente non ha estensione verticale (un solo
+// livello Z, es. "Surface"): le sezioni Longitudinal/Transverse tagliano in
+// altezza, quindi su questi gruppi non mostrerebbero altro che una linea
+// piatta e vanno nascoste (vista, thumbnail, export).
+export function hasVerticalExtent(dims) {
+  return !!dims && dims.z > 1;
+}
+
 // Estrae uno slice e lo confeziona con dimensioni, estensioni fisiche e range
 export async function loadSlice(edtFile, edxInfo, variableName, config) {
   const varIndex = edxInfo.variableNames.indexOf(variableName);
