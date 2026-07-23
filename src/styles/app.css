@@ -684,6 +684,22 @@ button { font-family: inherit; }
   border-color: var(--accent);
 }
 
+.wind-mode-toggle { position: relative; }
+.wind-mode-badge {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--accent);
+  color: var(--surface);
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.3;
+  font-family: var(--mono);
+  pointer-events: none;
+}
+
 .modal-section-title {
   font-size: 12.5px;
   font-weight: 600;
@@ -694,6 +710,10 @@ button { font-family: inherit; }
 }
 .modal-section-title:first-of-type { margin-top: 4px; }
 .modal-card .view-bar-group { flex-wrap: wrap; row-gap: 12px; }
+
+.modal-field-group { display: flex; flex-direction: column; gap: 14px; }
+.modal-field { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.modal-field .control-label { margin-bottom: 0; }
 
 .status-strip { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 .chip {

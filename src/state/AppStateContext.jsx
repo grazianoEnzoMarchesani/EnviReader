@@ -109,7 +109,6 @@ const initialState = {
   windVolumeLoading: false,
   cameraProjection: 'perspective', // 'perspective' | 'parallel' (viewer 3D)
   gizmoNorthMode: 'true', // riferimento cardinali del ViewCube: 'true' (nord vero) | 'grid' (lato piatto del modello)
-  resetViewNonce: 0, // incrementato da "Reimposta vista": il viewer 3D lo osserva
   // true = ruotare uno dei due viewer 3D (A/B) ruota anche l'altro allo stesso
   // orientamento (zoom e pan restano indipendenti); attivo di default perché è
   // il caso d'uso più comune nel confronto A/B

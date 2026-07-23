@@ -179,6 +179,18 @@ export function IconWindVolume(props) {
   );
 }
 
+// Icona compatta per il pulsante ciclico "Wind display" della toolbar 3D
+// (off → 2D → 3D): due sole linee di soffio, più corte di IconWindVolume,
+// per lasciare spazio al badge "2D"/"3D" sovrapposto in basso a destra.
+export function IconWindGust(props) {
+  return (
+    <svg {...base} width="18" height="18" {...props}>
+      <path d="M3 8.5h10a2.2 2.2 0 1 0-2-3.2" />
+      <path d="M3 13.5h6.5" />
+    </svg>
+  );
+}
+
 // Sostituisce IconWindVolume sul toggle mentre il worker sta ricalcolando il
 // campo di vento volumetrico (vedi windVolumeLoading in ModelView.jsx):
 // stesso spirito del .btn-spinner già usato per il caricamento dei fileset,

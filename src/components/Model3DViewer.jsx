@@ -44,7 +44,7 @@ function resolveCssColor(varName) {
 // A ~3×FOLLOW_TAU l'inseguimento è visivamente concluso (vedi loop sotto).
 const FOLLOW_TAU = 0.12;
 
-export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, resetNonce, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
+export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
   const { tr } = useI18n();
   const containerRef = useRef(null);
   const gizmoRef = useRef(null); // div overlay che intercetta i click del gizmo
@@ -763,11 +763,6 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       if (obj.material) obj.material.opacity = alpha;
     });
   }, [windVolumeOverlay?.opacity]);
-
-  // "Reimposta vista" dalla sidebar
-  useEffect(() => {
-    if (resetNonce > 0) stageRef.current?.resetView();
-  }, [resetNonce]);
 
   // switch prospettica/parallela dalla sidebar
   useEffect(() => {

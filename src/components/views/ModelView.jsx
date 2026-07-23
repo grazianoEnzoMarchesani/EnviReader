@@ -11,6 +11,7 @@ import { MapCalendar, MapClock } from '../MapChart';
 import TimeSeriesChart from '../TimeSeriesChart';
 import Segmented from '../controls/Segmented';
 import IconToggle from '../controls/IconToggle';
+import WindModeToggle from '../controls/WindModeToggle';
 import HelpTooltip from '../controls/HelpTooltip';
 import { IconBuilding, IconTree, IconTerrain, IconTerrainFix, IconReceptor, IconGrid, IconWireframe, IconSun, IconLayers3D, IconSectionX, IconSectionY, IconSmoothSurface, IconSyncRotate, IconCalendar, IconClock, IconSettings } from '../icons/ToolbarIcons';
 import ViewSettingsModal from '../ViewSettingsModal';
@@ -251,7 +252,7 @@ function computeStats(model) {
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
-function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, resetNonce, projection, gizmoNorthMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
+function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, projection, gizmoNorthMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
   const { tr } = useI18n();
   const model = loaded?.model;
   const showModel = model && !blockedNoVerticalExtent;
@@ -286,7 +287,6 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dat
               windVolumeOverlay={windVolumeOverlay}
               flags={flags}
               wireframe={wireframe}
-              resetNonce={resetNonce}
               projection={projection}
               sunEnabled={sunActive}
               sunAzimuth={sunInfo?.azimuth}
@@ -424,7 +424,11 @@ export default function ModelView() {
   // fine trascinamento invece che ad ogni tick intermedio, che altrimenti
   // metterebbe in coda un ricalcolo dopo l'altro. L'opacità NON è debounced:
   // Model3DViewer la applica solo al materiale, senza mai ricostruire la mesh.
-  const debouncedTime = useDebouncedValue(state.time, 250);
+  // Il debounce sul tempo va bypassato durante il play automatico (state.playing):
+  // a 5x/10x il TimePlayer avanza più in fretta della finestra di debounce (250ms),
+  // che verrebbe resettata a ogni tick e non propagherebbe mai il nuovo istante,
+  // bloccando di fatto il ricalcolo del vento volumetrico durante la riproduzione.
+  const debouncedTime = useDebouncedValue(state.time, 250, state.playing);
   const debouncedWindSize = useDebouncedValue(state.windSize, 250);
   const debouncedWindDensity = useDebouncedValue(state.windDensity, 250);
   const { cells: windVolumeCellsA, loading: windVolumeLoadingA } = useWindVolumeCells(state.showWindVolume, state.filesetA, state.dataGroup, debouncedTime, loadedA?.model?.geometry, spacingZ, state.windStyle, debouncedWindSize, debouncedWindDensity);
@@ -441,6 +445,14 @@ export default function ModelView() {
   useEffect(() => {
     set({ windVolumeLoading });
   }, [windVolumeLoading]);
+
+  // Pulsante ciclico "Wind display" in toolbar: off → 2D (wind field) → 3D
+  // (wind volume) → off. showWindField/showWindVolume restano la fonte di
+  // verità (condivisa con i toggle della sidebar WindTab); qui componiamo
+  // solo la transizione riusando toggle(), che già gestisce l'esclusione
+  // reciproca tra i due — vedi AppStateContext.jsx.
+  const windMode = state.showWindVolume ? '3d' : state.showWindField ? '2d' : 'off';
+  const cycleWindMode = () => toggle(windMode === 'off' ? 'showWindField' : 'showWindVolume');
 
   const flags = useMemo(
     () => ({
@@ -581,39 +593,20 @@ export default function ModelView() {
                 )}
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
-                  <HelpTooltip content={{ title: tr('help_reset_view_title'), body: tr('help_reset_view_body') }}>
-                    <button
-                      type="button"
-                      className="ghost-btn"
-                      style={{ width: 'auto', marginBottom: 0 }}
-                      onClick={() => set((s) => ({ resetViewNonce: s.resetViewNonce + 1 }))}
-                    >
-                      {tr('btn_reset_view')}
-                    </button>
-                  </HelpTooltip>
                   <IconToggle icon={IconSyncRotate} label={tr('toggle_sync_camera_3d')} on={state.syncCamera3D} onToggle={() => toggle('syncCamera3D')} help={{ title: tr('help_sync_camera_3d_title'), body: tr('help_sync_camera_3d_body'), note: tr('help_sync_camera_3d_note') }} />
-                  <Segmented
-                    options={[
-                      { key: 'perspective', label: tr('proj_perspective'), help: { title: tr('help_proj_perspective_title'), body: tr('help_proj_perspective_body') } },
-                      { key: 'parallel', label: tr('proj_parallel'), help: { title: tr('help_proj_parallel_title'), body: tr('help_proj_parallel_body') } },
-                    ]}
-                    value={state.cameraProjection}
-                    onSelect={(key) => set({ cameraProjection: key })}
-                  />
                   <IconToggle icon={IconWireframe} label={tr('btn_wireframe')} on={state.wireframe} onToggle={() => toggle('wireframe')} help={{ title: tr('help_wireframe_title'), body: tr('help_wireframe_body') }} />
-                  <Segmented
-                    options={[
-                      { key: 'true', label: tr('north_ref_true'), help: { title: tr('help_north_true_title'), body: tr('help_north_true_body') } },
-                      { key: 'grid', label: tr('north_ref_grid'), help: { title: tr('help_north_grid_title'), body: tr('help_north_grid_body') } },
-                    ]}
-                    value={state.gizmoNorthMode}
-                    onSelect={(key) => set({ gizmoNorthMode: key })}
-                  />
                 </div>
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
                   <div className="icon-toggle-row">
                     <IconToggle icon={IconSun} label={tr('toggle_sun_path')} on={state.sunPathEnabled} onToggle={() => toggle('sunPathEnabled')} help={{ title: tr('help_sun_path_title'), body: tr('help_sun_path_body') }} />
+                    <WindModeToggle
+                      mode={windMode}
+                      loading={windMode === '3d' && windVolumeLoading}
+                      onCycle={cycleWindMode}
+                      label={windMode === '3d' && windVolumeLoading ? tr('toggle_wind_mode_3d_loading') : tr(`toggle_wind_mode_${windMode}`)}
+                      help={{ title: tr('help_wind_mode_title'), body: tr('help_wind_mode_body') }}
+                    />
                     <IconToggle icon={IconCalendar} label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} help={{ title: tr('help_calendar_widget_title'), body: tr('help_calendar_widget_body') }} />
                     <IconToggle icon={IconClock} label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} help={{ title: tr('help_clock_widget_title'), body: tr('help_clock_widget_body') }} />
                   </div>
@@ -666,7 +659,6 @@ export default function ModelView() {
             {...panelProps[key]}
             flags={flags}
             wireframe={state.wireframe}
-            resetNonce={state.resetViewNonce}
             projection={state.cameraProjection}
             gizmoNorthMode={state.gizmoNorthMode}
             sunPathEnabled={state.sunPathEnabled}

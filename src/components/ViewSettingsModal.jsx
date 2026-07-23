@@ -1,6 +1,7 @@
 import { useAppState } from '../state/AppStateContext';
 import { useI18n } from '../i18n/I18nContext';
 import Slider from './controls/Slider';
+import Segmented from './controls/Segmented';
 import { DEFAULT_SECTION_LINE_COLOR } from './views/AnalysisView';
 
 export default function ViewSettingsModal() {
@@ -18,6 +19,36 @@ export default function ViewSettingsModal() {
     <div className="modal-backdrop" onClick={close}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">{tr('btn_view_settings')}</div>
+
+        {is3D && (
+          <>
+            <div className="modal-section-title">{tr('model_group_view')}</div>
+            <div className="modal-field-group">
+              <div className="modal-field">
+                <span className="control-label">{tr('model_projection')}</span>
+                <Segmented
+                  options={[
+                    { key: 'perspective', label: tr('proj_perspective'), help: { title: tr('help_proj_perspective_title'), body: tr('help_proj_perspective_body') } },
+                    { key: 'parallel', label: tr('proj_parallel'), help: { title: tr('help_proj_parallel_title'), body: tr('help_proj_parallel_body') } },
+                  ]}
+                  value={state.cameraProjection}
+                  onSelect={(key) => set({ cameraProjection: key })}
+                />
+              </div>
+              <div className="modal-field">
+                <span className="control-label">{tr('model_north_ref')}</span>
+                <Segmented
+                  options={[
+                    { key: 'true', label: tr('north_ref_true'), help: { title: tr('help_north_true_title'), body: tr('help_north_true_body') } },
+                    { key: 'grid', label: tr('north_ref_grid'), help: { title: tr('help_north_grid_title'), body: tr('help_north_grid_body') } },
+                  ]}
+                  value={state.gizmoNorthMode}
+                  onSelect={(key) => set({ gizmoNorthMode: key })}
+                />
+              </div>
+            </div>
+          </>
+        )}
 
         {!is3D && (
           <>

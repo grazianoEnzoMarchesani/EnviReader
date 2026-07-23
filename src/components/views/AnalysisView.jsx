@@ -8,7 +8,7 @@ import Slider from '../controls/Slider';
 import Select from '../controls/Select';
 import IconToggle from '../controls/IconToggle';
 import HelpTooltip from '../controls/HelpTooltip';
-import { IconLayers3D, IconBuilding, IconTerrain, IconTerrainFix, IconTree, IconCompass, IconCalendar, IconClock, IconSettings } from '../icons/ToolbarIcons';
+import { IconLayers3D, IconBuilding, IconTerrain, IconTerrainFix, IconTree, IconCompass, IconCalendar, IconClock, IconSettings, IconWindGust } from '../icons/ToolbarIcons';
 import ViewSettingsModal from '../ViewSettingsModal';
 import MapChart, { MapThumb } from '../MapChart';
 import TimeSeriesChart from '../TimeSeriesChart';
@@ -559,6 +559,7 @@ export default function AnalysisView() {
                     </>
                   )}
                   <div className="vertical-divider" />
+                  <IconToggle icon={IconWindGust} label={tr('toggle_wind_field')} on={state.showWindField} onToggle={() => toggle('showWindField')} help={{ title: tr('help_wind_field_title'), body: tr('help_wind_field_body') }} />
                   <IconToggle icon={IconCompass} label={tr('toggle_compass')} on={state.showNorthArrow} onToggle={() => toggle('showNorthArrow')} help={{ title: tr('help_compass_arrow_title'), body: tr('help_compass_arrow_body') }} />
                   <IconToggle icon={IconCalendar} label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} help={{ title: tr('help_calendar_widget_title'), body: tr('help_calendar_widget_body') }} />
                   <IconToggle icon={IconClock} label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} help={{ title: tr('help_clock_widget_title'), body: tr('help_clock_widget_body') }} />
