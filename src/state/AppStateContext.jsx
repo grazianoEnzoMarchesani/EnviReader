@@ -60,6 +60,11 @@ const initialState = {
   objOverlayBuildings: true,
   objOverlayTerrain: true,
   objOverlayVegetation: true,
+  // "Stile 1" alternativo per la vegetazione (rv 11-15): cerchi invece che
+  // pixel pieni, col raggio legato al LAD (vedi colormap.js). Il primo di una
+  // futura serie di stili selezionabili per l'overlay Objects. Acceso di
+  // default per ora, in fase di verifica del nuovo stile.
+  objOverlayVegStyle1: true,
   windStyle: 'arrows', // 'arrows' | 'streamlines' | 'combined'
   palette: 'Turbo',
   paletteOpen: false,
@@ -84,6 +89,11 @@ const initialState = {
   showBuildings: true,
   showVegetation: true,
   showTerrain: true,
+  // "Stile 1" per la vegetazione nel viewer 3D: sfere invece di voxel a
+  // parallelepipedo, con lo stesso raggio per LAD dei cerchi 2D (vedi
+  // objOverlayVegStyle1/colormap.js). Acceso di default per ora, in fase di
+  // verifica del nuovo stile.
+  vegStyle1: true,
   showReceptors: false,
   showGrid: false,
   showNorthArrow: true,

@@ -252,7 +252,7 @@ function computeStats(model) {
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
-function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, projection, gizmoNorthMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
+function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, vegStyle1, projection, gizmoNorthMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
   const { tr } = useI18n();
   const model = loaded?.model;
   const showModel = model && !blockedNoVerticalExtent;
@@ -287,6 +287,7 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dat
               windVolumeOverlay={windVolumeOverlay}
               flags={flags}
               wireframe={wireframe}
+              vegStyle1={vegStyle1}
               projection={projection}
               sunEnabled={sunActive}
               sunAzimuth={sunInfo?.azimuth}
@@ -659,6 +660,7 @@ export default function ModelView() {
             {...panelProps[key]}
             flags={flags}
             wireframe={state.wireframe}
+            vegStyle1={state.vegStyle1}
             projection={state.cameraProjection}
             gizmoNorthMode={state.gizmoNorthMode}
             sunPathEnabled={state.sunPathEnabled}

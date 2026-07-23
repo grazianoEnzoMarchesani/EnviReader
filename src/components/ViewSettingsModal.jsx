@@ -2,10 +2,11 @@ import { useAppState } from '../state/AppStateContext';
 import { useI18n } from '../i18n/I18nContext';
 import Slider from './controls/Slider';
 import Segmented from './controls/Segmented';
+import Toggle from './controls/Toggle';
 import { DEFAULT_SECTION_LINE_COLOR } from './views/AnalysisView';
 
 export default function ViewSettingsModal() {
-  const { state, set } = useAppState();
+  const { state, set, toggle } = useAppState();
   const { tr } = useI18n();
 
   if (!state.viewSettingsOpen) return null;
@@ -47,6 +48,11 @@ export default function ViewSettingsModal() {
                 />
               </div>
             </div>
+
+            <div className="modal-section-title">{tr('group_vegetation')}</div>
+            <div className="view-bar-group">
+              <Toggle label={tr('toggle_veg_style1')} on={state.vegStyle1} onToggle={() => toggle('vegStyle1')} />
+            </div>
           </>
         )}
 
@@ -78,6 +84,7 @@ export default function ViewSettingsModal() {
             <div className="modal-section-title">{tr('toggle_objects_overlay')}</div>
             <div className="view-bar-group">
               <Slider label={tr('slider_objects_opacity')} value={state.objOverlayOpacity} min={0} max={100} unit="%" onChange={(v) => set({ objOverlayOpacity: v })} />
+              <Toggle label={tr('toggle_veg_style1')} on={state.objOverlayVegStyle1} onToggle={() => toggle('objOverlayVegStyle1')} />
             </div>
           </>
         )}

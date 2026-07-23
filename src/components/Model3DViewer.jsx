@@ -7,7 +7,7 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildModelScene, setLayerVisibility, setWireframe, disposeGroup, updateSunLayer, setSunDiagram, setShadowCasting, buildDataOverlay, buildWindOnSlices, buildWindVolume, applyWindTheme, worldToGrid, gridToWorld, updateGridWallVisibility } from '../lib/inxScene';
+import { buildModelScene, buildVegetation, setLayerVisibility, setWireframe, disposeGroup, updateSunLayer, setSunDiagram, setShadowCasting, buildDataOverlay, buildWindOnSlices, buildWindVolume, applyWindTheme, worldToGrid, gridToWorld, updateGridWallVisibility } from '../lib/inxScene';
 import { createViewCube } from '../lib/viewCube';
 import { useI18n } from '../i18n/I18nContext';
 import HelpTooltip from './controls/HelpTooltip';
@@ -44,7 +44,7 @@ function resolveCssColor(varName) {
 // A ~3×FOLLOW_TAU l'inseguimento è visivamente concluso (vedi loop sotto).
 const FOLLOW_TAU = 0.12;
 
-export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
+export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, vegStyle1, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
   const { tr } = useI18n();
   const containerRef = useRef(null);
   const gizmoRef = useRef(null); // div overlay che intercetta i click del gizmo
@@ -74,6 +74,13 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
   useEffect(() => {
     flagsRef.current = flags;
   }, [flags]);
+  // stesso motivo di flagsRef: la (ri)costruzione della scena qui sotto deve
+  // leggere lo stile vegetazione corrente anche quando è objectsVolume/spacingZ
+  // a cambiare (non vegStyle1), altrimenti ricostruirebbe sempre in stile box.
+  const vegStyle1Ref = useRef(vegStyle1);
+  useEffect(() => {
+    vegStyle1Ref.current = vegStyle1;
+  }, [vegStyle1]);
 
   // setup del renderer: una volta sola per montaggio
   useEffect(() => {
@@ -578,8 +585,9 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage || !model) return;
-    const { group, layers, size, maxHeight, hemisphereLight, decorativeLight, sunLayer } = buildModelScene(model, objectsVolume, spacingZ, dimZ);
+    const { group, layers, size, maxHeight, hemisphereLight, decorativeLight, sunLayer } = buildModelScene(model, objectsVolume, spacingZ, dimZ, vegStyle1Ref.current);
     stage.scene.add(group);
+    stage.sceneGroup = group;
     stage.layers = layers;
     stage.hemisphereLight = hemisphereLight;
     stage.decorativeLight = decorativeLight;
@@ -645,12 +653,40 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     return () => {
       stage.scene.remove(group);
       disposeGroup(group);
+      stage.sceneGroup = null;
       stage.layers = null;
       stage.hemisphereLight = null;
       stage.decorativeLight = null;
       stage.sunLayer = null;
     };
   }, [model, objectsVolume, spacingZ, dimZ]);
+
+  // Cambio di "stile 1" della vegetazione (voxel vs sfere per LAD): sostituisce
+  // solo il sotto-layer vegetazione, senza ricostruire l'intera scena né
+  // richiamare stage.resetView — a differenza dell'effetto sopra (pensato per
+  // il cambio di modello/fileset), qui l'utente sta solo confrontando due stili
+  // e non si aspetta che la vista della camera salti alla posizione di default.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage?.sceneGroup || !stage.layers || !model) return;
+    const oldVeg = stage.layers.vegetation;
+    const { I, J, dx, dy } = model.geometry;
+    const W = I * dx;
+    const H = J * dy;
+    const toX = (i) => W / 2 - (i + 0.5) * dx;
+    const toZ = (j) => H / 2 - (j + 0.5) * dy;
+    const newVeg = buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ, vegStyle1);
+    if (oldVeg) {
+      stage.sceneGroup.remove(oldVeg);
+      disposeGroup(oldVeg);
+    }
+    if (newVeg) {
+      newVeg.name = 'vegetation';
+      stage.sceneGroup.add(newVeg);
+    }
+    stage.layers.vegetation = newVeg;
+    setLayerVisibility(stage.layers, flagsRef.current);
+  }, [vegStyle1]);
 
   // toggle dei livelli e wireframe, senza ricostruire
   useEffect(() => {

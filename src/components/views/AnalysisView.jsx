@@ -144,7 +144,8 @@ export default function AnalysisView() {
     showBuildings: state.objOverlayBuildings,
     showTerrain: state.objOverlayTerrain,
     showVegetation: state.objOverlayVegetation,
-  }), [state.objOverlayOpacity, state.objOverlayBuildings, state.objOverlayTerrain, state.objOverlayVegetation]);
+    vegStyle1: state.objOverlayVegStyle1,
+  }), [state.objOverlayOpacity, state.objOverlayBuildings, state.objOverlayTerrain, state.objOverlayVegetation, state.objOverlayVegStyle1]);
 
   const objectsThumbsDiff = useMemo(() => ({
     plan: objectsSlicesA.plan || objectsSlicesB.plan,

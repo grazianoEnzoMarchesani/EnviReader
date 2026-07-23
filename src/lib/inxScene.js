@@ -13,7 +13,7 @@
 
 import * as THREE from 'three';
 import { buildZLevels, zLevelsFromSpacing } from './inx';
-import { VEGETATION_COLORS as VEGETATION_HEX, buildLUT } from './colormap';
+import { VEGETATION_COLORS as VEGETATION_HEX, VEG_STYLE1_RADIUS_FRACTIONS, buildLUT } from './colormap';
 import { traceStreamlines2D } from './windField';
 
 const VEGETATION_COLORS = VEGETATION_HEX.map((hex) => Number(`0x${hex.slice(1)}`));
@@ -73,7 +73,7 @@ function soilColor(id) {
   return SOIL_COLORS[id.slice(-2).toUpperCase()] ?? SOIL_DEFAULT;
 }
 
-export function buildModelScene(model, objectsVolume = null, spacingZ = null, dimZ = null) {
+export function buildModelScene(model, objectsVolume = null, spacingZ = null, dimZ = null, vegStyle1 = false) {
   const { I, J, dx, dy } = model.geometry;
   const W = I * dx;
   const H = J * dy;
@@ -98,7 +98,7 @@ export function buildModelScene(model, objectsVolume = null, spacingZ = null, di
     buildings: fromObjects?.buildings ?? (model.buildings3D?.entries.length
       ? buildVoxelBuildings(model, { toX, toZ }, spacingZ)
       : buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ)),
-    vegetation: buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ),
+    vegetation: buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ, vegStyle1),
     receptors: buildReceptors(model, { toX, toZ, terrainAt }),
     grid: buildGrid(model, { W, H }, spacingZ, dimZ),
   };
@@ -527,6 +527,23 @@ function instancedBoxes(cells, material) {
   return mesh;
 }
 
+// Istanze di sfere unitarie (raggio 1): scala uniforme sui tre assi, così la
+// sfera resta tale (mai un ellissoide) anche su celle non cubiche — è
+// l'equivalente 3D dei cerchi dello "stile 1" 2D (vedi objectsToImageData).
+function instancedSpheres(cells, material) {
+  const geometry = new THREE.SphereGeometry(1, 16, 12);
+  const mesh = new THREE.InstancedMesh(geometry, material, cells.length);
+  const m = new THREE.Matrix4();
+  const color = new THREE.Color();
+  cells.forEach((c, idx) => {
+    m.makeScale(c.r, c.r, c.r);
+    m.setPosition(c.x, c.y, c.z);
+    mesh.setMatrixAt(idx, m);
+    mesh.setColorAt(idx, color.setHex(c.color));
+  });
+  return mesh;
+}
+
 // zTop/zBottom sono quote in metri, non indici di voxel: le confrontiamo con i
 // confini cumulativi della griglia verticale e prendiamo l'indice del confine
 // più vicino (arrotondamento all'unità intera di voxel, che esiste o non esiste).
@@ -647,7 +664,7 @@ function buildVoxelBuildings(model, { toX, toZ }, spacingZ) {
 // "Objects" dei risultati (EDT/EDX) su tutti i livelli k, quota assoluta come
 // per terreno e building (nessun "segui il terreno"). rv 11-15 = vegetazione,
 // con le stesse tonalità di verde dell'overlay 2D "Objects".
-function buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ) {
+export function buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ, vegStyle1 = false) {
   if (!objectsVolume) return null;
   const { I, J, dx, dy } = model.geometry;
   const { dims, data } = objectsVolume;
@@ -667,14 +684,23 @@ function buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ) {
       for (let i = 0; i < I; i++) {
         const rv = Math.round(data[(k * J + edtRow) * I + i]);
         if (rv < VEGETATION_RV_MIN || rv > VEGETATION_RV_MAX) continue;
-        cells.push({ x: toX(i), z: toZ(j), y: voxelY, sx: dx, sz: dy, sy: level.height, color: VEGETATION_COLORS[rv - VEGETATION_RV_MIN] });
+        const color = VEGETATION_COLORS[rv - VEGETATION_RV_MIN];
+        if (vegStyle1) {
+          // Sfera inscritta nella dimensione più piccola della cella (mai un
+          // ellissoide, anche su celle orizzontali/verticali non cubiche),
+          // con lo stesso raggio non lineare per LAD usato dai cerchi 2D.
+          const radius = (Math.min(dx, dy, level.height) / 2) * VEG_STYLE1_RADIUS_FRACTIONS[rv - VEGETATION_RV_MIN];
+          cells.push({ x: toX(i), z: toZ(j), y: voxelY, r: radius, color });
+        } else {
+          cells.push({ x: toX(i), z: toZ(j), y: voxelY, sx: dx, sz: dy, sy: level.height, color });
+        }
         maxHeight = Math.max(maxHeight, level.base + level.height);
       }
     }
   }
   if (!cells.length) return null;
   const layer = new THREE.Group();
-  layer.add(instancedBoxes(cells, new THREE.MeshLambertMaterial()));
+  layer.add(vegStyle1 ? instancedSpheres(cells, new THREE.MeshLambertMaterial()) : instancedBoxes(cells, new THREE.MeshLambertMaterial()));
   layer.userData.maxHeight = maxHeight;
   return layer;
 }
