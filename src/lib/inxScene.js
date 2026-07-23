@@ -73,7 +73,7 @@ function soilColor(id) {
   return SOIL_COLORS[id.slice(-2).toUpperCase()] ?? SOIL_DEFAULT;
 }
 
-export function buildModelScene(model, objectsVolume = null, spacingZ = null) {
+export function buildModelScene(model, objectsVolume = null, spacingZ = null, dimZ = null) {
   const { I, J, dx, dy } = model.geometry;
   const W = I * dx;
   const H = J * dy;
@@ -100,7 +100,7 @@ export function buildModelScene(model, objectsVolume = null, spacingZ = null) {
       : buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ)),
     vegetation: buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ),
     receptors: buildReceptors(model, { toX, toZ, terrainAt }),
-    grid: buildGrid(model, { W, H }, spacingZ),
+    grid: buildGrid(model, { W, H }, spacingZ, dimZ),
   };
   let maxHeight = 0;
   for (const [name, layer] of Object.entries(layers)) {
@@ -262,22 +262,45 @@ function makeGlowTexture() {
 }
 
 // Etichetta di testo come sprite (canvas texture): resta sempre rivolta alla
-// camera, dimensione in unità di scena.
-function makeLabelSprite(text, { color, size = 64, weight = '700', scale }) {
+// camera, dimensione in unità di scena. Canvas dimensionato sulla larghezza
+// reale del testo (measureText), non più un quadrato 128×128 fisso: con
+// quello, stringhe più lunghe di un paio di caratteri (es. "22.5 m") uscivano
+// dal bordo del canvas e venivano tagliate. `rotation` (radianti) ruota il
+// testo nel piano dello schermo, per le quote verticali che devono leggersi
+// dal basso verso l'alto come nel riferimento fornito dall'utente.
+function makeLabelSprite(text, { color, size = 64, weight = '700', scale, rotation = 0 }) {
+  const font = `${weight} ${size}px -apple-system, system-ui, sans-serif`;
+  const measure = document.createElement('canvas').getContext('2d');
+  measure.font = font;
+  const textWidth = measure.measureText(text).width;
+  const padX = size * 0.3;
+  const padY = size * 0.35;
   const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 128;
+  canvas.width = Math.ceil(textWidth + padX * 2);
+  canvas.height = Math.ceil(size + padY * 2);
   const ctx = canvas.getContext('2d');
-  ctx.font = `${weight} ${size}px -apple-system, system-ui, sans-serif`;
+  ctx.font = font;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = color;
-  ctx.fillText(text, 64, 64);
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
   const texture = new THREE.CanvasTexture(canvas);
   texture.anisotropy = 4;
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
-  sprite.scale.set(scale, scale, 1);
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, rotation });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(scale * (canvas.width / canvas.height), scale, 1);
   return sprite;
+}
+
+// Punti di una linea di quota "a parentesi" come nel riferimento: il
+// segmento principale p0→p1 più due piccole tacche perpendicolari terminali
+// (non linee di richiamo fino allo spigolo reale — resta solo lo scarto/gap
+// tra oggetto e linea, dato dal chiamante tramite l'offset di p0/p1).
+function buildDimensionLinePoints(p0, p1, tickDir, tickLen) {
+  const h = tickLen / 2;
+  const tick = (p) => [p[0] - tickDir[0] * h, p[1] - tickDir[1] * h, p[2] - tickDir[2] * h,
+    p[0] + tickDir[0] * h, p[1] + tickDir[1] * h, p[2] + tickDir[2] * h];
+  return [...p0, ...p1, ...tick(p0), ...tick(p1)];
 }
 
 // Svuota un gruppo liberando geometrie, materiali e texture dei figli.
@@ -1571,7 +1594,114 @@ function buildWallGeometry(count, step, boundaries, spanIsX) {
   return geometry;
 }
 
-function buildGrid(model, { W, H }, spacingZ) {
+// Etichetta di quota: valore in metri, un decimale solo se non intero.
+function formatMeters(value) {
+  const rounded = Math.round(value * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} m`;
+}
+
+// Le due quote in pianta (larghezza X, profondità Z) del dominio, disegnate
+// come nel riferimento fornito dall'utente: linea offset verso l'esterno
+// rispetto allo spigolo reale del box, con una piccola tacca perpendicolare a
+// ciascuna estremità (stile "a parentesi", niente più linee di richiamo fino
+// allo spigolo reale — resta solo lo scarto) ed etichetta in metri a metà
+// linea. Costruite una volta per ciascuno dei 4 spigoli verticali del box
+// (combinazioni di segno su X e Z): a runtime se ne mostra sempre e solo una,
+// quella sullo spigolo davanti a destra rispetto alla camera (vedi
+// updateGridWallVisibility), così le quote non finiscono mai sovrapposte al
+// modello né confuse con la griglia delle pareti sullo sfondo.
+function buildPlanDimensionCorner(W, H, top, xSign, zSign) {
+  const scaleRef = Math.max(W, H, top);
+  const margin = scaleRef * 0.06;
+  const tickLen = scaleRef * 0.02;
+  const cx = xSign * W / 2;
+  const cz = zSign * H / 2;
+  const ox = cx + xSign * margin;
+  const oz = cz + zSign * margin;
+
+  const pts = [
+    ...buildDimensionLinePoints([-W / 2, 0, oz], [W / 2, 0, oz], [0, 0, 1], tickLen), // larghezza (X), offset in Z
+    ...buildDimensionLinePoints([ox, 0, -H / 2], [ox, 0, H / 2], [1, 0, 0], tickLen), // profondità (Z), offset in X
+  ];
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  const material = new THREE.LineBasicMaterial({ color: 0x6b7278, transparent: true, opacity: 0.75 });
+  const lines = new THREE.LineSegments(geometry, material);
+
+  const labelScale = Math.max(scaleRef * 0.05, 1);
+  const labelGap = labelScale * 0.55;
+  const labelOpts = { color: '#4a5158', size: 60, scale: labelScale };
+  const widthLabel = makeLabelSprite(formatMeters(W), labelOpts);
+  widthLabel.position.set(0, labelGap, oz);
+  const depthLabel = makeLabelSprite(formatMeters(H), labelOpts);
+  depthLabel.position.set(ox, labelGap, 0);
+
+  const corner = new THREE.Group();
+  corner.add(lines, widthLabel, depthLabel);
+  return corner;
+}
+
+// La quota in alzato (altezza Y): a differenza di larghezza/profondità resta
+// sempre attaccata allo spigolo verticale dove si incontrano le due pareti di
+// sfondo (stesso spigolo, stesso criterio di scelta delle pareti — vedi
+// updateGridWallVisibility), invece che nel vuoto in primo piano: è l'unica
+// quota per cui "sullo sfondo" resta leggibile (sporge sopra le pareti, non si
+// confonde con la loro griglia) ed è più naturale leggerla lì, appoggiata al
+// muro, piuttosto che isolata accanto al modello. Stesso stile "a parentesi"
+// delle quote in pianta — linea scostata dallo spigolo reale con una tacca
+// perpendicolare a ciascuna estremità — ma con l'etichetta ruotata di 90° a
+// metà altezza, come nel riferimento fornito dall'utente (il testo corre
+// lungo la linea invece di restare orizzontale e staccato).
+function buildHeightCorner(W, H, top, xSign, zSign) {
+  const scaleRef = Math.max(W, H, top);
+  const margin = scaleRef * 0.05;
+  const tickLen = scaleRef * 0.02;
+  const dirX = xSign / Math.SQRT2;
+  const dirZ = zSign / Math.SQRT2;
+  const cx = xSign * W / 2 + dirX * margin;
+  const cz = zSign * H / 2 + dirZ * margin;
+
+  const pts = buildDimensionLinePoints([cx, 0, cz], [cx, top, cz], [dirX, 0, dirZ], tickLen);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  const material = new THREE.LineBasicMaterial({ color: 0x6b7278, transparent: true, opacity: 0.75 });
+  const line = new THREE.LineSegments(geometry, material);
+
+  const labelScale = Math.max(scaleRef * 0.05, 1);
+  const label = makeLabelSprite(formatMeters(top), { color: '#4a5158', size: 60, scale: labelScale, rotation: Math.PI / 2 });
+  const labelGap = labelScale * 0.6;
+  label.position.set(cx + dirX * labelGap, top / 2, cz + dirZ * labelGap);
+
+  const corner = new THREE.Group();
+  corner.add(line, label);
+  return corner;
+}
+
+function buildDimensions(W, H, top) {
+  const group = new THREE.Group();
+  const planCorners = {};
+  const heightCorners = {};
+  for (const xSign of [-1, 1]) {
+    for (const zSign of [-1, 1]) {
+      const key = `${xSign}_${zSign}`;
+      const planCorner = buildPlanDimensionCorner(W, H, top, xSign, zSign);
+      planCorner.visible = false;
+      group.add(planCorner);
+      planCorners[key] = planCorner;
+
+      const heightCorner = buildHeightCorner(W, H, top, xSign, zSign);
+      heightCorner.visible = false;
+      group.add(heightCorner);
+      heightCorners[key] = heightCorner;
+    }
+  }
+  group.userData.planCorners = planCorners;
+  group.userData.heightCorners = heightCorners;
+  return group;
+}
+
+function buildGrid(model, { W, H }, spacingZ, dimZ) {
   const { I, J, Z, dx, dy } = model.geometry;
   const points = [];
   for (let i = 0; i <= I; i++) points.push(i * dx - W / 2, 0, -H / 2, i * dx - W / 2, 0, H / 2);
@@ -1582,7 +1712,11 @@ function buildGrid(model, { W, H }, spacingZ) {
   const ground = new THREE.LineSegments(geometry, gridMaterial());
   ground.position.y = 0.05;
 
-  const boundaries = levelBoundaries(resolveZLevels(model.geometry, Z, spacingZ));
+  // Usa l'estensione verticale reale dei risultati caricati (dimZ, la stessa
+  // usata da overlay dati / slice del vento / volume del vento) invece del
+  // grids-Z dichiarato nell'INX: altrimenti, quando i due valori divergono,
+  // le pareti del dominio risultano troncate rispetto agli slice/volume.
+  const boundaries = levelBoundaries(resolveZLevels(model.geometry, dimZ || Z, spacingZ));
   const wallXGeo = buildWallGeometry(J, dy, boundaries, false); // fissa in x, si estende su z
   const wallZGeo = buildWallGeometry(I, dx, boundaries, true); // fissa in z, si estende su x
 
@@ -1595,25 +1729,66 @@ function buildGrid(model, { W, H }, spacingZ) {
   const wallZPos = new THREE.LineSegments(wallZGeo, gridMaterial());
   wallZPos.position.z = H / 2;
 
+  const dimensions = buildDimensions(W, H, boundaries[boundaries.length - 1]);
+
   const layer = new THREE.Group();
-  layer.add(ground, wallXNeg, wallXPos, wallZNeg, wallZPos);
+  layer.add(ground, wallXNeg, wallXPos, wallZNeg, wallZPos, dimensions);
   layer.userData.walls = { xNeg: wallXNeg, xPos: wallXPos, zNeg: wallZNeg, zPos: wallZPos };
+  layer.userData.dimensions = dimensions;
   return layer;
 }
 
 // Nasconde le due pareti del dominio più vicine alla camera, lasciando visibili
 // solo le due sullo sfondo — evita che la griglia verticale copra il modello
-// dal punto di vista corrente. Il centro del dominio è l'origine mondo, quindi
-// basta il segno della posizione della camera sui due assi orizzontali.
+// dal punto di vista corrente — e mostra le quote sullo spigolo opposto
+// (davanti a destra rispetto alla camera: avanti = verso l'utente, destra =
+// suo lato destro), così restano sempre in primo piano su sfondo libero
+// invece di confondersi con le linee della griglia delle pareti. "Vicino"
+// dipende solo dalla posizione della camera rispetto al centro del box
+// (le pareti sono a x=±W/2, z=±H/2 attorno all'origine): usare invece
+// right-forward (l'orientamento della camera) sembrava equivalente per
+// un'orbita semplice ma non lo è in generale — per una camera che orbita
+// a raggio costante attorno al target, right≈(cosθ,-sinθ) e forward≈
+// (-sinθ,-cosθ), quindi il segno di right-forward segue cosθ+sinθ invece che
+// il segno di sinθ (cioè della posizione x della camera): i due divergono per
+// metà giro, il che faceva sparire/riapparire le pareti nell'ordine sbagliato
+// durante la rotazione. Il vettore "right" resta necessario solo per scegliere
+// lo spigolo delle quote a destra rispetto all'orientamento della camera.
 // Richiamata ad ogni frame dal loop di rendering del viewer.
 export function updateGridWallVisibility(layers, camera) {
   const walls = layers.grid?.userData.walls;
-  if (!walls) return;
-  const { x, z } = camera.position;
-  walls.xNeg.visible = x >= 0;
-  walls.xPos.visible = x < 0;
-  walls.zNeg.visible = z >= 0;
-  walls.zPos.visible = z < 0;
+  const dimensions = layers.grid?.userData.dimensions?.userData;
+  if (!walls && !dimensions) return;
+
+  const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+  const nearX = camera.position.x >= 0 ? 1 : -1;
+  const nearZ = camera.position.z >= 0 ? 1 : -1;
+
+  if (walls) {
+    walls.xNeg.visible = nearX >= 0;
+    walls.xPos.visible = nearX < 0;
+    walls.zNeg.visible = nearZ >= 0;
+    walls.zPos.visible = nearZ < 0;
+  }
+  if (dimensions) {
+    // larghezza/profondità sullo spigolo vicino a destra. L'altezza va invece
+    // sullo spigolo verticale destro delle due pareti di sfondo — non su
+    // quello centrale dove le due pareti si incontrano (spesso nascosto
+    // dietro il modello) — cioè lo spigolo "misto" (una parete di sfondo +
+    // una vicina) più allineato al vettore "right" della camera.
+    const nearKey = `${nearX}_${nearZ}`;
+    for (const [key, corner] of Object.entries(dimensions.planCorners)) {
+      corner.visible = key === nearKey;
+    }
+    const mixedA = { x: -nearX, z: nearZ };
+    const mixedB = { x: nearX, z: -nearZ };
+    const scoreA = right.x * mixedA.x + right.z * mixedA.z;
+    const scoreB = right.x * mixedB.x + right.z * mixedB.z;
+    const heightKey = scoreA >= scoreB ? `${mixedA.x}_${mixedA.z}` : `${mixedB.x}_${mixedB.z}`;
+    for (const [key, corner] of Object.entries(dimensions.heightCorners)) {
+      corner.visible = key === heightKey;
+    }
+  }
 }
 
 /* ---------- utilità per il viewer ---------- */

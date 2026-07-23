@@ -7,6 +7,7 @@ import { DEFAULT_PRESETS } from '../../data/defaultPresets';
 import { useAppState } from '../../state/AppStateContext';
 import { useI18n } from '../../i18n/I18nContext';
 import Slider from '../controls/Slider';
+import TimePlayer from '../controls/TimePlayer';
 import Toggle from '../controls/Toggle';
 import Select from '../controls/Select';
 import OptionButtons from '../controls/OptionButtons';
@@ -41,7 +42,14 @@ function DataTab() {
         options={datasetOptions}
         onChange={(v) => set({ dataset: v })}
       />
-      <Slider label={tr('slider_time')} value={state.time} min={0} max={Math.max(0, state.seriesLabels.length - 1) || (loaded ? 0 : 100)} onChange={(v) => set({ time: v })} />
+      <Slider
+        label={tr('slider_time')}
+        value={state.time}
+        min={0}
+        max={Math.max(0, state.seriesLabels.length - 1) || (loaded ? 0 : 100)}
+        onChange={(v) => set({ time: v })}
+        accessory={<TimePlayer value={state.time} max={Math.max(0, state.seriesLabels.length - 1)} onChange={(v) => set({ time: v })} />}
+      />
       <Slider label={tr('slider_level')} value={state.level} min={0} max={dims ? Math.max(0, dims.z - 1) : 20} onChange={(v) => set({ level: v })} />
       <Slider label={tr('slider_sectionx')} value={state.sectionX} min={0} max={dims ? Math.max(0, dims.x - 1) : 100} onChange={(v) => set({ sectionX: v })} />
       <Slider label={tr('slider_sectiony')} value={state.sectionY} min={0} max={dims ? Math.max(0, dims.y - 1) : 100} onChange={(v) => set({ sectionY: v })} />

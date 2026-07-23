@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export default function Slider({ label, value, min, max, step = 1, unit = '', onChange }) {
+export default function Slider({ label, value, min, max, step = 1, unit = '', onChange, accessory }) {
   const clamp = (v) => Math.max(min, Math.min(max, v));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value));
@@ -38,20 +38,23 @@ export default function Slider({ label, value, min, max, step = 1, unit = '', on
     <div className="slider-block">
       <div className="slider-label-row">
         <span className="control-label">{label}</span>
-        <input
-          className="slider-value slider-value-input"
-          type="text"
-          inputMode="decimal"
-          value={editing ? draft : `${value}${unit}`}
-          onFocus={(e) => {
-            setEditing(true);
-            setDraft(String(value));
-            e.target.select();
-          }}
-          onChange={handleValueChange}
-          onBlur={commit}
-          onKeyDown={handleKeyDown}
-        />
+        <div className="slider-label-right">
+          {accessory}
+          <input
+            className="slider-value slider-value-input"
+            type="text"
+            inputMode="decimal"
+            value={editing ? draft : `${value}${unit}`}
+            onFocus={(e) => {
+              setEditing(true);
+              setDraft(String(value));
+              e.target.select();
+            }}
+            onChange={handleValueChange}
+            onBlur={commit}
+            onKeyDown={handleKeyDown}
+          />
+        </div>
       </div>
       <div className="slider-row">
         <button className="step-btn" onClick={() => onChange(clamp(value - step))}>–</button>

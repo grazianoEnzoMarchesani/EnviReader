@@ -251,7 +251,7 @@ function computeStats(model) {
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
-function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, resetNonce, projection, gizmoNorthMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
+function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, resetNonce, projection, gizmoNorthMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
   const { tr } = useI18n();
   const model = loaded?.model;
   const showModel = model && !blockedNoVerticalExtent;
@@ -280,6 +280,7 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dataOverl
               model={model}
               objectsVolume={objectsVolume}
               spacingZ={spacingZ}
+              dimZ={dimZ}
               dataOverlay={dataOverlay}
               windOverlay={windOverlay}
               windVolumeOverlay={windVolumeOverlay}
@@ -480,8 +481,8 @@ export default function ModelView() {
   const panelKeys = state.compareMode3D === 'ab' ? ['A', 'B'] : state.compareMode3D === 'b' ? ['B'] : ['A'];
 
   const panelProps = {
-    A: { title: filesetLabel('A'), loaded: loadedA, objectsVolume: objectsVolumeA, spacingZ, dataOverlay: dataOverlayA, windOverlay: windOverlayA, windVolumeOverlay: windVolumeOverlayA, sun: sunA, onLegendClick: (range) => handleLegendClick('A', range) },
-    B: { title: filesetLabel('B'), loaded: loadedB, objectsVolume: objectsVolumeB, spacingZ, dataOverlay: dataOverlayB, windOverlay: windOverlayB, windVolumeOverlay: windVolumeOverlayB, sun: sunB, onLegendClick: (range) => handleLegendClick('B', range) },
+    A: { title: filesetLabel('A'), loaded: loadedA, objectsVolume: objectsVolumeA, spacingZ, dimZ, dataOverlay: dataOverlayA, windOverlay: windOverlayA, windVolumeOverlay: windVolumeOverlayA, sun: sunA, onLegendClick: (range) => handleLegendClick('A', range) },
+    B: { title: filesetLabel('B'), loaded: loadedB, objectsVolume: objectsVolumeB, spacingZ, dimZ, dataOverlay: dataOverlayB, windOverlay: windOverlayB, windVolumeOverlay: windVolumeOverlayB, sun: sunB, onLegendClick: (range) => handleLegendClick('B', range) },
   };
   const flipRef = useFlip();
 

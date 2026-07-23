@@ -44,7 +44,7 @@ function resolveCssColor(varName) {
 // A ~3×FOLLOW_TAU l'inseguimento è visivamente concluso (vedi loop sotto).
 const FOLLOW_TAU = 0.12;
 
-export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, resetNonce, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
+export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, resetNonce, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
   const { tr } = useI18n();
   const containerRef = useRef(null);
   const gizmoRef = useRef(null); // div overlay che intercetta i click del gizmo
@@ -578,7 +578,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage || !model) return;
-    const { group, layers, size, maxHeight, hemisphereLight, decorativeLight, sunLayer } = buildModelScene(model, objectsVolume, spacingZ);
+    const { group, layers, size, maxHeight, hemisphereLight, decorativeLight, sunLayer } = buildModelScene(model, objectsVolume, spacingZ, dimZ);
     stage.scene.add(group);
     stage.layers = layers;
     stage.hemisphereLight = hemisphereLight;
@@ -650,7 +650,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dataOver
       stage.decorativeLight = null;
       stage.sunLayer = null;
     };
-  }, [model, objectsVolume, spacingZ]);
+  }, [model, objectsVolume, spacingZ, dimZ]);
 
   // toggle dei livelli e wireframe, senza ricostruire
   useEffect(() => {

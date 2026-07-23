@@ -25,6 +25,11 @@ const initialState = {
   dataGroup: DATA_GROUPS[0],
   dataset: DATASETS[0],
   time: 0,
+  // Riproduzione automatica dello slider Time (TimePlayer): playbackSpeed è
+  // un moltiplicatore (1x/5x/10x) dell'intervallo base, vedi l'effetto in
+  // AppStateProvider più sotto.
+  playing: false,
+  playbackSpeed: 1,
   level: 0,
   sectionX: 0,
   sectionY: 0,
@@ -162,6 +167,30 @@ export function AppStateProvider({ children }) {
   useEffect(() => {
     persistCustomPresets(state.customPresets);
   }, [state.customPresets]);
+
+  // TimePlayer: avanza automaticamente state.time finché "playing" resta
+  // true, in loop (torna a 0 dopo l'ultimo indice) — come un lettore
+  // multimediale. Vive qui, non nel componente del pannello, così la
+  // riproduzione sopravvive alla chiusura del popover e ai cambi di
+  // scheda/vista (Data/Wind/Palette, 2D/3D condividono lo stesso state.time).
+  useEffect(() => {
+    const max = Math.max(0, state.seriesLabels.length - 1);
+    if (!state.playing || max <= 0) return undefined;
+    const BASE_INTERVAL_MS = 600;
+    const id = setInterval(() => {
+      setState((s) => {
+        const m = Math.max(0, s.seriesLabels.length - 1);
+        return { ...s, time: s.time >= m ? 0 : s.time + 1 };
+      });
+    }, BASE_INTERVAL_MS / state.playbackSpeed);
+    return () => clearInterval(id);
+  }, [state.playing, state.playbackSpeed, state.seriesLabels.length]);
+
+  // Nessuna serie da animare (fileset chiuso, dataset senza serie temporale):
+  // spegne "playing" invece di lasciare il bottone acceso a vuoto.
+  useEffect(() => {
+    if (state.playing && state.seriesLabels.length <= 1) setState((s) => ({ ...s, playing: false }));
+  }, [state.seriesLabels.length]);
 
   const actions = useMemo(() => {
     const set = (patch) => setState((s) => ({ ...s, ...(typeof patch === 'function' ? patch(s) : patch) }));

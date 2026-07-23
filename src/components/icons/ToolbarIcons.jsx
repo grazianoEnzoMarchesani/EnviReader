@@ -191,3 +191,40 @@ export function IconSpinner(props) {
     </svg>
   );
 }
+
+// Glifi del player timeline (TimePlayer): pieni invece che a tratto, come le
+// icone di riproduzione native, per restare leggibili anche molto piccoli.
+export function IconPlay(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" stroke="none" {...props}>
+      <path d="M8 5.3v13.4a1 1 0 0 0 1.53.85l10.6-6.7a1 1 0 0 0 0-1.7l-10.6-6.7A1 1 0 0 0 8 5.3Z" />
+    </svg>
+  );
+}
+
+export function IconPause(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" stroke="none" {...props}>
+      <rect x="6.5" y="5" width="4" height="14" rx="1.2" />
+      <rect x="13.5" y="5" width="4" height="14" rx="1.2" />
+    </svg>
+  );
+}
+
+export function IconSkipBack(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="none" {...props}>
+      <rect x="4.3" y="5" width="2.2" height="14" rx="1" />
+      <path d="M19 5.6v12.8a1 1 0 0 1-1.53.85l-8.9-6.4a1 1 0 0 1 0-1.7l8.9-6.4A1 1 0 0 1 19 5.6Z" />
+    </svg>
+  );
+}
+
+export function IconSkipForward(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="none" {...props}>
+      <rect x="17.5" y="5" width="2.2" height="14" rx="1" />
+      <path d="M5 5.6v12.8a1 1 0 0 0 1.53.85l8.9-6.4a1 1 0 0 0 0-1.7l-8.9-6.4A1 1 0 0 0 5 5.6Z" />
+    </svg>
+  );
+}
