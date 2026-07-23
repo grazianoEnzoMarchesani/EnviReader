@@ -68,6 +68,8 @@ export const FALLBACK_I18N = {
     "compare_b": "Only B",
     "compare_ab": "A vs B",
     "compare_abdiff": "A vs B vs Diff",
+    "render_style_pixel": "Pixel",
+    "render_style_contour": "Contour",
     "btn_view_settings": "View settings",
     "btn_collapse_toolbar": "Collapse toolbar",
     "btn_expand_toolbar": "Expand toolbar",
@@ -367,6 +369,11 @@ export const FALLBACK_I18N = {
     "help_compare_ab_body": "Shows both filesets side by side with the same legend scope, so you can visually compare two scenarios directly against each other.",
     "help_compare_abdiff_title": "A vs B vs Diff",
     "help_compare_abdiff_body": "Adds a third panel with the point-by-point difference between A and B, on top of the side-by-side comparison — the fastest way to spot exactly where and how much the two scenarios diverge.",
+
+    "help_render_style_pixel_title": "Pixel",
+    "help_render_style_pixel_body": "Shows one flat color per grid cell, at the exact resolution of the simulation. The default, most literal reading of the data.",
+    "help_render_style_contour_title": "Filled contour",
+    "help_render_style_contour_body": "Interpolates the data between cells and groups it into color bands with isolines at the boundaries, like a filled contour plot / isarithmic map. Reads more like a smooth field, at the cost of hiding the exact per-cell values.",
 
     "help_objects_overlay_title": "3D layer overlay",
     "help_objects_overlay_body": "Overlays a lightweight 3D silhouette of the model (buildings, terrain, vegetation) on top of the 2D chart, to give spatial context to the data without leaving the 2D view.",

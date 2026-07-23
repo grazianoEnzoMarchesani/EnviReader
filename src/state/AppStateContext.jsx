@@ -11,6 +11,12 @@ const initialState = {
   compareMode: 'single',
   compareMode3D: 'single', // confronto nel viewer 3D: 'single' | 'b' | 'ab' (niente diff, non ha senso per un modello 3D)
   viewType: 'plan',
+  // Stile di resa del dato scalare, condiviso tra la mappa 2D e l'overlay dati
+  // del viewer 3D: 'pixel' = una tinta piatta per cella (risoluzione griglia
+  // esatta); 'contour' = interpolazione bilineare tra i centri cella,
+  // quantizzata in fasce (filled contour / mappa isaritmica) con isolinee ai
+  // bordi di fascia. Vedi sliceToContourImageData in colormap.js.
+  renderStyle: 'pixel',
   filesetAOpen: false,
   filesetBOpen: false,
   loadingFileset: null, // 'A' | 'B' mentre la cartella scelta viene letta e analizzata

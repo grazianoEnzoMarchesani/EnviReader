@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildLUT, sliceToImageData, orientColors, formatValue, objectsToImageData } from '../lib/colormap';
+import { buildLUT, sliceToImageData, sliceToContourImageData, orientColors, contourLegendGradient, formatValue, objectsToImageData } from '../lib/colormap';
 import { traceStreamlines2D } from '../lib/windField';
 
 // Anteprima in miniatura di uno slice, usata nei riquadri di cambio vista.
@@ -7,7 +7,7 @@ import { traceStreamlines2D } from '../lib/windField';
 // ridotta (senza deformare) solo se non entra nel riquadro.
 const THUMB_HEIGHT = 52;
 
-export function MapThumb({ slice, objectsSlice, objectsOpts, colors, reversed, wind, min, max, showLegend, onLegendClick }) {
+export function MapThumb({ slice, objectsSlice, objectsOpts, colors, reversed, wind, min, max, showLegend, onLegendClick, renderStyle }) {
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
   const objectsCanvasRef = useRef(null);
@@ -27,11 +27,12 @@ export function MapThumb({ slice, objectsSlice, objectsOpts, colors, reversed, w
   useEffect(() => {
     if (!slice || !canvasRef.current) return;
     const canvas = canvasRef.current;
-    const imgData = sliceToImageData(slice.data, slice.w, slice.h, sliceMin, sliceMax, lut, slice.spacingX, slice.spacingY, slice.extentW, slice.extentH);
+    const build = renderStyle === 'contour' ? sliceToContourImageData : sliceToImageData;
+    const imgData = build(slice.data, slice.w, slice.h, sliceMin, sliceMax, lut, slice.spacingX, slice.spacingY, slice.extentW, slice.extentH);
     canvas.width = imgData.width;
     canvas.height = imgData.height;
     canvas.getContext('2d').putImageData(imgData, 0, 0);
-  }, [slice, sliceMin, sliceMax, lut]);
+  }, [slice, sliceMin, sliceMax, lut, renderStyle]);
 
   useEffect(() => {
     if (!objectsSlice || !objectsCanvasRef.current) return;
@@ -60,14 +61,14 @@ export function MapThumb({ slice, objectsSlice, objectsOpts, colors, reversed, w
   return (
     <span ref={boxRef} className="thumb-map" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
       <span style={{ position: 'relative', width: cssW, height: cssH, display: 'block' }}>
-        {slice && <canvas ref={canvasRef} className="thumb-canvas" style={{ width: cssW, height: cssH, display: 'block' }} />}
+        {slice && <canvas ref={canvasRef} className="thumb-canvas" style={{ width: cssW, height: cssH, display: 'block', imageRendering: renderStyle === 'contour' ? 'auto' : undefined }} />}
         {objectsSlice && <canvas ref={objectsCanvasRef} className="thumb-objects-canvas" style={{ width: cssW, height: cssH, position: 'absolute', top: 0, left: 0, pointerEvents: 'none', imageRendering: 'pixelated' }} />}
         {wind && <canvas ref={windCanvasRef} className="thumb-wind-canvas" style={{ width: cssW, height: cssH, position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }} />}
       </span>
       {showLegend && slice && (
         <span className="thumb-legend" onClick={onLegendClick} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '9px', width: '100%', padding: '0 4px 4px 4px', boxSizing: 'border-box' }}>
           <span style={{ color: 'var(--text-faint)' }}>{formatValue(sliceMin, sliceMax - sliceMin)}</span>
-          <span style={{ flex: 1, height: '4px', background: `linear-gradient(90deg, ${orientColors(colors, reversed).join(',')})`, borderRadius: '2px' }} />
+          <span style={{ flex: 1, height: '4px', background: renderStyle === 'contour' ? contourLegendGradient(colors, reversed) : `linear-gradient(90deg, ${orientColors(colors, reversed).join(',')})`, borderRadius: '2px' }} />
           <span style={{ color: 'var(--text-faint)' }}>{formatValue(sliceMax, sliceMax - sliceMin)}</span>
         </span>
       )}
@@ -367,7 +368,7 @@ function crossGeometry(control, slice, W, H) {
 
 // Mappa raster: il canvas ha la risoluzione della griglia ENVI-met e viene
 // ingrandito via CSS (image-rendering: pixelated), come le celle di Leonardo.
-export default function MapChart({ slice, objectsSlice, objectsOpts, colors, reversed, min, max, onCellClick, marks, sectionControl, sectionLineStyle, compass, showCalendar, showClock, timeLabel, wind, onLegendClick, widgetScale }) {
+export default function MapChart({ slice, objectsSlice, objectsOpts, colors, reversed, min, max, onCellClick, marks, sectionControl, sectionLineStyle, compass, showCalendar, showClock, timeLabel, wind, onLegendClick, widgetScale, renderStyle }) {
   const canvasRef = useRef(null);
   const objectsCanvasRef = useRef(null);
   const frameRef = useRef(null);
@@ -383,11 +384,12 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
   useEffect(() => {
     if (!slice || !canvasRef.current) return;
     const canvas = canvasRef.current;
-    const imgData = sliceToImageData(slice.data, slice.w, slice.h, min, max, lut, slice.spacingX, slice.spacingY, slice.extentW, slice.extentH);
+    const build = renderStyle === 'contour' ? sliceToContourImageData : sliceToImageData;
+    const imgData = build(slice.data, slice.w, slice.h, min, max, lut, slice.spacingX, slice.spacingY, slice.extentW, slice.extentH);
     canvas.width = imgData.width;
     canvas.height = imgData.height;
     canvas.getContext('2d').putImageData(imgData, 0, 0);
-  }, [slice, min, max, lut]);
+  }, [slice, min, max, lut, renderStyle]);
 
   useEffect(() => {
     if (!objectsSlice || !objectsCanvasRef.current) return;
@@ -607,7 +609,7 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
         onMouseMove={sectionControl ? handleFrameMove : undefined}
         onMouseLeave={sectionControl ? () => { if (!rotDragging) setRotHandle(null); } : undefined}
       >
-        <canvas ref={canvasRef} className="map-canvas" onMouseMove={handleMove} onMouseLeave={() => setHover(null)} onClick={handleClick} />
+        <canvas ref={canvasRef} className="map-canvas" style={{ imageRendering: renderStyle === 'contour' ? 'auto' : undefined }} onMouseMove={handleMove} onMouseLeave={() => setHover(null)} onClick={handleClick} />
         {objectsSlice && <canvas ref={objectsCanvasRef} className="map-objects-canvas" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', imageRendering: 'pixelated' }} />}
         {wind && <canvas ref={windCanvasRef} className="map-wind-canvas" />}
         {!sectionControl && marks?.x != null && marks.x >= 0 && marks.x < slice.w && (
@@ -693,7 +695,7 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
         <span className="map-legend-label">{formatValue(min, span)}</span>
         <span
           className="map-legend-bar"
-          style={{ background: `linear-gradient(90deg, ${orientColors(colors, reversed).join(',')})` }}
+          style={{ background: renderStyle === 'contour' ? contourLegendGradient(colors, reversed) : `linear-gradient(90deg, ${orientColors(colors, reversed).join(',')})` }}
         />
         <span className="map-legend-label">{formatValue(max, span)}</span>
       </div>

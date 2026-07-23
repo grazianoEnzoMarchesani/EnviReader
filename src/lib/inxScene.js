@@ -13,7 +13,7 @@
 
 import * as THREE from 'three';
 import { buildZLevels, zLevelsFromSpacing } from './inx';
-import { VEGETATION_COLORS as VEGETATION_HEX, VEG_STYLE1_RADIUS_FRACTIONS, buildLUT } from './colormap';
+import { VEGETATION_COLORS as VEGETATION_HEX, VEG_STYLE1_RADIUS_FRACTIONS, buildLUT, CONTOUR_BANDS, axisCenters, continuousIndex, bilinearSample } from './colormap';
 import { traceStreamlines2D } from './windField';
 
 const VEGETATION_COLORS = VEGETATION_HEX.map((hex) => Number(`0x${hex.slice(1)}`));
@@ -1000,6 +1000,286 @@ function buildSectionSurface(slice, range, lut, viewType, pivotX, pivotY, I, J, 
   return { mesh, maxHeight };
 }
 
+/* ---------- filled contour 3D (fasce piatte + isolinee) ---------- */
+
+// Lato massimo della griglia fine di campionamento: abbastanza per curve di
+// livello morbide anche su griglie dati piccole, senza appesantire la scena
+// con troppi triangoli su griglie già fitte (dove non si sottocampiona oltre).
+const CONTOUR_FINE_MAX = 140;
+
+function contourFineSize(n) {
+  const sub = Math.max(1, Math.min(6, Math.floor(CONTOUR_FINE_MAX / Math.max(1, n))));
+  return Math.max(n, Math.min(CONTOUR_FINE_MAX, n * sub));
+}
+
+const CONTOUR_LINE_COLOR = 0x1f2430;
+const CONTOUR_LINE_WIDTH = 0.12; // m, spessore del nastro (una vera linea GL non ha larghezza affidabile multi-piattaforma)
+
+// Superficie a fasce piatte + isolinee, condivisa da pianta e sezioni: riceve
+// una griglia di punti (pointX/Y/Z, pointT normalizzato 0..1 o NaN) di
+// dimensione nPX x nPY e restituisce { mesh, lines, maxHeight }. Ogni cella
+// fine diventa un quad a colore piatto (vertici non condivisi: niente
+// sfumatura tra fasce, stesso principio del posterize 2D in
+// sliceToContourImageData); dove la fascia cambia tra celle fini adiacenti si
+// aggiunge un nastro sottile (due triangoli, coincidente col confine — vince
+// lo z-fighting via polygonOffset, non uno spostamento in world-space) la cui
+// larghezza è orientata da `normal`, la normale della superficie costante per
+// l'intera pianta/sezione.
+function buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, normal) {
+  const nCellsX = nPX - 1;
+  const nCellsY = nPY - 1;
+  if (nCellsX < 1 || nCellsY < 1) return null;
+  const idx = (pc, pr) => pr * nPX + pc;
+  const cellIdx = (ci, cj) => cj * nCellsX + ci;
+  const bandOf = new Int16Array(nCellsX * nCellsY).fill(-1);
+
+  const positions = [];
+  const colors = [];
+  const c = new THREE.Color();
+  let maxHeight = 0;
+
+  for (let cj = 0; cj < nCellsY; cj++) {
+    for (let ci = 0; ci < nCellsX; ci++) {
+      const t00 = pointT[idx(ci, cj)];
+      const t10 = pointT[idx(ci + 1, cj)];
+      const t01 = pointT[idx(ci, cj + 1)];
+      const t11 = pointT[idx(ci + 1, cj + 1)];
+      if (Number.isNaN(t00) || Number.isNaN(t10) || Number.isNaN(t01) || Number.isNaN(t11)) continue;
+      const t = (t00 + t10 + t01 + t11) / 4;
+      const band = Math.min(CONTOUR_BANDS - 1, Math.floor(t * CONTOUR_BANDS));
+      bandOf[cellIdx(ci, cj)] = band;
+      const tBand = (band + 0.5) / CONTOUR_BANDS;
+      const k = Math.min(255, (tBand * 255) | 0);
+      // setHex (non setRGB): interpreta i byte come sRGB, coerente con lutColor()
+      // usato altrove in questo file — setRGB tratterebbe gli stessi byte come
+      // già lineari, "lavando" i colori con il color management di three.js.
+      c.setHex((lut[k * 3] << 16) | (lut[k * 3 + 1] << 8) | lut[k * 3 + 2]);
+
+      const p00 = [pointX[idx(ci, cj)], pointY[idx(ci, cj)], pointZ[idx(ci, cj)]];
+      const p10 = [pointX[idx(ci + 1, cj)], pointY[idx(ci + 1, cj)], pointZ[idx(ci + 1, cj)]];
+      const p01 = [pointX[idx(ci, cj + 1)], pointY[idx(ci, cj + 1)], pointZ[idx(ci, cj + 1)]];
+      const p11 = [pointX[idx(ci + 1, cj + 1)], pointY[idx(ci + 1, cj + 1)], pointZ[idx(ci + 1, cj + 1)]];
+      maxHeight = Math.max(maxHeight, p00[1], p10[1], p01[1], p11[1]);
+      const quad = [p00, p10, p11, p00, p11, p01];
+      for (const p of quad) {
+        positions.push(p[0], p[1], p[2]);
+        colors.push(c.r, c.g, c.b);
+      }
+    }
+  }
+  if (!positions.length) return null;
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  const mesh = new THREE.Mesh(geometry, overlayMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+
+  // Nastro dell'isolinea lungo un bordo condiviso pa-pb: larghezza nel piano
+  // (cross(normal, direzione bordo)), geometricamente coincidente col bordo
+  // della superficie sottostante — a vincere lo z-fighting contro di essa è
+  // il polygonOffset del materiale (più aggressivo di quello della superficie,
+  // vedi sotto), non uno spostamento in world-space: quest'ultimo richiederebbe
+  // di indovinare un epsilon adeguato alla scala della scena (metri di un
+  // giardino o di un intero quartiere), mentre il polygonOffset agisce sul
+  // depth buffer ed è quindi indipendente dalla scala.
+  const [nx, ny, nz] = normal;
+  const linePositions = [];
+  const addEdge = (pa, pb) => {
+    const dx = pb[0] - pa[0], dy = pb[1] - pa[1], dz = pb[2] - pa[2];
+    const len = Math.hypot(dx, dy, dz) || 1;
+    const ex = dx / len, ey = dy / len, ez = dz / len;
+    let wx = ny * ez - nz * ey;
+    let wy = nz * ex - nx * ez;
+    let wz = nx * ey - ny * ex;
+    const wlen = Math.hypot(wx, wy, wz) || 1;
+    const half = CONTOUR_LINE_WIDTH / 2;
+    wx = (wx / wlen) * half; wy = (wy / wlen) * half; wz = (wz / wlen) * half;
+    const a0 = [pa[0] + wx, pa[1] + wy, pa[2] + wz];
+    const a1 = [pa[0] - wx, pa[1] - wy, pa[2] - wz];
+    const b0 = [pb[0] + wx, pb[1] + wy, pb[2] + wz];
+    const b1 = [pb[0] - wx, pb[1] - wy, pb[2] - wz];
+    for (const p of [a0, b0, b1, a0, b1, a1]) linePositions.push(p[0], p[1], p[2]);
+  };
+
+  for (let cj = 0; cj < nCellsY; cj++) {
+    for (let ci = 0; ci < nCellsX; ci++) {
+      const band = bandOf[cellIdx(ci, cj)];
+      if (band < 0) continue;
+      if (ci + 1 < nCellsX) {
+        const rightBand = bandOf[cellIdx(ci + 1, cj)];
+        if (rightBand >= 0 && rightBand !== band) {
+          addEdge(
+            [pointX[idx(ci + 1, cj)], pointY[idx(ci + 1, cj)], pointZ[idx(ci + 1, cj)]],
+            [pointX[idx(ci + 1, cj + 1)], pointY[idx(ci + 1, cj + 1)], pointZ[idx(ci + 1, cj + 1)]],
+          );
+        }
+      }
+      if (cj + 1 < nCellsY) {
+        const downBand = bandOf[cellIdx(ci, cj + 1)];
+        if (downBand >= 0 && downBand !== band) {
+          addEdge(
+            [pointX[idx(ci, cj + 1)], pointY[idx(ci, cj + 1)], pointZ[idx(ci, cj + 1)]],
+            [pointX[idx(ci + 1, cj + 1)], pointY[idx(ci + 1, cj + 1)], pointZ[idx(ci + 1, cj + 1)]],
+          );
+        }
+      }
+    }
+  }
+
+  let lines = null;
+  if (linePositions.length) {
+    const lineGeometry = new THREE.BufferGeometry();
+    lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+    // polygonOffset più negativo (-4) di quello della superficie (-1, vedi
+    // overlayMaterial): a parità di depth, vince sempre il nastro scuro
+    // dell'isolinea invece di sparire dietro la banda colorata sottostante.
+    lines = new THREE.Mesh(
+      lineGeometry,
+      new THREE.MeshBasicMaterial({
+        color: CONTOUR_LINE_COLOR,
+        side: THREE.DoubleSide,
+        polygonOffset: true,
+        polygonOffsetFactor: -4,
+        polygonOffsetUnits: -4,
+      }),
+    );
+  }
+
+  return { mesh, lines, maxHeight };
+}
+
+// Pianta a fasce piatte + isolinee: come buildPlanSurface ma campiona quota e
+// dato con interpolazione bilineare (vedi bilinearSample in colormap.js) su
+// una griglia fine invece che sui soli centri cella, e quantizza il colore in
+// CONTOUR_BANDS fasce invece di leggerlo in continuo dalla LUT.
+function buildContourPlanSurface(slice, range, lut, level, terrainCut, I, J, dx, dy, zLevels, boundaries) {
+  if (!slice || slice.w !== I || slice.h !== J) return null;
+  const { data, w, h } = slice;
+  const kMax = zLevels.length - 1;
+
+  const cellY = new Float32Array(I * J);
+  for (let row = 0; row < J; row++) {
+    for (let col = 0; col < I; col++) {
+      const cidx = row * w + col;
+      const kf = terrainCut ? Math.min(kMax, Math.max(0, terrainCut.data[cidx] * terrainCut.gain + terrainCut.base)) : level;
+      cellY[row * I + col] = continuousHeight(zLevels, boundaries, kf);
+    }
+  }
+
+  const fineI = contourFineSize(I);
+  const fineJ = contourFineSize(J);
+  const extentX = I * dx;
+  const extentY = J * dy;
+  const colIdx = continuousIndex(axisCenters(null, I, extentX), I, extentX, fineI + 1, false);
+  const rowIdx = continuousIndex(axisCenters(null, J, extentY), J, extentY, fineJ + 1, false);
+  // buildPlanSurface usa worldX/worldZ con la convenzione "indice intero =
+  // confine cella" (col e col+1 sono i due bordi): colIdx/rowIdx sono invece
+  // in convenzione "indice = centro cella" (quella di bilinearSample), da qui
+  // il +0.5 per riallinearle prima di chiamare worldX/worldZ.
+  const worldX = (gx) => (I * dx) / 2 - gx * dx;
+  const worldZ = (gy) => gy * dy - (J * dy) / 2;
+
+  const nPX = fineI + 1;
+  const nPY = fineJ + 1;
+  const pointX = new Float32Array(nPX * nPY);
+  const pointY = new Float32Array(nPX * nPY);
+  const pointZ = new Float32Array(nPX * nPY);
+  const pointT = new Float32Array(nPX * nPY).fill(NaN);
+  const range01 = range.max - range.min || 1;
+
+  for (let pr = 0; pr < nPY; pr++) {
+    const rowF = rowIdx[pr];
+    const z = worldZ(rowF + 0.5);
+    for (let pc = 0; pc < nPX; pc++) {
+      const colF = colIdx[pc];
+      const p = pr * nPX + pc;
+      pointX[p] = worldX(colF + 0.5);
+      pointZ[p] = z;
+      pointY[p] = bilinearSample(cellY, I, J, colF, rowF);
+      const v = bilinearSample(data, w, h, colF, rowF);
+      if (!Number.isNaN(v)) {
+        let t = (v - range.min) / range01;
+        pointT[p] = t < 0 ? 0 : t > 1 ? 1 : t;
+      }
+    }
+  }
+
+  return buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, [0, 1, 0]);
+}
+
+// Sezione a fasce piatte + isolinee: come buildSectionSurface ma con
+// interpolazione bilineare su una griglia fine sia lungo la traccia (col) sia
+// in quota (row, passo non uniforme secondo zLevels — riusa axisCenters con
+// gli spacing reali, esattamente come farebbe la mappa 2D con spacingY).
+function buildContourSectionSurface(slice, range, lut, viewType, pivotX, pivotY, I, J, dx, dy, boundaries, zLevels) {
+  if (!slice) return null;
+  const { data, w, h, line } = slice;
+  const worldX = (gx) => (I * dx) / 2 - (gx + 0.5) * dx;
+  const worldZ = (gy) => (gy + 0.5) * dy - (J * dy) / 2;
+  const colPos = (col) => {
+    if (line) return [line.x0 + line.dx * col, line.y0 + line.dy * col];
+    return viewType === 'sectionX' ? [pivotX, col] : [col, pivotY];
+  };
+
+  const fineW = contourFineSize(w);
+  const fineH = contourFineSize(h);
+  const totalHeight = boundaries[h];
+
+  const colIdx = continuousIndex(axisCenters(null, w, w), w, w, fineW + 1, false);
+  const levelHeights = [];
+  for (let i = 0; i < h; i++) levelHeights.push(zLevels[i].height);
+  const rowIdx = continuousIndex(axisCenters(levelHeights, h, totalHeight), h, totalHeight, fineH + 1, false);
+
+  const nPX = fineW + 1;
+  const nPY = fineH + 1;
+  // X/Z dipendono solo dalla traccia (col): colPos usa già la convenzione
+  // "indice = centro cella", coerente con colIdx, nessun +0.5 qui a differenza
+  // della pianta. Y dipende solo dalla quota fisica continua (row), niente
+  // a che vedere con gli indici di livello.
+  const colWorldX = new Float32Array(nPX);
+  const colWorldZ = new Float32Array(nPX);
+  for (let pc = 0; pc < nPX; pc++) {
+    const [gx, gy] = colPos(colIdx[pc]);
+    colWorldX[pc] = worldX(gx);
+    colWorldZ[pc] = worldZ(gy);
+  }
+  const rowWorldY = new Float32Array(nPY);
+  for (let pr = 0; pr < nPY; pr++) rowWorldY[pr] = (pr + 0.5) * (totalHeight / fineH);
+
+  const pointX = new Float32Array(nPX * nPY);
+  const pointY = new Float32Array(nPX * nPY);
+  const pointZ = new Float32Array(nPX * nPY);
+  const pointT = new Float32Array(nPX * nPY).fill(NaN);
+  const range01 = range.max - range.min || 1;
+  for (let pr = 0; pr < nPY; pr++) {
+    const rowF = rowIdx[pr];
+    for (let pc = 0; pc < nPX; pc++) {
+      const p = pr * nPX + pc;
+      pointX[p] = colWorldX[pc];
+      pointZ[p] = colWorldZ[pc];
+      pointY[p] = rowWorldY[pr];
+      const v = bilinearSample(data, w, h, colIdx[pc], rowF);
+      if (!Number.isNaN(v)) {
+        let t = (v - range.min) / range01;
+        pointT[p] = t < 0 ? 0 : t > 1 ? 1 : t;
+      }
+    }
+  }
+
+  // Normale della sezione (piano verticale lungo la traccia): perpendicolare
+  // sia alla traccia (orizzontale) sia al verticale, costante su tutta la
+  // sezione dato che la traccia è una retta — serve a orientare lo spessore
+  // e il sollevamento delle isolinee (vedi buildBandedSurface).
+  let tx = colWorldX[nPX - 1] - colWorldX[0];
+  let tz = colWorldZ[nPX - 1] - colWorldZ[0];
+  const tlen = Math.hypot(tx, tz) || 1;
+  tx /= tlen; tz /= tlen;
+  const normal = [tz, 0, -tx];
+
+  return buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, normal);
+}
+
 // Overlay 3D del dataset corrente (stesso dato/palette della vista 2D Data
 // Analysis): voxel colorati in pianta e/o nelle sezioni trasversali/longitudinali,
 // a scelta dell'utente (overlay.views). Un'unica LUT/range condivisi tra i piani
@@ -1009,7 +1289,7 @@ function buildSectionSurface(slice, range, lut, viewType, pivotX, pivotY, I, J, 
 // "segui il terreno" o con sezioni ruotate).
 export function buildDataOverlay(model, overlay) {
   if (!overlay?.colors?.length || !overlay.dimZ) return null;
-  const { views, range, colors, reversed, pivot, terrainCut, level, dimZ, smooth, spacingZ } = overlay;
+  const { views, range, colors, reversed, pivot, terrainCut, level, dimZ, smooth, spacingZ, contour } = overlay;
   if (!views.plan && !views.sectionX && !views.sectionY) return null;
   const { I, J, dx, dy } = model.geometry;
   const toX = (i) => (I * dx) / 2 - (i + 0.5) * dx;
@@ -1022,7 +1302,30 @@ export function buildDataOverlay(model, overlay) {
   let maxHeight = 0;
   let any = false;
 
-  if (smooth) {
+  if (contour) {
+    // Filled contour / mappa isaritmica (stessa modalità della vista 2D):
+    // superficie campionata con interpolazione bilineare, fasce piatte e
+    // isolinee — vedi buildContourPlanSurface/buildContourSectionSurface.
+    if (views.plan) {
+      const built = buildContourPlanSurface(views.plan, range, lut, level, terrainCut, I, J, dx, dy, zLevels, boundaries);
+      if (built) {
+        layer.add(built.mesh);
+        if (built.lines) layer.add(built.lines);
+        maxHeight = Math.max(maxHeight, built.maxHeight);
+        any = true;
+      }
+    }
+    for (const key of ['sectionX', 'sectionY']) {
+      if (!views[key]) continue;
+      const built = buildContourSectionSurface(views[key], range, lut, key, pivot.sectionX, pivot.sectionY, I, J, dx, dy, boundaries, zLevels);
+      if (built) {
+        layer.add(built.mesh);
+        if (built.lines) layer.add(built.lines);
+        maxHeight = Math.max(maxHeight, built.maxHeight);
+        any = true;
+      }
+    }
+  } else if (smooth) {
     if (views.plan) {
       const built = buildPlanSurface(views.plan, range, lut, level, terrainCut, I, J, dx, dy, zLevels, boundaries);
       if (built) { layer.add(built.mesh); maxHeight = Math.max(maxHeight, built.maxHeight); any = true; }

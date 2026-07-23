@@ -19,7 +19,7 @@ import { useFlip } from '../../lib/useFlip';
 import { usePointSeries, useSlices, useTerrainCut, useWindFields, useWindVolumeCells } from '../../lib/useSlice';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { findPalette } from '../../data/palettes';
-import { formatValue, orientColors } from '../../lib/colormap';
+import { formatValue, orientColors, contourLegendGradient } from '../../lib/colormap';
 import { niceCeil } from '../../lib/windField';
 
 const LAYER_ICONS = {
@@ -176,7 +176,7 @@ function overlayRange(scaleType, customRanges, filesetKey, slices, otherSlices) 
 // attivi (pianta/sezioni) così i colori restano confrontabili quando più piani
 // sono visibili insieme. null se non c'è nulla da mostrare (overlay spento,
 // nessun piano attivo, o dataset non ancora caricato).
-function useDataOverlay(slices, terrainCut, views, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ, range) {
+function useDataOverlay(slices, terrainCut, views, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ, range, contour) {
   return useMemo(() => {
     if (!dimZ || (!views.plan && !views.sectionX && !views.sectionY)) return null;
     if (!(views.plan && slices.plan) && !(views.sectionX && slices.sectionX) && !(views.sectionY && slices.sectionY)) return null;
@@ -195,8 +195,9 @@ function useDataOverlay(slices, terrainCut, views, colors, reversed, sectionX, s
       dimZ,
       smooth,
       spacingZ,
+      contour,
     };
-  }, [slices.plan, slices.sectionX, slices.sectionY, terrainCut, views.plan, views.sectionX, views.sectionY, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ, range]);
+  }, [slices.plan, slices.sectionX, slices.sectionY, terrainCut, views.plan, views.sectionX, views.sectionY, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ, range, contour]);
 }
 
 // Confeziona l'overlay 3D del vento sulle fette dati di un fileset: stessa
@@ -323,7 +324,7 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dat
           <span className="map-legend-label">{formatValue(dataOverlay.range.min, dataOverlay.range.max - dataOverlay.range.min)}</span>
           <span
             className="map-legend-bar"
-            style={{ background: `linear-gradient(90deg, ${orientColors(dataOverlay.colors, dataOverlay.reversed).join(',')})` }}
+            style={{ background: dataOverlay.contour ? contourLegendGradient(dataOverlay.colors, dataOverlay.reversed) : `linear-gradient(90deg, ${orientColors(dataOverlay.colors, dataOverlay.reversed).join(',')})` }}
           />
           <span className="map-legend-label">{formatValue(dataOverlay.range.max, dataOverlay.range.max - dataOverlay.range.min)}</span>
         </div>
@@ -388,8 +389,8 @@ export default function ModelView() {
   const spacingZ = state.edxMeta?.spacing?.z;
   const overlayRangeA = overlayRange(state.scaleType3D, state.customRanges, 'A', slicesA, slicesB);
   const overlayRangeB = overlayRange(state.scaleType3D, state.customRanges, 'B', slicesB, slicesA);
-  const dataOverlayA = useDataOverlay(slicesA, terrainCutA, voxelViews, activePalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ, overlayRangeA);
-  const dataOverlayB = useDataOverlay(slicesB, terrainCutB, voxelViews, activePalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ, overlayRangeB);
+  const dataOverlayA = useDataOverlay(slicesA, terrainCutA, voxelViews, activePalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ, overlayRangeA, state.renderStyle === 'contour');
+  const dataOverlayB = useDataOverlay(slicesB, terrainCutB, voxelViews, activePalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ, overlayRangeB, state.renderStyle === 'contour');
 
   // Vento sulle fette dati già disegnate (pianta/sezioni): quali piani sono
   // "selezionati" (dataVoxelPlan/SectionX/SectionY) resta indipendente dal
@@ -491,6 +492,10 @@ export default function ModelView() {
     { key: 'b', label: tr('compare_b'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined, help: { title: tr('help_compare_b_title'), body: tr('help_compare_b_body') } },
     { key: 'ab', label: tr('compare_ab'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined, help: { title: tr('help_compare_ab_title'), body: tr('help_compare_ab_body') } },
   ];
+  const renderStyleOptions = [
+    { key: 'pixel', label: tr('render_style_pixel'), help: { title: tr('help_render_style_pixel_title'), body: tr('help_render_style_pixel_body') } },
+    { key: 'contour', label: tr('render_style_contour'), help: { title: tr('help_render_style_contour_title'), body: tr('help_render_style_contour_body') } },
+  ];
   const panelKeys = state.compareMode3D === 'ab' ? ['A', 'B'] : state.compareMode3D === 'b' ? ['B'] : ['A'];
 
   const panelProps = {
@@ -536,7 +541,7 @@ export default function ModelView() {
     observer.observe(topEl);
     observer.observe(panelEl);
     return () => observer.disconnect();
-  }, [state.compareMode3D, state.filesetBOpen, loadedA, loadedB]);
+  }, [state.compareMode3D, state.filesetBOpen, state.showDataVoxels, loadedA, loadedB]);
 
   return (
     <div className="model-view-page">
@@ -630,6 +635,7 @@ export default function ModelView() {
               {(loadedA || loadedB) && (
                 <div className={`view-bar-modes view-bar-modes--${modesLayout}`} ref={viewBarModesRef}>
                   <Segmented options={compareOptions} value={state.compareMode3D} onSelect={setCompareMode3D} variant="accent" />
+                  <Segmented options={renderStyleOptions} value={state.renderStyle} onSelect={(v) => set({ renderStyle: v })} variant="dark" />
                 </div>
               )}
             </div>

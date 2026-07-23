@@ -42,7 +42,7 @@ function computeDiff(a, b, orderAB) {
   return { ...a, data, min: -maxAbs || 0, max: maxAbs || 0 };
 }
 
-function ChartCard({ flipKey, title, stats, body, stripe, caption, thumbs, objectsThumbs, objectsOpts, thumbRanges, thumbShowLegend, thumbWinds, colors, reversed, viewTypes, currentViewType, onSelectViewType, onThumbLegendClick }) {
+function ChartCard({ flipKey, title, stats, body, stripe, caption, thumbs, objectsThumbs, objectsOpts, thumbRanges, thumbShowLegend, thumbWinds, colors, reversed, viewTypes, currentViewType, onSelectViewType, onThumbLegendClick, renderStyle }) {
   const { tr } = useI18n();
   const otherViews = viewTypes.filter((v) => v.key !== currentViewType);
   return (
@@ -71,6 +71,7 @@ function ChartCard({ flipKey, title, stats, body, stripe, caption, thumbs, objec
                 min={thumbRanges?.[v.key]?.min}
                 max={thumbRanges?.[v.key]?.max}
                 showLegend={thumbShowLegend}
+                renderStyle={renderStyle}
                 onLegendClick={(e) => {
                   e.stopPropagation();
                   onThumbLegendClick?.(v.key, thumbRanges?.[v.key] ?? thumbs[v.key]);
@@ -409,7 +410,7 @@ export default function AnalysisView() {
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('A', vType, range),
       body: sliceA ? (
-        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} />
+        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} renderStyle={state.renderStyle} />
       ) : null,
     },
     {
@@ -428,7 +429,7 @@ export default function AnalysisView() {
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('B', vType, range),
       body: sliceB ? (
-        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} />
+        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} renderStyle={state.renderStyle} />
       ) : null,
     },
     {
@@ -446,7 +447,7 @@ export default function AnalysisView() {
       reversed: diffReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('Diff', vType, range),
       body: sliceDiff ? (
-        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={activeDiffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} />
+        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={activeDiffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} renderStyle={state.renderStyle} />
       ) : null,
     },
   ];
@@ -472,6 +473,10 @@ export default function AnalysisView() {
     { key: 'abdiff', label: tr('compare_abdiff'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined, help: { title: tr('help_compare_abdiff_title'), body: tr('help_compare_abdiff_body') } },
   ];
   const viewTypeOptions = visibleViewTypes.map((v) => ({ key: v.key, label: tr(v.labelKey) }));
+  const renderStyleOptions = [
+    { key: 'pixel', label: tr('render_style_pixel'), help: { title: tr('help_render_style_pixel_title'), body: tr('help_render_style_pixel_body') } },
+    { key: 'contour', label: tr('render_style_contour'), help: { title: tr('help_render_style_contour_title'), body: tr('help_render_style_contour_body') } },
+  ];
 
   // Se il gruppo dati cambia e perde l'estensione verticale mentre una sezione
   // era selezionata, si torna alla pianta (unica vista che resta visibile).
@@ -583,6 +588,7 @@ export default function AnalysisView() {
               <div className={`view-bar-modes view-bar-modes--${modesLayout}`} ref={viewBarModesRef}>
                 <Segmented options={compareOptions} value={state.compareMode} onSelect={setCompareMode} variant="accent" />
                 {showSections && <Segmented options={viewTypeOptions} value={state.viewType} onSelect={(v) => set({ viewType: v })} variant="dark" />}
+                <Segmented options={renderStyleOptions} value={state.renderStyle} onSelect={(v) => set({ renderStyle: v })} variant="dark" />
               </div>
             </div>
           </div>
@@ -626,6 +632,7 @@ export default function AnalysisView() {
             currentViewType={state.viewType}
             onSelectViewType={(v) => set({ viewType: v })}
             onThumbLegendClick={c.onThumbLegendClick}
+            renderStyle={state.renderStyle}
           />
         ))}
       </div>

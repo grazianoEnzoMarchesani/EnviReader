@@ -147,6 +147,169 @@ export function sliceToImageData(data, w, h, min, max, lut, spacingX, spacingY, 
   return img;
 }
 
+// Numero di fasce del filled contour: compromesso tra leggibilità delle
+// bande e granularità del dato, condiviso tra la mappa 2D e l'overlay 3D
+// (vedi CONTOUR_BANDS in inxScene.js) così i due viewer restano coerenti.
+export const CONTOUR_BANDS = 12;
+
+// Centro fisico (coordinata continua, origine 0) di ciascuna cella lungo un
+// asse: con spacing forniti usa i passi reali (tasselli non uniformi),
+// altrimenti celle di dimensione costante extent/n. Esportata: la superficie
+// a fasce del viewer 3D (buildContourPlanSurface/buildContourSectionSurface
+// in inxScene.js) la riusa per campionare con la stessa interpolazione della
+// mappa 2D invece di duplicarne la logica.
+export function axisCenters(spacing, n, extent) {
+  const centers = new Float64Array(n);
+  let cur = 0;
+  for (let i = 0; i < n; i++) {
+    const s = spacing ? spacing[i] : extent / n;
+    centers[i] = cur + s / 2;
+    cur += s;
+  }
+  return centers;
+}
+
+// Indice continuo (frazionario, clampato a [0, n-1]) del centro cella più
+// vicino alla coordinata fisica x, per interpolazione bilineare tra celle.
+function centerIndex(centers, n, x) {
+  if (x <= centers[0]) return 0;
+  if (x >= centers[n - 1]) return n - 1;
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (centers[mid] <= x) lo = mid; else hi = mid;
+  }
+  return lo + (x - centers[lo]) / (centers[hi] - centers[lo]);
+}
+
+// Indice continuo per ciascuno dei `target` campioni equispaziati lungo
+// l'asse (centro pixel di output); flip=true inverte la direzione (asse Y:
+// riga 0 dei dati a sud, ma l'alto del canvas è il nord — vedi sliceToImageData).
+export function continuousIndex(centers, n, extent, target, flip) {
+  const idx = new Float64Array(target);
+  for (let p = 0; p < target; p++) {
+    const raw = (p + 0.5) * (extent / target);
+    idx[p] = centerIndex(centers, n, flip ? extent - raw : raw);
+  }
+  return idx;
+}
+
+// Valore bilineare ai 4 centri cella più vicini a (colF, rowF). Prima verifica
+// la cella "proprietaria" del punto (il centro cella più vicino, quello di cui
+// fa parte in modalità pixel): se è NaN il punto resta vuoto punto e basta,
+// qualunque sia il valore dei vicini — altrimenti un ostacolo mascherato (es.
+// un edificio, dove l'aria non viene calcolata) verrebbe "eroso" fin dentro
+// la sua metà più vicina al bordo invece di restare vuoto per intero. Solo se
+// la cella proprietaria ha dato, si media sui 4 angoli pesando solo quelli
+// validi (i pesi dei mancanti si redistribuiscono sugli altri): così il
+// colore resta liscio ed esteso fino al bordo esatto della cella vuota, senza
+// l'alone di mezza cella che si aveva scartando il campione a ogni angolo NaN.
+export function bilinearSample(data, w, h, colF, rowF) {
+  const c0 = Math.floor(colF), r0 = Math.floor(rowF);
+  const c1 = Math.min(c0 + 1, w - 1), r1 = Math.min(r0 + 1, h - 1);
+  const fc = colF - c0, fr = rowF - r0;
+  const ownCol = fc < 0.5 ? c0 : c1;
+  const ownRow = fr < 0.5 ? r0 : r1;
+  if (Number.isNaN(data[ownRow * w + ownCol])) return NaN;
+
+  const v00 = data[r0 * w + c0], v10 = data[r0 * w + c1];
+  const v01 = data[r1 * w + c0], v11 = data[r1 * w + c1];
+  const w00 = (1 - fc) * (1 - fr), w10 = fc * (1 - fr);
+  const w01 = (1 - fc) * fr, w11 = fc * fr;
+  let sum = 0, wsum = 0;
+  if (!Number.isNaN(v00)) { sum += v00 * w00; wsum += w00; }
+  if (!Number.isNaN(v10)) { sum += v10 * w10; wsum += w10; }
+  if (!Number.isNaN(v01)) { sum += v01 * w01; wsum += w01; }
+  if (!Number.isNaN(v11)) { sum += v11 * w11; wsum += w11; }
+  return wsum > 0 ? sum / wsum : NaN;
+}
+
+// Filled contour / mappa isaritmica: come sliceToImageData ma il valore è
+// interpolato bilinearmente tra i centri cella (invece che a blocchi pieni
+// per cella) e quantizzato in CONTOUR_BANDS fasce di colore piatto; i pixel
+// al confine tra due fasce vengono scuriti per disegnare l'isolinea. Sempre
+// ricampionato a risoluzione fissa (serve spazio per l'interpolazione anche
+// su griglie piccole), indipendentemente da spacingX/spacingY.
+export function sliceToContourImageData(data, w, h, min, max, lut, spacingX, spacingY, extentW, extentH) {
+  const extW = extentW || w;
+  const extH = extentH || h;
+  const MAX_DIM = 1024;
+  let targetW, targetH;
+  if (extW > extH) {
+    targetW = MAX_DIM;
+    targetH = Math.max(1, Math.round(MAX_DIM * (extH / extW)));
+  } else {
+    targetH = MAX_DIM;
+    targetW = Math.max(1, Math.round(MAX_DIM * (extW / extH)));
+  }
+
+  const centersX = axisCenters(spacingX, w, extW);
+  const centersY = axisCenters(spacingY, h, extH);
+  const colIdx = continuousIndex(centersX, w, extW, targetW, false);
+  const rowIdx = continuousIndex(centersY, h, extH, targetH, true);
+
+  const range = max - min || 1;
+  const bandOf = new Int16Array(targetW * targetH).fill(-1);
+  const img = new ImageData(targetW, targetH);
+  const px = img.data;
+
+  for (let py = 0; py < targetH; py++) {
+    const rowF = rowIdx[py];
+    for (let pxi = 0; pxi < targetW; pxi++) {
+      const v = bilinearSample(data, w, h, colIdx[pxi], rowF);
+      if (Number.isNaN(v)) continue;
+      let t = (v - min) / range;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const band = Math.min(CONTOUR_BANDS - 1, Math.floor(t * CONTOUR_BANDS));
+      const tBand = (band + 0.5) / CONTOUR_BANDS;
+      const k = (tBand * (LUT_STEPS - 1)) | 0;
+      const o = (py * targetW + pxi) * 4;
+      bandOf[py * targetW + pxi] = band;
+      px[o] = lut[k * 3];
+      px[o + 1] = lut[k * 3 + 1];
+      px[o + 2] = lut[k * 3 + 2];
+      px[o + 3] = 255;
+    }
+  }
+
+  // Isolinee: scurisce i pixel dove la fascia cambia rispetto al vicino a
+  // destra/sotto. Scurire (invece di un tratto a tinta fissa, es. nero) resta
+  // leggibile su qualunque palette, chiara o scura che sia.
+  for (let py = 0; py < targetH; py++) {
+    for (let pxi = 0; pxi < targetW; pxi++) {
+      const i = py * targetW + pxi;
+      const band = bandOf[i];
+      if (band < 0) continue;
+      const rightBand = pxi + 1 < targetW ? bandOf[i + 1] : band;
+      const downBand = py + 1 < targetH ? bandOf[i + targetW] : band;
+      if (rightBand !== band || downBand !== band) {
+        const o = i * 4;
+        px[o] *= 0.4; px[o + 1] *= 0.4; px[o + 2] *= 0.4;
+      }
+    }
+  }
+
+  return img;
+}
+
+// Legenda per la modalità contour: stessi CONTOUR_BANDS colori piatti usati
+// da sliceToContourImageData (LUT campionata al centro fascia), disposti in
+// una gradient CSS a stop doppi così le transizioni sono nette invece che
+// sfumate — la legenda deve mostrare la stessa quantizzazione della mappa.
+export function contourLegendGradient(colors, reversed) {
+  const lut = buildLUT(colors, reversed);
+  const stops = [];
+  for (let band = 0; band < CONTOUR_BANDS; band++) {
+    const tBand = (band + 0.5) / CONTOUR_BANDS;
+    const k = (tBand * (LUT_STEPS - 1)) | 0;
+    const rgb = `rgb(${lut[k * 3]},${lut[k * 3 + 1]},${lut[k * 3 + 2]})`;
+    const p0 = (band / CONTOUR_BANDS) * 100;
+    const p1 = ((band + 1) / CONTOUR_BANDS) * 100;
+    stops.push(`${rgb} ${p0}%`, `${rgb} ${p1}%`);
+  }
+  return `linear-gradient(90deg, ${stops.join(', ')})`;
+}
+
 export function formatValue(value, span = 0) {
   if (!Number.isFinite(value)) return '–';
   const decimals = Math.abs(span || value) >= 100 ? 1 : 2;
