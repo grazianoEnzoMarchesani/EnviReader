@@ -51,7 +51,7 @@ export default function ViewSettingsModal() {
 
             <div className="modal-section-title">{tr('group_vegetation')}</div>
             <div className="view-bar-group">
-              <Toggle label={tr('toggle_veg_style1')} on={state.vegStyle1} onToggle={() => toggle('vegStyle1')} />
+              <Toggle label={tr('toggle_veg_style1')} on={state.style1} onToggle={() => toggle('style1')} />
             </div>
           </>
         )}
@@ -84,7 +84,7 @@ export default function ViewSettingsModal() {
             <div className="modal-section-title">{tr('toggle_objects_overlay')}</div>
             <div className="view-bar-group">
               <Slider label={tr('slider_objects_opacity')} value={state.objOverlayOpacity} min={0} max={100} unit="%" onChange={(v) => set({ objOverlayOpacity: v })} />
-              <Toggle label={tr('toggle_veg_style1')} on={state.objOverlayVegStyle1} onToggle={() => toggle('objOverlayVegStyle1')} />
+              <Toggle label={tr('toggle_style1')} on={state.style1} onToggle={() => toggle('style1')} />
             </div>
           </>
         )}

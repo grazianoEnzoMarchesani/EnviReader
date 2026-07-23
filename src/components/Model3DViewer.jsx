@@ -88,7 +88,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -686,6 +686,20 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     }
     stage.layers.vegetation = newVeg;
     setLayerVisibility(stage.layers, flagsRef.current);
+    // il nuovo layer vegetazione nasce senza castShadow/receiveShadow: vanno
+    // riallineati allo stato corrente del sole, altrimenti restano spenti
+    // finché non si disattiva e riattiva manualmente la simulazione solare
+    if (newVeg && sunEnabled) {
+      newVeg.traverse((obj) => {
+        if (obj.isMesh || obj.isInstancedMesh) {
+          obj.castShadow = true;
+          obj.receiveShadow = true;
+        }
+      });
+    }
+    // sunEnabled non è nelle dipendenze di proposito: qui serve solo lo stato
+    // corrente al momento del cambio stile, non un'altra ricostruzione del
+    // layer (costosa) ogni volta che si accende/spegne il sole
   }, [vegStyle1]);
 
   // toggle dei livelli e wireframe, senza ricostruire
@@ -813,9 +827,11 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     const on = !!sunEnabled;
     stage.sunLayer.group.visible = on;
     stage.decorativeLight.intensity = on ? 0 : 1.6;
-    // in modalità solare l'ambiente hemisphere va tenuto basso, altrimenti
-    // annulla il contrasto delle ombre proiettate dalla luce direzionale
-    if (stage.hemisphereLight) stage.hemisphereLight.intensity = on ? 0.45 : 1.15;
+    // in modalità solare l'ambiente hemisphere va tenuto più basso, altrimenti
+    // annulla il contrasto delle ombre proiettate dalla luce direzionale; non
+    // troppo basso però, o ogni bordo a scalini dei voxel in ombra risalta
+    // (vedi bias/normalBias in buildSunLayer per l'altra metà del fix)
+    if (stage.hemisphereLight) stage.hemisphereLight.intensity = on ? 0.65 : 1.15;
     setShadowCasting(stage.layers, on);
   }, [model, sunEnabled]);
 

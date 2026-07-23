@@ -660,7 +660,7 @@ export default function ModelView() {
             {...panelProps[key]}
             flags={flags}
             wireframe={state.wireframe}
-            vegStyle1={state.vegStyle1}
+            vegStyle1={state.style1}
             projection={state.cameraProjection}
             gizmoNorthMode={state.gizmoNorthMode}
             sunPathEnabled={state.sunPathEnabled}

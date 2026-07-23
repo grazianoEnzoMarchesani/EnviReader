@@ -160,7 +160,7 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
     showBuildings = true,
     showTerrain = true,
     showVegetation = true,
-    vegStyle1 = false,
+    style1 = false,
   } = opts;
   const opF = opacity / 100;
 
@@ -171,11 +171,15 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
 
   const isBuildingAt = (r, c) => r >= 0 && r < h && c >= 0 && c < w && Math.round(data[r * w + c]) === 1;
 
+  const paintBuildingDefault = (pxArr, o) => {
+    pxArr[o] = 75; pxArr[o+1] = 85; pxArr[o+2] = 99; pxArr[o+3] = 230 * opF;
+  };
+
   const paintBuilding = (pxArr, o, px, py, r, c) => {
-    if (colStart == null) {
-      // Percorso 1:1 (senza ricampionamento): una cella è un solo pixel, non
-      // c'è spazio per contorno/retino — resta il riempimento pieno.
-      pxArr[o] = 75; pxArr[o+1] = 85; pxArr[o+2] = 99; pxArr[o+3] = 230 * opF;
+    if (colStart == null || !style1) {
+      // Stile di default (style1 off, o percorso 1:1 senza ricampionamento
+      // dove non c'è spazio per contorno/retino): riempimento piatto grigio.
+      paintBuildingDefault(pxArr, o);
       return;
     }
     const distTop = py - rowStart[r];
@@ -198,10 +202,10 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
   };
 
   const assignPixel = (pxArr, o, v, px, py, r, c) => {
-    // 1: Building (sezione tecnica: contorno + retino a 45°)
+    // 1: Building (default: piatto grigio; style1: contorno + retino a 45°)
     // 2: Terrain (marrone chiaro)
     // 4: Contained source (rosso/viola trasparente)
-    // 11-15: Vegetation (verde)
+    // 11-15: Vegetation (verde; style1: ritagliata a cerchio)
     const rv = Math.round(v);
     if (rv === 1 && showBuildings) {
       paintBuilding(pxArr, o, px, py, r, c);
@@ -297,7 +301,7 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
       if (Number.isNaN(v)) continue;
       const o = (py * targetW + px) * 4;
       assignPixel(pxArr, o, v, px, py, srcRow, srcCol);
-      if (vegStyle1 && showVegetation) {
+      if (style1 && showVegetation) {
         const rv = Math.round(v);
         if (rv >= 11 && rv <= 15) {
           const cellW = colEnd[srcCol] - colStart[srcCol] + 1;

@@ -86,6 +86,7 @@ export const FALLBACK_I18N = {
     "toggle_objects_overlay": "Show 3D layer",
     "slider_objects_opacity": "Objects opacity",
     "toggle_veg_style1": "Style 1",
+    "toggle_style1": "Style 1",
     "toggle_obj_buildings": "Buildings",
     "toggle_obj_terrain": "Terrain",
     "toggle_obj_vegetation": "Vegetation",

@@ -155,15 +155,22 @@ function buildSunLayer({ W, H }) {
   const light = new THREE.DirectionalLight(0xfff3e0, 0);
   light.castShadow = true;
   const shadowExtent = span * 0.65;
+  const shadowMapSize = 4096;
   light.shadow.camera.left = -shadowExtent;
   light.shadow.camera.right = shadowExtent;
   light.shadow.camera.top = shadowExtent;
   light.shadow.camera.bottom = -shadowExtent;
   light.shadow.camera.near = 1;
   light.shadow.camera.far = radius + shadowExtent * 2;
-  light.shadow.mapSize.set(2048, 2048);
-  light.shadow.bias = -0.0012;
-  light.shadow.normalBias = 0.4;
+  light.shadow.mapSize.set(shadowMapSize, shadowMapSize);
+  // bias/normalBias in valore assoluto non hanno senso su modelli di scale
+  // diverse (una città di 500m e un cortile di 20m userebbero lo stesso
+  // offset): si derivano dalla dimensione reale di un texel della shadow map,
+  // così l'aliasing sui bordi voxel resta corretto qualunque sia l'estensione
+  // del modello (span/shadowExtent).
+  const texelSize = (shadowExtent * 2) / shadowMapSize;
+  light.shadow.bias = -texelSize * 0.25;
+  light.shadow.normalBias = texelSize * 1.5;
   light.target = new THREE.Object3D();
   group.add(light.target);
   group.add(light);
