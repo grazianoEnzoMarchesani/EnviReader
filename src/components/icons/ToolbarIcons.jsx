@@ -58,6 +58,18 @@ export function IconTree(props) {
   );
 }
 
+// Modalità HD: rettangolo "schermo" con le lettere H/D a tratto, per il
+// toggle di ricampionamento ad alta risoluzione della mappa raster/contour.
+export function IconHD(props) {
+  return (
+    <svg {...base} width="18" height="18" {...props}>
+      <rect x="3" y="6" width="18" height="12" rx="2" />
+      <path d="M7 9v6M7 12h2.5M9.5 9v6" />
+      <path d="M13 9v6h1.5a1.5 1.5 0 0 0 1.5-1.5v-3A1.5 1.5 0 0 0 14.5 9H13Z" />
+    </svg>
+  );
+}
+
 export function IconCompass(props) {
   return (
     <svg {...base} width="18" height="18" {...props}>

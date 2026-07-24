@@ -65,7 +65,7 @@ export function buildLUT(colors, reversed = false) {
 // così il nord resta in alto (pianta) e l'alto resta in alto (sezioni).
 // Se spacingX e spacingY sono forniti, esegue un ricampionamento fulmineo su
 // una risoluzione maggiore per preservare le proporzioni variabili dei tasselli.
-export function sliceToImageData(data, w, h, min, max, lut, spacingX, spacingY, extentW, extentH) {
+export function sliceToImageData(data, w, h, min, max, lut, spacingX, spacingY, extentW, extentH, maxDim = 1024) {
   if (!spacingX || !spacingY) {
     const img = new ImageData(w, h);
     const px = img.data;
@@ -88,7 +88,7 @@ export function sliceToImageData(data, w, h, min, max, lut, spacingX, spacingY, 
     return img;
   }
 
-  const MAX_DIM = 1024;
+  const MAX_DIM = maxDim;
   let targetW, targetH;
   if (extentW > extentH) {
     targetW = MAX_DIM;
@@ -230,10 +230,10 @@ export function bilinearSample(data, w, h, colF, rowF) {
 // al confine tra due fasce vengono scuriti per disegnare l'isolinea. Sempre
 // ricampionato a risoluzione fissa (serve spazio per l'interpolazione anche
 // su griglie piccole), indipendentemente da spacingX/spacingY.
-export function sliceToContourImageData(data, w, h, min, max, lut, spacingX, spacingY, extentW, extentH) {
+export function sliceToContourImageData(data, w, h, min, max, lut, spacingX, spacingY, extentW, extentH, maxDim = 1024) {
   const extW = extentW || w;
   const extH = extentH || h;
-  const MAX_DIM = 1024;
+  const MAX_DIM = maxDim;
   let targetW, targetH;
   if (extW > extH) {
     targetW = MAX_DIM;
@@ -317,7 +317,7 @@ export function formatValue(value, span = 0) {
 }
 
 // Genera una ImageData per l'overlay degli oggetti
-export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, extentH, opts = {}) {
+export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, extentH, opts = {}, maxDim = 1024) {
   const {
     opacity = 70,
     showBuildings = true,
@@ -421,7 +421,7 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
     return img;
   }
 
-  const MAX_DIM = 1024;
+  const MAX_DIM = maxDim;
   let targetW, targetH;
   if (extentW > extentH) {
     targetW = MAX_DIM;

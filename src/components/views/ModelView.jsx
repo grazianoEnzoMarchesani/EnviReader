@@ -524,7 +524,7 @@ export default function ModelView() {
     const modesEl = viewBarModesRef.current;
     if (!topEl || !panelEl || !modesEl) return;
     const measure = () => {
-      const widths = Array.from(modesEl.querySelectorAll('.segmented')).map((el) => el.getBoundingClientRect().width);
+      const widths = Array.from(modesEl.children).map((el) => el.getBoundingClientRect().width);
       const gap = 12;
       const unstackedWidth = widths.reduce((sum, w) => sum + w, 0) + gap * (widths.length - 1);
       const stackedWidth = Math.max(0, ...widths);
@@ -601,8 +601,8 @@ export default function ModelView() {
                 )}
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
-                  <IconToggle icon={IconSyncRotate} label={tr('toggle_sync_camera_3d')} on={state.syncCamera3D} onToggle={() => toggle('syncCamera3D')} help={{ title: tr('help_sync_camera_3d_title'), body: tr('help_sync_camera_3d_body'), note: tr('help_sync_camera_3d_note') }} />
                   <IconToggle icon={IconWireframe} label={tr('btn_wireframe')} on={state.wireframe} onToggle={() => toggle('wireframe')} help={{ title: tr('help_wireframe_title'), body: tr('help_wireframe_body') }} />
+                  <Segmented options={renderStyleOptions} value={state.renderStyle} onSelect={(v) => set({ renderStyle: v })} variant="dark" />
                 </div>
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
@@ -615,6 +615,11 @@ export default function ModelView() {
                       label={windMode === '3d' && windVolumeLoading ? tr('toggle_wind_mode_3d_loading') : tr(`toggle_wind_mode_${windMode}`)}
                       help={{ title: tr('help_wind_mode_title'), body: tr('help_wind_mode_body') }}
                     />
+                  </div>
+                </div>
+                <div className="vertical-divider" />
+                <div className="view-bar-group">
+                  <div className="icon-toggle-row">
                     <IconToggle icon={IconCalendar} label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} help={{ title: tr('help_calendar_widget_title'), body: tr('help_calendar_widget_body') }} />
                     <IconToggle icon={IconClock} label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} help={{ title: tr('help_clock_widget_title'), body: tr('help_clock_widget_body') }} />
                   </div>
@@ -636,8 +641,12 @@ export default function ModelView() {
 
               {(loadedA || loadedB) && (
                 <div className={`view-bar-modes view-bar-modes--${modesLayout}`} ref={viewBarModesRef}>
-                  <Segmented options={compareOptions} value={state.compareMode3D} onSelect={setCompareMode3D} variant="accent" />
-                  <Segmented options={renderStyleOptions} value={state.renderStyle} onSelect={(v) => set({ renderStyle: v })} variant="dark" />
+                  <div className="modes-compare-group">
+                    {state.compareMode3D === 'ab' && (
+                      <IconToggle icon={IconSyncRotate} label={tr('toggle_sync_camera_3d')} on={state.syncCamera3D} onToggle={() => toggle('syncCamera3D')} help={{ title: tr('help_sync_camera_3d_title'), body: tr('help_sync_camera_3d_body'), note: tr('help_sync_camera_3d_note') }} />
+                    )}
+                    <Segmented options={compareOptions} value={state.compareMode3D} onSelect={setCompareMode3D} variant="accent" />
+                  </div>
                 </div>
               )}
             </div>

@@ -32,13 +32,22 @@ export default function ViewSettingsModal() {
         <div className="modal-title">{tr('btn_view_settings')}</div>
 
         <div className="modal-section-title">{tr('label_object_style')}</div>
-        <div className="view-bar-group" style={{ marginBottom: '16px' }}>
+        <div className="view-bar-group" style={{ marginBottom: is3D ? 0 : '16px' }}>
           <Select
             value={currentObjectStyle}
             options={styleOptions}
             onChange={(val) => set({ objectStyle: val, style1: val === 'style1' })}
           />
         </div>
+        {is3D && (
+          <div className="modal-field" style={{ marginTop: '14px', marginBottom: '16px' }}>
+            <Toggle
+              label={tr('toggle_ambient_occlusion')}
+              on={state.ambientOcclusion}
+              onToggle={() => toggle('ambientOcclusion')}
+            />
+          </div>
+        )}
 
         {is3D && (
           <>
@@ -66,13 +75,6 @@ export default function ViewSettingsModal() {
                   onSelect={(key) => set({ gizmoNorthMode: key })}
                 />
               </div>
-              <div className="modal-field" style={{ marginTop: '8px' }}>
-                <Toggle
-                  label={tr('toggle_ambient_occlusion')}
-                  on={state.ambientOcclusion}
-                  onToggle={() => toggle('ambientOcclusion')}
-                />
-              </div>
             </div>
           </>
         )}
@@ -83,26 +85,29 @@ export default function ViewSettingsModal() {
             <div className="view-bar-group">
               <Slider label={tr('slider_section_line_width')} value={state.sectionLineWidth} min={1} max={5} step={1} unit="px" onChange={(v) => set({ sectionLineWidth: v })} />
               <Slider label={tr('slider_section_line_gap')} value={state.sectionLineGap} min={0} max={12} step={1} unit="px" onChange={(v) => set({ sectionLineGap: v })} />
-              <span className="line-color-row">
-                <input
-                  type="color"
-                  className="line-color-input"
-                  title={tr('label_section_line_color')}
-                  aria-label={tr('label_section_line_color')}
-                  value={state.sectionLineColor || DEFAULT_SECTION_LINE_COLOR}
-                  onChange={(e) => set({ sectionLineColor: e.target.value })}
-                />
-                {state.sectionLineColor && (
-                  <button type="button" className="step-btn" title={tr('btn_section_line_color_reset')} onClick={() => set({ sectionLineColor: null })}>↺</button>
-                )}
-              </span>
+              <div className="line-color-field">
+                <span className="control-label">{tr('label_section_line_color')}</span>
+                <span className="line-color-row">
+                  <input
+                    type="color"
+                    className="line-color-input"
+                    title={tr('label_section_line_color')}
+                    aria-label={tr('label_section_line_color')}
+                    value={state.sectionLineColor || DEFAULT_SECTION_LINE_COLOR}
+                    onChange={(e) => set({ sectionLineColor: e.target.value })}
+                  />
+                  {state.sectionLineColor && (
+                    <button type="button" className="step-btn" title={tr('btn_section_line_color_reset')} onClick={() => set({ sectionLineColor: null })}>↺</button>
+                  )}
+                </span>
+              </div>
             </div>
           </>
         )}
 
         {!is3D && state.showObjectsOverlay && (
           <>
-            <div className="modal-section-title">{tr('toggle_objects_overlay')}</div>
+            <div className="modal-section-title">{tr('help_objects_overlay_title')}</div>
             <div className="view-bar-group">
               <Slider label={tr('slider_objects_opacity')} value={state.objOverlayOpacity} min={0} max={100} unit="%" onChange={(v) => set({ objOverlayOpacity: v })} />
             </div>

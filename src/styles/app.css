@@ -467,6 +467,7 @@ button { font-family: inherit; }
 .gradient-stop::-webkit-color-swatch { border: none; border-radius: 4px; }
 
 /* ---------- colore linea di sezione (view bar) ---------- */
+.line-color-field { display: flex; align-items: center; gap: 12px; flex: 1 0 100%; }
 .line-color-row { display: flex; align-items: center; gap: 6px; }
 .line-color-input {
   width: 24px;
@@ -620,6 +621,8 @@ button { font-family: inherit; }
 .view-bar-modes { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; margin-left: auto; }
 .view-bar-modes--inline { flex-direction: row; align-items: center; gap: 12px; }
 .view-bar-modes--wrapped { flex-direction: row; align-items: center; gap: 12px; flex-basis: 100%; justify-content: flex-start; margin-left: 0; }
+
+.modes-compare-group { display: flex; align-items: center; gap: 8px; }
 .view-bar-panel {
   display: flex;
   gap: 16px;

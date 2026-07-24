@@ -8,7 +8,7 @@ import Slider from '../controls/Slider';
 import Select from '../controls/Select';
 import IconToggle from '../controls/IconToggle';
 import HelpTooltip from '../controls/HelpTooltip';
-import { IconLayers3D, IconBuilding, IconTerrain, IconTerrainFix, IconTree, IconCompass, IconCalendar, IconClock, IconSettings, IconWindGust } from '../icons/ToolbarIcons';
+import { IconLayers3D, IconBuilding, IconTerrain, IconTerrainFix, IconTree, IconCompass, IconCalendar, IconClock, IconSettings, IconWindGust, IconHD } from '../icons/ToolbarIcons';
 import ViewSettingsModal from '../ViewSettingsModal';
 import MapChart, { MapThumb } from '../MapChart';
 import TimeSeriesChart from '../TimeSeriesChart';
@@ -411,7 +411,7 @@ export default function AnalysisView() {
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('A', vType, range),
       body: sliceA ? (
-        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} renderStyle={state.renderStyle} />
+        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} renderStyle={state.renderStyle} hdMode={state.hdMode} />
       ) : null,
     },
     {
@@ -430,7 +430,7 @@ export default function AnalysisView() {
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('B', vType, range),
       body: sliceB ? (
-        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} renderStyle={state.renderStyle} />
+        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} renderStyle={state.renderStyle} hdMode={state.hdMode} />
       ) : null,
     },
     {
@@ -448,7 +448,7 @@ export default function AnalysisView() {
       reversed: diffReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('Diff', vType, range),
       body: sliceDiff ? (
-        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={activeDiffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} renderStyle={state.renderStyle} />
+        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={activeDiffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} renderStyle={state.renderStyle} hdMode={state.hdMode} />
       ) : null,
     },
   ];
@@ -550,6 +550,11 @@ export default function AnalysisView() {
                   </select>
                 </div>
                 <div className="vertical-divider" />
+                <div className="view-bar-group">
+                  <Segmented options={renderStyleOptions} value={state.renderStyle} onSelect={(v) => set({ renderStyle: v })} variant="dark" />
+                  <IconToggle icon={IconHD} label={tr('toggle_hd_mode')} on={state.hdMode} onToggle={() => toggle('hdMode')} help={{ title: tr('help_hd_mode_title'), body: tr('help_hd_mode_body') }} />
+                </div>
+                <div className="vertical-divider" />
                 <div className="icon-toggle-row">
                   <IconToggle icon={IconLayers3D} label={tr('toggle_objects_overlay')} on={state.showObjectsOverlay} onToggle={() => toggle('showObjectsOverlay')} help={{ title: tr('help_objects_overlay_title'), body: tr('help_objects_overlay_body'), note: tr('help_objects_overlay_note') }} />
                   {state.showObjectsOverlay && (
@@ -565,8 +570,11 @@ export default function AnalysisView() {
                       <IconToggle icon={IconTerrainFix} label={tr('toggle_biomet_fix')} on={state.fixBiometSections} onToggle={() => toggle('fixBiometSections')} help={{ title: tr('help_biomet_fix_title'), body: tr('help_biomet_fix_body'), note: tr('help_biomet_fix_note') }} />
                     </>
                   )}
-                  <div className="vertical-divider" />
+                </div>
+                <div className="vertical-divider" />
+                <div className="icon-toggle-row">
                   <IconToggle icon={IconWindGust} label={tr('toggle_wind_field')} on={state.showWindField} onToggle={() => toggle('showWindField')} help={{ title: tr('help_wind_field_title'), body: tr('help_wind_field_body') }} />
+                  <div className="vertical-divider" />
                   <IconToggle icon={IconCompass} label={tr('toggle_compass')} on={state.showNorthArrow} onToggle={() => toggle('showNorthArrow')} help={{ title: tr('help_compass_arrow_title'), body: tr('help_compass_arrow_body') }} />
                   <IconToggle icon={IconCalendar} label={tr('toggle_calendar_widget')} on={state.showCalendarWidget} onToggle={() => toggle('showCalendarWidget')} help={{ title: tr('help_calendar_widget_title'), body: tr('help_calendar_widget_body') }} />
                   <IconToggle icon={IconClock} label={tr('toggle_clock_widget')} on={state.showClockWidget} onToggle={() => toggle('showClockWidget')} help={{ title: tr('help_clock_widget_title'), body: tr('help_clock_widget_body') }} />
@@ -588,8 +596,7 @@ export default function AnalysisView() {
 
               <div className={`view-bar-modes view-bar-modes--${modesLayout}`} ref={viewBarModesRef}>
                 <Segmented options={compareOptions} value={state.compareMode} onSelect={setCompareMode} variant="accent" />
-                {showSections && <Segmented options={viewTypeOptions} value={state.viewType} onSelect={(v) => set({ viewType: v })} variant="dark" />}
-                <Segmented options={renderStyleOptions} value={state.renderStyle} onSelect={(v) => set({ renderStyle: v })} variant="dark" />
+                {showSections && <Segmented options={viewTypeOptions} value={state.viewType} onSelect={(v) => set({ viewType: v })} variant="accent" />}
               </div>
             </div>
           </div>

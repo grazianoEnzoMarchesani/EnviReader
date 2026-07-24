@@ -7,6 +7,25 @@ import { traceStreamlines2D } from '../lib/windField';
 // ridotta (senza deformare) solo se non entra nel riquadro.
 const THUMB_HEIGHT = 52;
 
+// Modalità HD: ricampiona la mappa raster/contour alla risoluzione fisica
+// del frame (frameSize, già consapevole dello zoom perché "View zoom" allarga
+// la larghezza CSS reale della card, non un transform:scale) invece del
+// MAX_DIM fisso di colormap.js. DPR capped a 2 (come Model3DViewer/
+// ForcingChart) per non esplodere su schermi 4K/5K; tetto assoluto a 2048
+// indipendente dal caso pessimo (fino a 3 MapChart × 3 canvas in
+// compareMode 'abdiff' a zoom 3x). Fallback alla base 1024 finché frameSize
+// è null (primo mount, prima che il ResizeObserver scatti) o se HD è spento.
+const HD_DPR_CAP = 2;
+const HD_MAX_DIM_CAP = 2048;
+const HD_BASE_DIM = 1024;
+
+function computeMaxDim(hdMode, frameSize) {
+  if (!hdMode || !frameSize) return HD_BASE_DIM;
+  const dpr = Math.min(window.devicePixelRatio || 1, HD_DPR_CAP);
+  const target = Math.round(Math.max(frameSize.w, frameSize.h) * dpr);
+  return Math.min(HD_MAX_DIM_CAP, Math.max(HD_BASE_DIM, target));
+}
+
 export function MapThumb({ slice, objectsSlice, objectsOpts, colors, reversed, wind, min, max, showLegend, onLegendClick, renderStyle }) {
   const boxRef = useRef(null);
   const canvasRef = useRef(null);
@@ -368,7 +387,7 @@ function crossGeometry(control, slice, W, H) {
 
 // Mappa raster: il canvas ha la risoluzione della griglia ENVI-met e viene
 // ingrandito via CSS (image-rendering: pixelated), come le celle di Leonardo.
-export default function MapChart({ slice, objectsSlice, objectsOpts, colors, reversed, min, max, onCellClick, marks, sectionControl, sectionLineStyle, compass, showCalendar, showClock, timeLabel, wind, onLegendClick, widgetScale, renderStyle }) {
+export default function MapChart({ slice, objectsSlice, objectsOpts, colors, reversed, min, max, onCellClick, marks, sectionControl, sectionLineStyle, compass, showCalendar, showClock, timeLabel, wind, onLegendClick, widgetScale, renderStyle, hdMode }) {
   const canvasRef = useRef(null);
   const objectsCanvasRef = useRef(null);
   const frameRef = useRef(null);
@@ -385,20 +404,22 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
     if (!slice || !canvasRef.current) return;
     const canvas = canvasRef.current;
     const build = renderStyle === 'contour' ? sliceToContourImageData : sliceToImageData;
-    const imgData = build(slice.data, slice.w, slice.h, min, max, lut, slice.spacingX, slice.spacingY, slice.extentW, slice.extentH);
+    const maxDim = computeMaxDim(hdMode, frameSize);
+    const imgData = build(slice.data, slice.w, slice.h, min, max, lut, slice.spacingX, slice.spacingY, slice.extentW, slice.extentH, maxDim);
     canvas.width = imgData.width;
     canvas.height = imgData.height;
     canvas.getContext('2d').putImageData(imgData, 0, 0);
-  }, [slice, min, max, lut, renderStyle]);
+  }, [slice, min, max, lut, renderStyle, hdMode, frameSize]);
 
   useEffect(() => {
     if (!objectsSlice || !objectsCanvasRef.current) return;
     const canvas = objectsCanvasRef.current;
-    const imgData = objectsToImageData(objectsSlice.data, objectsSlice.w, objectsSlice.h, objectsSlice.spacingX, objectsSlice.spacingY, objectsSlice.extentW, objectsSlice.extentH, objectsOpts);
+    const maxDim = computeMaxDim(hdMode, frameSize);
+    const imgData = objectsToImageData(objectsSlice.data, objectsSlice.w, objectsSlice.h, objectsSlice.spacingX, objectsSlice.spacingY, objectsSlice.extentW, objectsSlice.extentH, objectsOpts, maxDim);
     canvas.width = imgData.width;
     canvas.height = imgData.height;
     canvas.getContext('2d').putImageData(imgData, 0, 0);
-  }, [objectsSlice, objectsOpts]);
+  }, [objectsSlice, objectsOpts, hdMode, frameSize]);
 
   // Dimensione in px CSS della cornice mappa: serve al canvas del vento, che
   // (a differenza della mappa raster) disegna alla risoluzione dello schermo
