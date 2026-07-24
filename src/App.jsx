@@ -5,7 +5,6 @@ import TopBar from './components/TopBar';
 import CreditsModal from './components/CreditsModal';
 import CustomRangeModal from './components/CustomRangeModal';
 import AnalysisSidebar from './components/sidebar/AnalysisSidebar';
-import BoundarySidebar from './components/sidebar/BoundarySidebar';
 import AnalysisView from './components/views/AnalysisView';
 import ModelView from './components/views/ModelView';
 import BoundaryView from './components/views/BoundaryView';
@@ -16,7 +15,7 @@ import HelpTooltip from './components/controls/HelpTooltip';
 const VIEWS = {
   analysis: { Sidebar: AnalysisSidebar, Main: AnalysisView },
   model: { Sidebar: AnalysisSidebar, Main: ModelView },
-  boundary: { Sidebar: BoundarySidebar, Main: BoundaryView },
+  boundary: { Main: BoundaryView },
 };
 
 function AppLayout() {

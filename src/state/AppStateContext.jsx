@@ -139,7 +139,7 @@ const initialState = {
   // condizioni al contorno: fileset mostrato, periodo dei grafici FOX,
   // eventuale file FOX aperto a mano quando non è nella cartella risultati
   boundaryFileset: 'A',
-  boundaryPeriod: 'all', // 'all' | 'sim' | 'custom' | 'm:YYYY-MM'
+  boundaryPeriod: 'sim', // 'all' | 'sim' | 'custom' | 'm:YYYY-MM' — default al periodo di simulazione: sull'intero anno del FOX i grafici sarebbero troppo densi per essere letti
   boundaryRange: null, // [i0, i1] della selezione manuale (brush)
   boundaryScaleFactor: 1, // zoom dei grafici FOX (stesso principio di scaleFactor in 2D)
   foxFileA: null,

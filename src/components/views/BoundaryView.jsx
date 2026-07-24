@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef } from 'react';
+import { Fragment, useMemo, useRef, useState } from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { useI18n } from '../../i18n/I18nContext';
 import { useForcing } from '../../lib/useForcing';
@@ -6,6 +6,7 @@ import { useFlip } from '../../lib/useFlip';
 import ForcingChart from '../ForcingChart';
 import Segmented from '../controls/Segmented';
 import Slider from '../controls/Slider';
+import HelpTooltip from '../controls/HelpTooltip';
 
 // Colonne massime a zoom minimo (1x): oltre, i grafici andrebbero troppo
 // stretti per essere leggibili — stessa idea dello zoom di AnalysisView, ma
@@ -146,9 +147,17 @@ function resolveRange(forcing, period, customRange) {
   return null;
 }
 
+// Etichetta di un mese del FOX per il Select del periodo (es. "Luglio 2019")
+function monthLabel(key, lang) {
+  const label = new Intl.DateTimeFormat(lang === 'it' ? 'it-IT' : 'en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+    .format(new Date(`${key}-01T00:00:00Z`));
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 export default function BoundaryView() {
   const { state, set } = useAppState();
-  const { tr } = useI18n();
+  const { tr, lang } = useI18n();
+  const [viewBarCollapsed, setViewBarCollapsed] = useState(false);
 
   // fileset mostrato: quello selezionato, con fallback su quello disponibile
   const shown = state[`fileset${state.boundaryFileset}`] ? state.boundaryFileset : state.filesetA ? 'A' : state.filesetB ? 'B' : null;
@@ -202,42 +211,117 @@ export default function BoundaryView() {
       ]
     : [];
 
+  const getSimPeriodLabel = () => {
+    let base = tr('period_sim');
+    const hours = parseFloat(forcing?.simx?.mainData?.simDuration);
+    if (Number.isFinite(hours) && hours > 0) {
+      if (hours % 24 === 0) {
+        const days = hours / 24;
+        base += ` (${days} ${days === 1 ? tr('duration_day') : tr('duration_days')})`;
+      } else {
+        base += ` (${hours} ${hours === 1 ? tr('duration_hour') : tr('duration_hours')})`;
+      }
+    }
+    return base;
+  };
+
+  const periodOptions = fox
+    ? [
+        { value: 'all', label: tr('period_all') },
+        ...(forcing.window ? [{ value: 'sim', label: getSimPeriodLabel() }] : []),
+        ...(state.boundaryPeriod === 'custom' ? [{ value: 'custom', label: tr('period_custom') }] : []),
+        ...(fox.months.length > 1 ? fox.months.map((m) => ({ value: `m:${m.key}`, label: monthLabel(m.key, lang) })) : []),
+      ]
+    : [];
+
+  // periodo del FOX mostrato nei grafici, spostato qui dalla ex sidebar (era
+  // l'unico controllo interattivo lì dentro, affine alla scala della view-bar).
+  // Il default globale è 'sim': se per questo FOX manca la finestra di
+  // simulazione (raro) si ripiega su 'all' invece di un value orfano nel <select>.
+  const periodValue = periodOptions.some((o) => o.value === state.boundaryPeriod) ? state.boundaryPeriod : 'all';
+  const periodGroup = fox && (
+    <>
+      <span className="control-label">{tr('boundary_group_period')}</span>
+      <select
+        className="select"
+        style={{ width: 'auto' }}
+        value={periodValue}
+        onChange={(e) => set({ boundaryPeriod: e.target.value, ...(e.target.value !== 'custom' ? { boundaryRange: null } : {}) })}
+      >
+        {periodOptions.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </>
+  );
+
+  // Simple/Full Forcing: sola indicazione, il dettaglio sta nel tooltip (era
+  // il testo descrittivo statico della ex sidebar)
+  const sourceGroup = forcing && (
+    <HelpTooltip content={{ title: tr('boundary_group_source'), body: tr(forcing.mode === 'full' ? 'boundary_full_desc' : 'boundary_simple_desc') }}>
+      <span className="control-label" style={{ cursor: 'help' }}>
+        {tr(forcing.mode === 'full' ? 'source_full' : 'source_simple')}
+      </span>
+    </HelpTooltip>
+  );
+
+  const filesetSelector = (state.filesetA || state.filesetB) && (
+    <Segmented
+      options={[
+        { key: 'A', label: filesetLabel('A'), disabled: !state.filesetA },
+        { key: 'B', label: filesetLabel('B'), disabled: !state.filesetB },
+      ]}
+      value={shown}
+      onSelect={(key) => set({ boundaryFileset: key })}
+      variant="accent"
+    />
+  );
+
   const barGroups = [
-    (state.filesetA || state.filesetB) && (
-      <Segmented
-        options={[
-          { key: 'A', label: filesetLabel('A'), disabled: !state.filesetA },
-          { key: 'B', label: filesetLabel('B'), disabled: !state.filesetB },
-        ]}
-        value={shown}
-        onSelect={(key) => set({ boundaryFileset: key })}
-      />
-    ),
-    forcing && <div className="chip accent">{tr(isFull ? 'source_full' : 'source_simple')}</div>,
-    (forcing?.simxFileName || (forcing?.foxFileName && fox)) && (
-      <>
-        {forcing?.simxFileName && <div className="chip">SIMX · {forcing.simxFileName}</div>}
-        {forcing?.foxFileName && fox && <div className="chip">FOX · {forcing.foxFileName}</div>}
-      </>
-    ),
-    fox?.location?.name && <div className="chip">{fox.location.name}</div>,
     chartCount > 0 && <Slider label={tr('slider_scale')} value={zoom} min={1} max={zoomMax} step={0.25} unit="x" onChange={(v) => set({ boundaryScaleFactor: v })} />,
+    periodGroup,
+    sourceGroup,
   ].filter(Boolean);
 
   return (
     <>
-      {barGroups.length > 0 && (
-        <div className="view-bar">
-          <div className="view-bar-top">
-            <div className="view-bar-panel">
-              {barGroups.map((group, i) => (
-                <Fragment key={i}>
-                  {i > 0 && <div className="vertical-divider" />}
-                  <div className="view-bar-group">{group}</div>
-                </Fragment>
-              ))}
+      {(barGroups.length > 0 || filesetSelector) && (
+        <div className={`view-bar${viewBarCollapsed ? ' view-bar-collapsed' : ''}`}>
+          <div className="view-bar-collapse">
+            <div className="view-bar-collapse-inner">
+              <div className="view-bar-top">
+                {barGroups.length > 0 && (
+                  <div className="view-bar-panel">
+                    {barGroups.map((group, i) => (
+                      <Fragment key={i}>
+                        {i > 0 && <div className="vertical-divider" />}
+                        <div className="view-bar-group">{group}</div>
+                      </Fragment>
+                    ))}
+                  </div>
+                )}
+
+                {filesetSelector && (
+                  <div className="view-bar-modes view-bar-modes--inline">
+                    {filesetSelector}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+
+          <HelpTooltip content={{ title: tr('help_collapse_toolbar_title'), body: tr('help_collapse_toolbar_body') }}>
+            <button
+              type="button"
+              className="view-bar-toggle"
+              onClick={() => setViewBarCollapsed((v) => !v)}
+              aria-label={tr(viewBarCollapsed ? 'btn_expand_toolbar' : 'btn_collapse_toolbar')}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="18 15 12 9 6 15"></polyline>
+              </svg>
+            </button>
+          </HelpTooltip>
         </div>
       )}
 
