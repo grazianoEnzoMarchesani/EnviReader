@@ -91,9 +91,9 @@ export default function HelpTooltip({ content, children }) {
   const trigger = cloneElement(child, {
     ref: (node) => {
       anchorRef.current = node;
-      const { ref } = child;
-      if (typeof ref === 'function') ref(node);
-      else if (ref) ref.current = node;
+      const childRef = child.props?.ref;
+      if (typeof childRef === 'function') childRef(node);
+      else if (childRef) childRef.current = node;
     },
     onMouseEnter: (e) => { child.props.onMouseEnter?.(e); show(); },
     onMouseLeave: (e) => { child.props.onMouseLeave?.(e); hide(); },

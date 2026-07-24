@@ -7,7 +7,12 @@
 import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildModelScene, buildVegetation, setLayerVisibility, setWireframe, disposeGroup, updateSunLayer, setSunDiagram, setShadowCasting, buildDataOverlay, buildWindOnSlices, buildWindVolume, applyWindTheme, worldToGrid, gridToWorld, updateGridWallVisibility } from '../lib/inxScene';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { buildModelScene, rebuildObjectLayers, setLayerVisibility, setWireframe, disposeGroup, updateSunLayer, setSunDiagram, setShadowCasting, buildDataOverlay, buildWindOnSlices, buildWindVolume, applyWindTheme, worldToGrid, gridToWorld, updateGridWallVisibility } from '../lib/inxScene';
 import { createViewCube } from '../lib/viewCube';
 import { useI18n } from '../i18n/I18nContext';
 import HelpTooltip from './controls/HelpTooltip';
@@ -39,17 +44,34 @@ function resolveCssColor(varName) {
   const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
   return `rgb(${r}, ${g}, ${b})`;
 }
+
+function isOverlayObject(object) {
+  let curr = object;
+  while (curr) {
+    if (curr.userData && curr.userData.isOverlay) return true;
+    curr = curr.parent;
+  }
+  return false;
+}
+
 // costante di tempo (s) dell'inseguimento morbido di rotazione/zoom ricevuti
 // in sincronizzazione: più basso = risposta più pronta, più alto = più lento.
 // A ~3×FOLLOW_TAU l'inseguimento è visivamente concluso (vedi loop sotto).
 const FOLLOW_TAU = 0.12;
 
-export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, vegStyle1, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
+export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, vegStyle1, objectStyle, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, ambientOcclusion, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
   const { tr } = useI18n();
+  const activeStyle = objectStyle || (vegStyle1 ? 'style1' : 'default');
   const containerRef = useRef(null);
   const gizmoRef = useRef(null); // div overlay che intercetta i click del gizmo
-  const stageRef = useRef(null); // { renderer, scene, camera, controls, layers, resetView, setProjection }
+  const stageRef = useRef(null); // { renderer, composer, renderPass, gtaoPass, scene, camera, controls, layers, resetView, setProjection }
   const gizmoApiRef = useRef(null); // API del ViewCube (setNorthReference, ecc.)
+  // stato sempre fresco per l'occlusione ambientale nel loop di rendering
+  const ambientOcclusionRef = useRef(ambientOcclusion);
+  const depthOnlyMaterialRef = useRef(null);
+  useEffect(() => {
+    ambientOcclusionRef.current = ambientOcclusion;
+  }, [ambientOcclusion]);
   // stato sempre fresco per il loop di rendering (registrato una sola volta al
   // mount, vedi interactionRef sotto per lo stesso pattern)
   const cameraSyncEnabledRef = useRef(cameraSyncEnabled);
@@ -62,25 +84,14 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
   useEffect(() => {
     interactionRef.current = { model, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange };
   });
-  // flag sempre fresco per applicare subito la visibilità dei livelli alla
-  // (ri)costruzione della scena qui sotto: senza questo, ogni volta che
-  // objectsVolume/spacingZ cambiano (es. al primo caricamento dei risultati)
-  // la scena viene ricostruita da zero con tutti i livelli visibili di
-  // default (i Group di three.js nascono visible=true), e l'effetto separato
-  // che applica i toggle non riparte perché non dipende da objectsVolume —
-  // risultato: ricettori (e altri livelli spenti) visibili finché non si
-  // tocca manualmente un toggle.
   const flagsRef = useRef(flags);
   useEffect(() => {
     flagsRef.current = flags;
   }, [flags]);
-  // stesso motivo di flagsRef: la (ri)costruzione della scena qui sotto deve
-  // leggere lo stile vegetazione corrente anche quando è objectsVolume/spacingZ
-  // a cambiare (non vegStyle1), altrimenti ricostruirebbe sempre in stile box.
-  const vegStyle1Ref = useRef(vegStyle1);
+  const objectStyleRef = useRef(activeStyle);
   useEffect(() => {
-    vegStyle1Ref.current = vegStyle1;
-  }, [vegStyle1]);
+    objectStyleRef.current = activeStyle;
+  }, [activeStyle]);
 
   // setup del renderer: una volta sola per montaggio
   useEffect(() => {
@@ -88,7 +99,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -119,11 +130,155 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI / 2 - 0.02; // mai sotto il terreno
 
+    const composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, perspCam);
+    composer.addPass(renderPass);
+
+    const initialW = container.clientWidth || 512;
+    const initialH = container.clientHeight || 512;
+    const gtaoPass = new GTAOPass(scene, perspCam, initialW, initialH);
+    gtaoPass.output = GTAOPass.OUTPUT.Default;
+    gtaoPass.blendIntensity = 1.25;
+    gtaoPass.normalMaterial.side = THREE.DoubleSide;
+
+    // Nasconde dal G-Buffer (normali e profondità) di GTAO tutti i punti, linee,
+    // sprite di testo (etichette ore, bussola) e overlay dati/vento/sole: evita
+    // che i canvas trasparenti dei testi o gli elementi 2D vengano renderizzati
+    // come rettangoli o quadrati neri solidi sullo schermo.
+    gtaoPass._overrideVisibility = function () {
+      const sceneObj = this.scene;
+      const cache = this._visibilityCache;
+
+      sceneObj.traverse(function (object) {
+        if (!object.visible) return;
+        const skip =
+          object.isPoints ||
+          object.isLine ||
+          object.isLine2 ||
+          object.isSprite ||
+          isOverlayObject(object);
+
+        if (skip) {
+          object.visible = false;
+          cache.push(object);
+        }
+      });
+    };
+
+    composer.addPass(gtaoPass);
+
+    // Silhouette dello "stile 3": un solo OutlinePass su TUTTI gli oggetti
+    // tridimensionali insieme (edifici, terreno, vegetazione, pareti dati in
+    // sezione/pianta) invece di un bordo per singolo voxel: rilevamento bordi
+    // in screen-space su profondità/normali dell'intero gruppo, invariante
+    // alla distanza (a differenza del vecchio inverted-hull per-istanza, che
+    // si vedeva solo da molto vicino) e con un'unica silhouette coerente per
+    // l'intera scena invece di contorni separati per categoria.
+    const makeOutlinePass = () => {
+      const pass = new OutlinePass(new THREE.Vector2(initialW, initialH), scene, perspCam);
+      pass.visibleEdgeColor.set(0x000000);
+      pass.edgeStrength = 6.0;
+      pass.edgeGlow = 0.0;
+      pass.edgeThickness = 1.0;
+      pass.pulsePeriod = 0;
+      pass.enabled = false;
+      // downSampleRatio di default (2) fa girare edge detection + blur interno
+      // di OutlinePass a metà risoluzione, poi la reinterpola su schermo intero:
+      // risultato una silhouette sempre sfumata (alone), indipendentemente da
+      // colore/edgeThickness. A risoluzione piena il contorno resta un bordo
+      // netto invece di un alone sfocato.
+      pass.downSampleRatio = 1;
+      pass.setSize(initialW, initialH);
+      // L'overlay del pass usa di default il blending additivo: sommare un
+      // colore scuro a pixel già bianco pieno (sfondo del tema chiaro) non
+      // produce alcun cambiamento visibile, quindi il contorno sparirebbe del
+      // tutto in light mode. Lo shader dell'overlay produce dati "premultiplied
+      // alpha" (rgb = alpha × colore), quindi il compositing corretto è
+      // src=One, dst=1-srcAlpha invece dell'additivo puro.
+      pass.overlayMaterial.blending = THREE.CustomBlending;
+      pass.overlayMaterial.blendSrc = THREE.OneFactor;
+      pass.overlayMaterial.blendDst = THREE.OneMinusSrcAlphaFactor;
+      pass.overlayMaterial.blendEquation = THREE.AddEquation;
+      // Di default l'OutlinePass disegna comunque (con hiddenEdgeColor) il
+      // contorno delle parti nascoste dietro altra geometria non selezionata
+      // (un edificio davanti a un albero, un pannello dati opaco davanti alla
+      // vegetazione): risultato "a raggi X" che attraversa l'occlusore invece
+      // di interrompersi. Qui li scartiamo del tutto (alpha 0) così il
+      // contorno si interrompe esattamente dove l'oggetto è davvero coperto.
+      pass.edgeDetectionMaterial.fragmentShader = `
+        varying vec2 vUv;
+        uniform sampler2D maskTexture;
+        uniform vec2 texSize;
+        uniform vec3 visibleEdgeColor;
+        void main() {
+          vec2 invSize = 1.0 / texSize;
+          vec4 uvOffset = vec4(1.0, 0.0, 0.0, 1.0) * vec4(invSize, invSize);
+          vec4 c1 = texture2D( maskTexture, vUv + uvOffset.xy);
+          vec4 c2 = texture2D( maskTexture, vUv - uvOffset.xy);
+          vec4 c3 = texture2D( maskTexture, vUv + uvOffset.yw);
+          vec4 c4 = texture2D( maskTexture, vUv - uvOffset.yw);
+          float diff1 = (c1.r - c2.r) * 0.5;
+          float diff2 = (c3.r - c4.r) * 0.5;
+          float d = length(vec2(diff1, diff2));
+          float a1 = min(c1.g, c2.g);
+          float a2 = min(c3.g, c4.g);
+          float visibilityFactor = min(a1, a2);
+          float hidden = 1.0 - visibilityFactor > 0.001 ? 0.0 : 1.0;
+          // step() invece del gradiente "d" grezzo: un bordo binario (dentro/
+          // fuori) invece di un'alpha continua, così il blur gaussiano interno
+          // di OutlinePass (separableBlurMaterial, sempre attivo) attenua un
+          // gradino netto invece di allargare una sfumatura già morbida in
+          // partenza — il contorno resta un filo pulito invece di un alone.
+          float edge = step(0.05, d);
+          gl_FragColor = vec4(visibleEdgeColor, 1.0) * edge * (1.0 - hidden);
+        }
+      `;
+      pass.edgeDetectionMaterial.needsUpdate = true;
+      return pass;
+    };
+    const outlinePass = makeOutlinePass();
+    composer.addPass(outlinePass);
+    const outlinePasses = [outlinePass];
+
+    const outputPass = new OutputPass();
+    composer.addPass(outputPass);
+
+    // Aggiorna gli oggetti selezionati dell'OutlinePass in base ai layer
+    // correnti e allo stile attivo: chiamata dopo ogni (ri)costruzione dei
+    // layer (scena nuova, cambio di stile, o ricostruzione dell'overlay dati
+    // al cambio di slice/palette/tempo), non solo alla creazione.
+    const updateOutlineSelection = () => {
+      const layers = stage.layers;
+      const active = objectStyleRef.current === 'style3';
+      const objects = active && layers
+        ? [layers.buildings, layers.terrain, layers.vegetation, stage.dataOverlayLayer].filter(Boolean)
+        : [];
+      outlinePass.selectedObjects = objects;
+      outlinePass.enabled = objects.length > 0;
+    };
+
     const stage = {
-      renderer, scene, perspCam, orthoCam, camera: perspCam, controls,
+      renderer, composer, renderPass, gtaoPass, outlinePass, outlinePasses, updateOutlineSelection,
+      scene, perspCam, orthoCam, camera: perspCam, controls,
       layers: null, resetView: () => {}, setProjection: () => {},
     };
     stageRef.current = stage;
+
+    // Il RenderPass (il "beauty pass" base) non deve disegnare le pareti
+    // overlay dati (temperatura/vento/volume): vengono ridipinte a parte più
+    // avanti nel loop con una propria gestione dello z-buffer. Si nasconde/
+    // ripristina la loro visibilità solo per la durata di QUESTA sotto-chiamata
+    // (non per l'intera composer.render()) così l'OutlinePass, eseguito subito
+    // dopo nella stessa composer.render(), le ritrova visibili e ne calcola
+    // correttamente la silhouette invece di saltarle.
+    const baseRenderPassRender = renderPass.render.bind(renderPass);
+    renderPass.render = (r, writeBuffer, readBuffer, deltaTime, maskActive) => {
+      const overlays = [stage.dataOverlayLayer, stage.windOverlayLayer, stage.windVolumeLayer].filter(Boolean);
+      const prevVis = overlays.map((o) => o.visible);
+      for (const o of overlays) o.visible = false;
+      baseRenderPassRender(r, writeBuffer, readBuffer, deltaTime, maskActive);
+      overlays.forEach((o, i) => { o.visible = prevVis[i]; });
+    };
 
     // "Quanto è zoomato" il pannello, in un'unica unità comparabile tra le
     // due proiezioni: per la prospettica è la distanza camera→target (più
@@ -223,6 +378,13 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       nc.target.copy(t);
       stage.controls = nc;
       stage.camera = next;
+      renderPass.camera = next;
+      gtaoPass.camera = next;
+      for (const pass of outlinePasses) pass.renderCamera = next;
+      if (gtaoPass.gtaoMaterial) {
+        gtaoPass.gtaoMaterial.defines.PERSPECTIVE_CAMERA = next.isPerspectiveCamera ? 1 : 0;
+        gtaoPass.gtaoMaterial.needsUpdate = true;
+      }
       nc.update();
       gizmo.onControlsChanged(); // riaggancia il rebase del gizmo se in vista assiale
     };
@@ -231,6 +393,9 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       const { clientWidth: w, clientHeight: h } = container;
       if (!w || !h) return;
       renderer.setSize(w, h, false);
+      composer.setSize(w, h);
+      gtaoPass.setSize(w, h);
+      for (const pass of outlinePasses) pass.setSize(w, h);
       const aspect = w / h;
       perspCam.aspect = aspect;
       perspCam.updateProjectionMatrix();
@@ -509,7 +674,55 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
         if (stage.camera.up.y > 0.999) stage.controls.update();
       }
       if (stage.layers) updateGridWallVisibility(stage.layers, stage.camera);
-      renderer.render(stage.scene, stage.camera);
+      if (ambientOcclusionRef.current) {
+        const scene = stage.scene;
+        const camera = stage.camera;
+
+        // 1. Stato di visibilità degli overlay dati (slice temp/vento/volume):
+        //    il RenderPass li nasconde per conto suo solo per la propria
+        //    sotto-chiamata (vedi patch di renderPass.render sopra), quindi
+        //    qui restano nel loro stato reale per tutta composer.render() e
+        //    l'OutlinePass può calcolarne correttamente la silhouette.
+        const dataVis = stage.dataOverlayLayer?.visible ?? false;
+        const windVis = stage.windOverlayLayer?.visible ?? false;
+        const windVolVis = stage.windVolumeLayer?.visible ?? false;
+
+        // 2. Renderizza la scena 3D base (con luce solare, ombre portate, GTAO, silhouette OutlinePass e diagramma solare)
+        composer.render();
+
+        // 3. Se ci sono overlay dati attivi, renderizzali in sovrapposizione con occlusione Z
+        if (dataVis || windVis || windVolVis) {
+          const savedBg = scene.background;
+          scene.background = null;
+          renderer.autoClear = false;
+
+          // Depth pre-pass: popola lo Z-buffer del canvas con gli edifici per l'occlusione degli slice
+          if (stage.sceneGroup) stage.sceneGroup.visible = true;
+          if (!depthOnlyMaterialRef.current) {
+            depthOnlyMaterialRef.current = new THREE.MeshBasicMaterial({
+              colorWrite: false,
+              depthWrite: true,
+              depthTest: true,
+              side: THREE.DoubleSide,
+            });
+          }
+          scene.overrideMaterial = depthOnlyMaterialRef.current;
+          renderer.clearDepth();
+          renderer.render(scene, camera);
+          scene.overrideMaterial = null;
+
+          // Renderizza gli overlay dati mantenendo lo Z-buffer popolato
+          if (stage.sceneGroup) stage.sceneGroup.visible = false;
+          renderer.render(scene, camera);
+
+          // Ripristina la scena base e lo sfondo
+          if (stage.sceneGroup) stage.sceneGroup.visible = true;
+          scene.background = savedBg;
+          renderer.autoClear = true;
+        }
+      } else {
+        renderer.render(stage.scene, stage.camera);
+      }
       gizmo.render(renderer);
 
       // trasmette il trascinamento/zoom/pan manuale (mai durante l'animazione
@@ -566,6 +779,9 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       renderer.domElement.removeEventListener('pointermove', onHoverMove);
       window.removeEventListener('pointermove', onWindowMove);
       window.removeEventListener('pointerup', onWindowUp);
+      gtaoPass.dispose();
+      for (const pass of outlinePasses) pass.dispose();
+      composer.dispose();
       gizmo.dispose();
       stage.controls.dispose();
       renderer.dispose();
@@ -585,42 +801,36 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage || !model) return;
-    const { group, layers, size, maxHeight, hemisphereLight, decorativeLight, sunLayer } = buildModelScene(model, objectsVolume, spacingZ, dimZ, vegStyle1Ref.current);
+    const { group, layers, size, maxHeight, hemisphereLight, decorativeLight, sunLayer } = buildModelScene(model, objectsVolume, spacingZ, dimZ, objectStyleRef.current);
     stage.scene.add(group);
     stage.sceneGroup = group;
     stage.layers = layers;
+    stage.updateOutlineSelection?.();
     stage.hemisphereLight = hemisphereLight;
     stage.decorativeLight = decorativeLight;
     stage.sunLayer = sunLayer;
+    if (sunLayer?.group) sunLayer.group.userData.isOverlay = true;
     setLayerVisibility(layers, flagsRef.current);
 
     const radius = Math.max(size.W, size.H, maxHeight * 2);
-    // distanza di riferimento per lo zoom sincronizzato (vedi broadcastSync/
-    // "zoomRatio" nel loop sotto): permette di confrontare lo zoom fra due
-    // modelli di dimensioni diverse come rapporto rispetto alla propria
-    // inquadratura di default, invece che come distanza assoluta (altrimenti
-    // un fileset più grande apparirebbe sempre "più lontano" dell'altro anche
-    // a parità di inquadratura percepita)
     stage.baseRadius = radius;
+    if (stage.gtaoPass) {
+      const radiusVal = Math.max(3.0, Math.min(16.0, radius * 0.08));
+      const thicknessVal = Math.max(8.0, Math.min(40.0, (maxHeight || 20) * 0.8));
+      stage.gtaoPass.blendIntensity = 1.25;
+      stage.gtaoPass.updateGtaoMaterial({
+        radius: radiusVal,
+        distanceExponent: 1.0,
+        thickness: thicknessVal,
+        distanceFallOff: 1.0,
+        scale: 1.6,
+      });
+    }
     const resetPos = new THREE.Vector3(radius * 0.65, radius * 0.75, radius * 0.95);
     const resetTarget = new THREE.Vector3(0, maxHeight / 4, 0);
-    // punto di riferimento per il pan sincronizzato (vedi "pan" nel loop
-    // sotto): lo spostamento del target viene condiviso come scarto da questo
-    // punto, in frazioni di baseRadius, così resta proporzionato anche fra
-    // modelli di dimensioni diverse invece di essere una posizione assoluta
-    // (che non avrebbe senso confrontare fra due griglie diverse)
     stage.baseTarget = resetTarget.clone();
-    // animate=false per lo snap iniziale al caricamento del modello (nessun
-    // "volo" dall'origine); animate=true per Home/"Reimposta vista", che
-    // deleghano al gizmo un'animazione fluida (vedi animateReset/flyTo in
-    // viewCube.js, che interpola anche il target a differenza di goTo)
     stage.resetView = ({ animate = true } = {}) => {
-      // annulla animazioni/vista assiale del gizmo residue: altrimenti la
-      // camera riparte con un up-vector non verticale e la vista appare
-      // "storta" (vedi resetGizmoState in viewCube.js)
       gizmoApiRef.current?.resetGizmoState();
-      // la parallela non anima: il frustum va ricalcolato sulla nuova
-      // distanza, quindi resta uno snap istantaneo come prima
       if (!animate || stage.camera.isOrthographicCamera) {
         stage.camera.up.set(0, 1, 0);
         stage.camera.position.copy(resetPos);
@@ -638,11 +848,6 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
           stage.camera.updateProjectionMatrix();
         }
         stage.controls.update();
-        // snap silenzioso (caricamento/cambio modello, animate=false): non è
-        // un gesto dell'utente, quindi non deve ruotare l'altro pannello
-        // sincronizzato (vedi resyncDragBaseline) — a differenza di un
-        // Home/"Reimposta vista" (animate=true) finito qui solo perché la
-        // proiezione è parallela, che va invece sincronizzato normalmente
         if (!animate) stage.resyncDragBaseline?.();
         return;
       }
@@ -661,46 +866,37 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     };
   }, [model, objectsVolume, spacingZ, dimZ]);
 
-  // Cambio di "stile 1" della vegetazione (voxel vs sfere per LAD): sostituisce
-  // solo il sotto-layer vegetazione, senza ricostruire l'intera scena né
-  // richiamare stage.resetView — a differenza dell'effetto sopra (pensato per
-  // il cambio di modello/fileset), qui l'utente sta solo confrontando due stili
-  // e non si aspetta che la vista della camera salti alla posizione di default.
+  // Cambio di stile degli oggetti (vegetazione/edifici/terreno):
+  // sostituisce solo i sotto-layer interessati (buildings, terrain, vegetation)
+  // senza distruggere la scena, le luci o la simulazione solare (sunLayer).
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage?.sceneGroup || !stage.layers || !model) return;
-    const oldVeg = stage.layers.vegetation;
-    const { I, J, dx, dy } = model.geometry;
-    const W = I * dx;
-    const H = J * dy;
-    const toX = (i) => W / 2 - (i + 0.5) * dx;
-    const toZ = (j) => H / 2 - (j + 0.5) * dy;
-    const newVeg = buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ, vegStyle1);
-    if (oldVeg) {
-      stage.sceneGroup.remove(oldVeg);
-      disposeGroup(oldVeg);
-    }
-    if (newVeg) {
-      newVeg.name = 'vegetation';
-      stage.sceneGroup.add(newVeg);
-    }
-    stage.layers.vegetation = newVeg;
+
+    const { buildings, terrain, vegetation } = rebuildObjectLayers(model, objectsVolume, spacingZ, activeStyle);
+
+    const replaceSubLayer = (key, newLayer) => {
+      const oldLayer = stage.layers[key];
+      if (oldLayer) {
+        stage.sceneGroup.remove(oldLayer);
+        disposeGroup(oldLayer);
+      }
+      if (newLayer) {
+        newLayer.name = key;
+        stage.sceneGroup.add(newLayer);
+      }
+      stage.layers[key] = newLayer;
+    };
+
+    replaceSubLayer('buildings', buildings);
+    replaceSubLayer('terrain', terrain);
+    replaceSubLayer('vegetation', vegetation);
+    stage.updateOutlineSelection?.();
+
     setLayerVisibility(stage.layers, flagsRef.current);
-    // il nuovo layer vegetazione nasce senza castShadow/receiveShadow: vanno
-    // riallineati allo stato corrente del sole, altrimenti restano spenti
-    // finché non si disattiva e riattiva manualmente la simulazione solare
-    if (newVeg && sunEnabled) {
-      newVeg.traverse((obj) => {
-        if (obj.isMesh || obj.isInstancedMesh) {
-          obj.castShadow = true;
-          obj.receiveShadow = true;
-        }
-      });
-    }
-    // sunEnabled non è nelle dipendenze di proposito: qui serve solo lo stato
-    // corrente al momento del cambio stile, non un'altra ricostruzione del
-    // layer (costosa) ogni volta che si accende/spegne il sole
-  }, [vegStyle1]);
+    setWireframe(stage.layers, wireframe);
+    setShadowCasting(stage.layers, !!sunEnabled);
+  }, [activeStyle, model, objectsVolume, spacingZ, wireframe, sunEnabled]);
 
   // toggle dei livelli e wireframe, senza ricostruire
   useEffect(() => {
@@ -726,15 +922,18 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     }
     const layer = buildDataOverlay(model, dataOverlay);
     if (layer) {
+      layer.userData.isOverlay = true;
       stage.scene.add(layer);
       stage.dataOverlayLayer = layer;
     }
+    stage.updateOutlineSelection?.();
     return () => {
       if (stage.dataOverlayLayer) {
         stage.scene.remove(stage.dataOverlayLayer);
         disposeGroup(stage.dataOverlayLayer);
         stage.dataOverlayLayer = null;
       }
+      stage.updateOutlineSelection?.();
     };
   }, [model, dataOverlay]);
 
@@ -761,6 +960,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     }
     const layer = buildWindOnSlices(model, windOverlay);
     if (layer) {
+      layer.userData.isOverlay = true;
       stage.scene.add(layer);
       stage.windOverlayLayer = layer;
     }
@@ -790,6 +990,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     }
     const layer = buildWindVolume(windVolumeOverlay);
     if (layer) {
+      layer.userData.isOverlay = true;
       stage.scene.add(layer);
       stage.windVolumeLayer = layer;
     }

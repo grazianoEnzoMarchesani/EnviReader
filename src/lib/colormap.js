@@ -324,12 +324,14 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
     showTerrain = true,
     showVegetation = true,
     style1 = false,
+    objectStyle = null,
   } = opts;
   const opF = opacity / 100;
+  const activeStyle = objectStyle || (style1 ? 'style1' : 'default');
 
   // Riquadro di pixel di output occupato da ciascuna cella sorgente (indicizzato
   // per riga/colonna dati), popolato più sotto solo nel percorso ricampionato:
-  // serve sia al contorno degli edifici sia ai cerchi della vegetazione (stile 1).
+  // serve sia al contorno degli edifici sia ai cerchi della vegetazione.
   let colStart, colEnd, rowStart, rowEnd;
 
   const isBuildingAt = (r, c) => r >= 0 && r < h && c >= 0 && c < w && Math.round(data[r * w + c]) === 1;
@@ -339,9 +341,8 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
   };
 
   const paintBuilding = (pxArr, o, px, py, r, c) => {
-    if (colStart == null || !style1) {
-      // Stile di default (style1 off, o percorso 1:1 senza ricampionamento
-      // dove non c'è spazio per contorno/retino): riempimento piatto grigio.
+    if (colStart == null || activeStyle === 'default') {
+      // Stile di default: riempimento piatto grigio slate.
       paintBuildingDefault(pxArr, o);
       return;
     }
@@ -354,31 +355,53 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
       (distBottom < BUILDING_BORDER_PX && !isBuildingAt(r - 1, c)) ||
       (distLeft < BUILDING_BORDER_PX && !isBuildingAt(r, c - 1)) ||
       (distRight < BUILDING_BORDER_PX && !isBuildingAt(r, c + 1));
-    if (isBorder) {
-      pxArr[o] = 20; pxArr[o+1] = 20; pxArr[o+2] = 20; pxArr[o+3] = 255 * opF;
-      return;
+
+    if (activeStyle === 'style1') {
+      // Stile 1: Contorno tecnico + retino a 45°
+      if (isBorder) {
+        pxArr[o] = 20; pxArr[o+1] = 20; pxArr[o+2] = 20; pxArr[o+3] = 255 * opF;
+        return;
+      }
+      const cov = hatchCoverage(px, py);
+      const gray = 255 - cov * (255 - 20);
+      const alpha = (210 + cov * (220 - 210)) * opF;
+      pxArr[o] = gray; pxArr[o+1] = gray; pxArr[o+2] = gray; pxArr[o+3] = alpha;
+    } else if (activeStyle === 'style2' || activeStyle === 'style3') {
+      // Stile 2 / Stile 3: Modello architettonico bianco con bordo definito
+      if (isBorder) {
+        // Bordo blu navy scuro per stile 3, ardesia per stile 2
+        if (activeStyle === 'style3') {
+          pxArr[o] = 27; pxArr[o+1] = 42; pxArr[o+2] = 74; pxArr[o+3] = 255 * opF;
+        } else {
+          pxArr[o] = 30; pxArr[o+1] = 41; pxArr[o+2] = 59; pxArr[o+3] = 255 * opF;
+        }
+      } else {
+        pxArr[o] = 255; pxArr[o+1] = 255; pxArr[o+2] = 255; pxArr[o+3] = 240 * opF;
+      }
+    } else {
+      paintBuildingDefault(pxArr, o);
     }
-    const cov = hatchCoverage(px, py);
-    const gray = 255 - cov * (255 - 20);
-    const alpha = (210 + cov * (220 - 210)) * opF;
-    pxArr[o] = gray; pxArr[o+1] = gray; pxArr[o+2] = gray; pxArr[o+3] = alpha;
   };
 
   const assignPixel = (pxArr, o, v, px, py, r, c) => {
-    // 1: Building (default: piatto grigio; style1: contorno + retino a 45°)
-    // 2: Terrain (marrone chiaro)
-    // 4: Contained source (rosso/viola trasparente)
-    // 11-15: Vegetation (verde; style1: ritagliata a cerchio)
     const rv = Math.round(v);
     if (rv === 1 && showBuildings) {
       paintBuilding(pxArr, o, px, py, r, c);
     } else if (rv === 2 && showTerrain) {
-      pxArr[o] = 163; pxArr[o+1] = 113; pxArr[o+2] = 84; pxArr[o+3] = 180 * opF;
+      if (activeStyle === 'style2' || activeStyle === 'style3') {
+        pxArr[o] = 255; pxArr[o+1] = 255; pxArr[o+2] = 255; pxArr[o+3] = 200 * opF;
+      } else {
+        pxArr[o] = 163; pxArr[o+1] = 113; pxArr[o+2] = 84; pxArr[o+3] = 180 * opF;
+      }
     } else if (rv === 4) {
       pxArr[o] = 190; pxArr[o+1] = 40; pxArr[o+2] = 190; pxArr[o+3] = 200 * opF;
     } else if (rv >= 11 && rv <= 15 && showVegetation) {
-      const [rC, gC, bC] = hexToRgb(VEGETATION_COLORS[rv - 11]);
-      pxArr[o] = rC; pxArr[o+1] = gC; pxArr[o+2] = bC; pxArr[o+3] = 200 * opF;
+      if (activeStyle === 'style2' || activeStyle === 'style3') {
+        pxArr[o] = 255; pxArr[o+1] = 255; pxArr[o+2] = 255; pxArr[o+3] = 230 * opF;
+      } else {
+        const [rC, gC, bC] = hexToRgb(VEGETATION_COLORS[rv - 11]);
+        pxArr[o] = rC; pxArr[o+1] = gC; pxArr[o+2] = bC; pxArr[o+3] = 200 * opF;
+      }
     } else {
       pxArr[o+3] = 0; // Trasparente
     }
@@ -434,10 +457,7 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
     mapY[py] = h - 1 - cy;
   }
 
-  // Riquadro di pixel di output occupato da ciascuna cella (mapX/mapY sono
-  // monotone, quindi ogni cella corrisponde a un intervallo contiguo di
-  // pixel): serve al contorno degli edifici e ai cerchi della vegetazione,
-  // che devono restare tali (mai ovalizzati) anche su celle rettangolari.
+  // Riquadro di pixel di output occupato da ciascuna cella
   colStart = new Int32Array(w).fill(-1);
   colEnd = new Int32Array(w);
   for (let px = 0; px < targetW; px++) {
@@ -464,17 +484,21 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
       if (Number.isNaN(v)) continue;
       const o = (py * targetW + px) * 4;
       assignPixel(pxArr, o, v, px, py, srcRow, srcCol);
-      if (style1 && showVegetation) {
+
+      if ((activeStyle === 'style1' || activeStyle === 'style2' || activeStyle === 'style3') && showVegetation) {
         const rv = Math.round(v);
         if (rv >= 11 && rv <= 15) {
           const cellW = colEnd[srcCol] - colStart[srcCol] + 1;
           const cellH = rowEnd[srcRow] - rowStart[srcRow] + 1;
           const centerX = colStart[srcCol] + cellW / 2;
           const centerY = rowStart[srcRow] + cellH / 2;
-          const radius = (Math.min(cellW, cellH) / 2) * VEG_STYLE1_RADIUS_FRACTIONS[rv - 11];
+          const maxRadius = (Math.min(cellW, cellH) / 2);
+          const radius = maxRadius * VEG_STYLE1_RADIUS_FRACTIONS[rv - 11];
           const dx = px + 0.5 - centerX;
           const dy = py + 0.5 - centerY;
-          if (dx * dx + dy * dy > radius * radius) pxArr[o + 3] = 0;
+          const distSq = dx * dx + dy * dy;
+
+          if (distSq > radius * radius) pxArr[o + 3] = 0;
         }
       }
     }

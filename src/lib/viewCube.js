@@ -589,9 +589,12 @@ export function createViewCube(stage, hitEl, { onUserGoTo } = {}) {
       // gizmo). Si disattiva autoClear e si cancella solo la depth a mano,
       // così il colore del render principale resta intatto sotto al gizmo.
       const prevAutoClear = renderer.autoClear;
+      const prevShadows = renderer.shadowMap.enabled;
       renderer.autoClear = false;
+      renderer.shadowMap.enabled = false;
       renderer.clearDepth();
       renderer.render(scene, camera);
+      renderer.shadowMap.enabled = prevShadows;
       renderer.autoClear = prevAutoClear;
       renderer.setScissorTest(false);
       renderer.setViewport(prev);

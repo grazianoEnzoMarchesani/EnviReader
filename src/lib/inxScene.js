@@ -68,12 +68,14 @@ function hashPick(id, palette) {
   return palette[Math.abs(h) % palette.length];
 }
 
-function soilColor(id) {
+function soilColor(id, activeStyle = 'default') {
+  if (activeStyle === 'style2' || activeStyle === 'style3') return 0xffffff;
   if (!id || id === '000000') return SOIL_DEFAULT;
   return SOIL_COLORS[id.slice(-2).toUpperCase()] ?? SOIL_DEFAULT;
 }
 
-export function buildModelScene(model, objectsVolume = null, spacingZ = null, dimZ = null, vegStyle1 = false) {
+export function rebuildObjectLayers(model, objectsVolume, spacingZ, activeStyle = 'default') {
+  if (!model) return { buildings: null, terrain: null, vegetation: null };
   const { I, J, dx, dy } = model.geometry;
   const W = I * dx;
   const H = J * dy;
@@ -81,24 +83,35 @@ export function buildModelScene(model, objectsVolume = null, spacingZ = null, di
   const toZ = (j) => H / 2 - (j + 0.5) * dy;
   const terrainAt = (i, j) => model.terrain?.data[j * I + i] ?? 0;
 
-  // Il volume "Objects" dei risultati (EDT/EDX) è la fonte più affidabile per
-  // edifici e terreno: stessa griglia voxel esatta usata dall'overlay dati e
-  // già caricata per la vegetazione (vedi buildVegetation), invece di
-  // ricostruire noi una quota continua e arrotondarla al confine più vicino
-  // (nearestBoundaryIndex), che può sfasarsi dalla vera griglia di ENVI-met.
-  // Fallback al metodo basato su INX (zTop/zBottom/terrainheight) quando i
-  // risultati non sono ancora caricati o non coprono la stessa griglia I×J.
   const fromObjects = objectsVolume && objectsVolume.dims.x === I && objectsVolume.dims.y === J
-    ? buildFromObjectsVolume(model, objectsVolume, { toX, toZ }, spacingZ)
+    ? buildFromObjectsVolume(model, objectsVolume, { toX, toZ }, spacingZ, activeStyle)
     : null;
+
+  const buildings = fromObjects?.buildings ?? (model.buildings3D?.entries.length
+    ? buildVoxelBuildings(model, { toX, toZ }, spacingZ, activeStyle)
+    : buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ, activeStyle));
+
+  const terrain = fromObjects?.terrain ?? buildTerrain(model, { toX, toZ }, spacingZ, activeStyle);
+
+  const vegetation = buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ, activeStyle);
+
+  return { buildings, terrain, vegetation };
+}
+
+export function buildModelScene(model, objectsVolume = null, spacingZ = null, dimZ = null, vegStyle1Arg = false) {
+  const objectStyle = typeof vegStyle1Arg === 'boolean' ? (vegStyle1Arg ? 'style1' : 'default') : (vegStyle1Arg || 'default');
+  const { I, J, dx, dy } = model.geometry;
+  const W = I * dx;
+  const H = J * dy;
+  const toX = (i) => W / 2 - (i + 0.5) * dx;
+  const toZ = (j) => H / 2 - (j + 0.5) * dy;
+  const terrainAt = (i, j) => model.terrain?.data[j * I + i] ?? 0;
+
+  const objectLayers = rebuildObjectLayers(model, objectsVolume, spacingZ, objectStyle);
 
   const group = new THREE.Group();
   const layers = {
-    terrain: fromObjects?.terrain ?? buildTerrain(model, { toX, toZ }, spacingZ),
-    buildings: fromObjects?.buildings ?? (model.buildings3D?.entries.length
-      ? buildVoxelBuildings(model, { toX, toZ }, spacingZ)
-      : buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ)),
-    vegetation: buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ, vegStyle1),
+    ...objectLayers,
     receptors: buildReceptors(model, { toX, toZ, terrainAt }),
     grid: buildGrid(model, { W, H }, spacingZ, dimZ),
   };
@@ -481,7 +494,7 @@ export function setShadowCasting(layers, on) {
 // Terreno: pila di voxel per colonna, dal livello 0 fino alla quota di
 // terrainheight (metri, arrotondata al confine di griglia più vicino) — stessa
 // logica voxel-per-voxel usata per i building, invece di una superficie continua.
-function buildTerrain(model, { toX, toZ }, spacingZ) {
+function buildTerrain(model, { toX, toZ }, spacingZ, activeStyle = 'default') {
   const { I, J, dx, dy, Z } = model.geometry;
   const zLevels = resolveZLevels(model.geometry, Z, spacingZ);
   const boundaries = levelBoundaries(zLevels);
@@ -491,7 +504,7 @@ function buildTerrain(model, { toX, toZ }, spacingZ) {
     for (let i = 0; i < I; i++) {
       const height = model.terrain?.data[j * I + i] ?? 0;
       const id = model.soils?.data[j * I + i] ?? '';
-      const color = soilColor(id);
+      const color = soilColor(id, activeStyle);
       const topIdx = Math.max(1, nearestBoundaryIndex(boundaries, height));
       const x = toX(i);
       const z = toZ(j);
@@ -504,15 +517,18 @@ function buildTerrain(model, { toX, toZ }, spacingZ) {
   }
   if (!cells.length) return null;
   const layer = new THREE.Group();
-  layer.add(instancedBoxes(cells, new THREE.MeshLambertMaterial()));
+  layer.add(instancedBoxes(cells, new THREE.MeshLambertMaterial(), activeStyle));
   layer.userData.maxHeight = maxHeight;
   return layer;
 }
 
 /* ---------- edifici ---------- */
 
-function buildingColors(model, nr) {
-  const info = model.buildingInfo.get(nr);
+function buildingColors(model, nr, activeStyle = 'default') {
+  if (activeStyle === 'style2' || activeStyle === 'style3') {
+    return { wall: 0xffffff, roof: 0xffffff };
+  }
+  const info = model.buildingInfo?.get(nr);
   return {
     wall: hashPick(info?.wallMaterial || String(nr), WALL_COLORS),
     roof: hashPick(info?.roofMaterial || String(nr), ROOF_COLORS),
@@ -520,7 +536,7 @@ function buildingColors(model, nr) {
 }
 
 // Istanze di box unitari: la matrice di trasformazione fa scala + posizione
-function instancedBoxes(cells, material) {
+function instancedBoxes(cells, material, activeStyle = 'default') {
   const geometry = new THREE.BoxGeometry(1, 1, 1);
   const mesh = new THREE.InstancedMesh(geometry, material, cells.length);
   const m = new THREE.Matrix4();
@@ -531,6 +547,43 @@ function instancedBoxes(cells, material) {
     mesh.setMatrixAt(idx, m);
     mesh.setColorAt(idx, color.setHex(c.color));
   });
+
+  if (activeStyle === 'style3') {
+    const group = new THREE.Group();
+    group.add(mesh);
+
+    // Spigoli/contorni per i box 3D: dettaglio interno delle facce. Geometria
+    // unica con le trasformazioni per-istanza "bakate" in CPU (LineSegments),
+    // non InstancedMesh — three.js disegna sempre un InstancedMesh come
+    // triangoli pieni, quindi un'EdgesGeometry (pensata per GL_LINES, coppie
+    // di vertici) letta a triplette produce triangoli degeneri sparsi invece
+    // di linee. La silhouette esterna unificata per categoria (edifici+
+    // terreno, vegetazione) è affidata all'OutlinePass in post-processing
+    // (vedi Model3DViewer), invariante alla distanza e non per-voxel.
+    const edgesGeom = new THREE.EdgesGeometry(geometry);
+    const basePositions = edgesGeom.getAttribute('position');
+    const mergedPositions = new Float32Array(basePositions.count * cells.length * 3);
+    const v = new THREE.Vector3();
+    let offset = 0;
+    cells.forEach((c) => {
+      m.makeScale(c.sx, c.sy, c.sz);
+      m.setPosition(c.x, c.y, c.z);
+      for (let vi = 0; vi < basePositions.count; vi++) {
+        v.fromBufferAttribute(basePositions, vi).applyMatrix4(m);
+        mergedPositions[offset++] = v.x;
+        mergedPositions[offset++] = v.y;
+        mergedPositions[offset++] = v.z;
+      }
+    });
+    const mergedGeom = new THREE.BufferGeometry();
+    mergedGeom.setAttribute('position', new THREE.BufferAttribute(mergedPositions, 3));
+    const edgesMat = new THREE.LineBasicMaterial({ color: 0x000000 });
+    const edgesMesh = new THREE.LineSegments(mergedGeom, edgesMat);
+
+    group.add(edgesMesh);
+    return group;
+  }
+
   return mesh;
 }
 
@@ -548,6 +601,7 @@ function instancedSpheres(cells, material) {
     mesh.setMatrixAt(idx, m);
     mesh.setColorAt(idx, color.setHex(c.color));
   });
+
   return mesh;
 }
 
@@ -576,7 +630,7 @@ function nearestBoundaryIndex(boundaries, value) {
 // Modello 2.5D: un voxel per ogni livello della griglia verticale (buildZLevels)
 // compreso tra gli indici di zBottom e zTop arrotondati, invece di un unico box
 // estruso. Rispetta lo splitting/telescoping dichiarato nella modelGeometry.
-function buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ) {
+function buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ, activeStyle = 'default') {
   const { I, J, dx, dy, Z } = model.geometry;
   const { zTop, zBottom, buildingNr, fixedheight } = model.buildings2D;
   if (!zTop) return null;
@@ -611,7 +665,7 @@ function buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ) {
       const topIdx = nearestBoundaryIndex(boundaries, absTop - origin);
       if (topIdx <= bottomIdx) continue; // arrotondati sullo stesso confine: nessun voxel
       const nr = buildingNr?.data[j * I + i] ?? 0;
-      const { wall, roof } = buildingColors(model, nr);
+      const { wall, roof } = buildingColors(model, nr, activeStyle);
       const x = toX(i);
       const z = toZ(j);
       for (let k = bottomIdx; k < topIdx; k++) {
@@ -625,8 +679,8 @@ function buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ) {
   }
   if (!walls.length) return null;
   const layer = new THREE.Group();
-  layer.add(instancedBoxes(walls, new THREE.MeshLambertMaterial()));
-  layer.add(instancedBoxes(roofs, new THREE.MeshLambertMaterial()));
+  layer.add(instancedBoxes(walls, new THREE.MeshLambertMaterial(), activeStyle));
+  layer.add(instancedBoxes(roofs, new THREE.MeshLambertMaterial(), activeStyle));
   layer.userData.maxHeight = maxHeight;
   return layer;
 }
@@ -636,7 +690,7 @@ function buildExtrudedBuildings(model, { toX, toZ, terrainAt }, spacingZ) {
 // La matrice sparsa usa la convenzione "nativa" di riga (come i dati EDT,
 // riga 0 = sud), diversa da quella delle matrici dense zTop/zBottom (riga 0 =
 // nord): stesso specchiamento già applicato alla vegetazione.
-function buildVoxelBuildings(model, { toX, toZ }, spacingZ) {
+function buildVoxelBuildings(model, { toX, toZ }, spacingZ, activeStyle = 'default') {
   const { J, dx, dy } = model.geometry;
   const K = model.geometry3D?.K ?? model.buildings3D.K;
   const zLevels = resolveZLevels(model.geometry, K, spacingZ);
@@ -646,7 +700,7 @@ function buildVoxelBuildings(model, { toX, toZ }, spacingZ) {
   let maxHeight = 0;
   for (const e of model.buildings3D.entries) {
     const nr = parseInt(e.values[1] ?? e.values[0], 10) || 0;
-    const { wall, roof } = buildingColors(model, nr);
+    const { wall, roof } = buildingColors(model, nr, activeStyle);
     const level = zLevels[Math.min(e.k, zLevels.length - 1)];
     const top = level.base + level.height;
     const x = toX(e.i);
@@ -658,8 +712,8 @@ function buildVoxelBuildings(model, { toX, toZ }, spacingZ) {
     maxHeight = Math.max(maxHeight, top);
   }
   const layer = new THREE.Group();
-  layer.add(instancedBoxes(walls, new THREE.MeshLambertMaterial()));
-  layer.add(instancedBoxes(roofs, new THREE.MeshLambertMaterial()));
+  layer.add(instancedBoxes(walls, new THREE.MeshLambertMaterial(), activeStyle));
+  layer.add(instancedBoxes(roofs, new THREE.MeshLambertMaterial(), activeStyle));
   layer.userData.maxHeight = maxHeight;
   return layer;
 }
@@ -671,8 +725,9 @@ function buildVoxelBuildings(model, { toX, toZ }, spacingZ) {
 // "Objects" dei risultati (EDT/EDX) su tutti i livelli k, quota assoluta come
 // per terreno e building (nessun "segui il terreno"). rv 11-15 = vegetazione,
 // con le stesse tonalità di verde dell'overlay 2D "Objects".
-export function buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ, vegStyle1 = false) {
+export function buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ, vegStyle1Arg = false) {
   if (!objectsVolume) return null;
+  const activeStyle = typeof vegStyle1Arg === 'boolean' ? (vegStyle1Arg ? 'style1' : 'default') : (vegStyle1Arg || 'default');
   const { I, J, dx, dy } = model.geometry;
   const { dims, data } = objectsVolume;
   if (dims.x !== I || dims.y !== J) return null;
@@ -683,19 +738,12 @@ export function buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ, ve
     const level = zLevels[k];
     const voxelY = level.base + level.height / 2;
     for (let j = 0; j < J; j++) {
-      // le matrici INX hanno la riga 0 a nord, mentre nei dati EDT la riga 0 è a
-      // sud: si specchia l'indice riga per allinearlo alla stessa convenzione j
-      // usata da building e terreno (toZ), altrimenti la vegetazione risulta
-      // ribaltata nord-sud rispetto al resto della scena.
       const edtRow = J - 1 - j;
       for (let i = 0; i < I; i++) {
         const rv = Math.round(data[(k * J + edtRow) * I + i]);
         if (rv < VEGETATION_RV_MIN || rv > VEGETATION_RV_MAX) continue;
-        const color = VEGETATION_COLORS[rv - VEGETATION_RV_MIN];
-        if (vegStyle1) {
-          // Sfera inscritta nella dimensione più piccola della cella (mai un
-          // ellissoide, anche su celle orizzontali/verticali non cubiche),
-          // con lo stesso raggio non lineare per LAD usato dai cerchi 2D.
+        const color = (activeStyle === 'style2' || activeStyle === 'style3') ? 0xffffff : VEGETATION_COLORS[rv - VEGETATION_RV_MIN];
+        if (activeStyle !== 'default') {
           const radius = (Math.min(dx, dy, level.height) / 2) * VEG_STYLE1_RADIUS_FRACTIONS[rv - VEGETATION_RV_MIN];
           cells.push({ x: toX(i), z: toZ(j), y: voxelY, r: radius, color });
         } else {
@@ -707,25 +755,20 @@ export function buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ, ve
   }
   if (!cells.length) return null;
   const layer = new THREE.Group();
-  layer.add(vegStyle1 ? instancedSpheres(cells, new THREE.MeshLambertMaterial()) : instancedBoxes(cells, new THREE.MeshLambertMaterial()));
+
+  if (activeStyle === 'style1' || activeStyle === 'style2' || activeStyle === 'style3') {
+    layer.add(instancedSpheres(cells, new THREE.MeshLambertMaterial()));
+  } else {
+    layer.add(instancedBoxes(cells, new THREE.MeshLambertMaterial(), activeStyle));
+  }
+
   layer.userData.maxHeight = maxHeight;
   return layer;
 }
 
 /* ---------- edifici e terreno dal volume "Objects" ---------- */
 
-// Ricostruisce edifici e terreno voxel per voxel direttamente dal volume
-// "Objects" dei risultati (EDT/EDX) invece che da zTop/zBottom/terrainheight
-// dell'INX + un arrotondamento nostro della quota continua al confine di
-// griglia più vicino: quel metodo può sfasarsi dalla vera griglia usata da
-// ENVI-met (nearestBoundaryIndex non sempre arrotonda nella stessa direzione
-// del vero calcolo interno, causando edifici/terreno sfalsati rispetto alle
-// sezioni dati che invece leggono la quota assoluta della stessa griglia).
-// Qui invece si legge dove ENVI-met ha davvero messo edificio/terreno,
-// voxel per voxel, sulla stessa identica griglia zLevels usata dall'overlay
-// e dalla vegetazione: combaciano sempre per costruzione. Stessi codici rv
-// del riferimento 2D "Objects" (colormap.js): 1 = edificio, 2 = terreno.
-function buildFromObjectsVolume(model, objectsVolume, { toX, toZ }, spacingZ) {
+function buildFromObjectsVolume(model, objectsVolume, { toX, toZ }, spacingZ, activeStyle = 'default') {
   const { I, J, dx, dy } = model.geometry;
   const { buildingNr } = model.buildings2D;
   const { dims, data } = objectsVolume;
@@ -740,14 +783,12 @@ function buildFromObjectsVolume(model, objectsVolume, { toX, toZ }, spacingZ) {
     const voxelY = level.base + level.height / 2;
     const aboveLevel = k + 1 < dims.z ? zLevels[k + 1] : null;
     for (let j = 0; j < J; j++) {
-      // stessa convenzione di specchiamento riga di buildVegetation: la
-      // matrice INX ha la riga 0 a nord, i dati EDT la riga 0 a sud.
       const edtRow = J - 1 - j;
       for (let i = 0; i < I; i++) {
         const rv = Math.round(data[(k * J + edtRow) * I + i]);
         if (rv === OBJECTS_RV_BUILDING) {
           const nr = buildingNr?.data[j * I + i] ?? 0;
-          const { wall, roof } = buildingColors(model, nr);
+          const { wall, roof } = buildingColors(model, nr, activeStyle);
           walls.push({ x: toX(i), z: toZ(j), y: voxelY, sx: dx, sz: dy, sy: level.height, color: wall });
           buildingsMaxHeight = Math.max(buildingsMaxHeight, level.base + level.height);
           const aboveRv = aboveLevel ? Math.round(data[((k + 1) * J + edtRow) * I + i]) : NaN;
@@ -756,7 +797,7 @@ function buildFromObjectsVolume(model, objectsVolume, { toX, toZ }, spacingZ) {
           }
         } else if (rv === OBJECTS_RV_TERRAIN) {
           const id = model.soils?.data[j * I + i] ?? '';
-          soilCells.push({ x: toX(i), z: toZ(j), y: voxelY, sx: dx, sz: dy, sy: level.height, color: soilColor(id) });
+          soilCells.push({ x: toX(i), z: toZ(j), y: voxelY, sx: dx, sz: dy, sy: level.height, color: soilColor(id, activeStyle) });
           terrainMaxHeight = Math.max(terrainMaxHeight, level.base + level.height);
         }
       }
@@ -765,14 +806,14 @@ function buildFromObjectsVolume(model, objectsVolume, { toX, toZ }, spacingZ) {
   let buildings = null;
   if (walls.length) {
     buildings = new THREE.Group();
-    buildings.add(instancedBoxes(walls, new THREE.MeshLambertMaterial()));
-    buildings.add(instancedBoxes(roofs, new THREE.MeshLambertMaterial()));
+    buildings.add(instancedBoxes(walls, new THREE.MeshLambertMaterial(), activeStyle));
+    buildings.add(instancedBoxes(roofs, new THREE.MeshLambertMaterial(), activeStyle));
     buildings.userData.maxHeight = buildingsMaxHeight;
   }
   let terrain = null;
   if (soilCells.length) {
     terrain = new THREE.Group();
-    terrain.add(instancedBoxes(soilCells, new THREE.MeshLambertMaterial()));
+    terrain.add(instancedBoxes(soilCells, new THREE.MeshLambertMaterial(), activeStyle));
     terrain.userData.maxHeight = terrainMaxHeight;
   }
   if (!buildings && !terrain) return null;

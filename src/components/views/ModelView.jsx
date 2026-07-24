@@ -253,7 +253,7 @@ function computeStats(model) {
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
-function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, vegStyle1, projection, gizmoNorthMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
+function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, vegStyle1, objectStyle, projection, gizmoNorthMode, ambientOcclusion, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
   const { tr } = useI18n();
   const model = loaded?.model;
   const showModel = model && !blockedNoVerticalExtent;
@@ -289,6 +289,7 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dat
               flags={flags}
               wireframe={wireframe}
               vegStyle1={vegStyle1}
+              objectStyle={objectStyle}
               projection={projection}
               sunEnabled={sunActive}
               sunAzimuth={sunInfo?.azimuth}
@@ -296,6 +297,7 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dat
               sunPathPoints={sunPathPoints}
               sunDiagram={sunDiagram}
               gizmoNorthMode={gizmoNorthMode}
+              ambientOcclusion={ambientOcclusion}
               sectionX={sectionX}
               sectionY={sectionY}
               sectionAngle={sectionAngle}
@@ -666,9 +668,11 @@ export default function ModelView() {
             {...panelProps[key]}
             flags={flags}
             wireframe={state.wireframe}
+            objectStyle={state.objectStyle}
             vegStyle1={state.style1}
             projection={state.cameraProjection}
             gizmoNorthMode={state.gizmoNorthMode}
+            ambientOcclusion={state.ambientOcclusion}
             sunPathEnabled={state.sunPathEnabled}
             showCalendarWidget={state.showCalendarWidget}
             showClockWidget={state.showClockWidget}

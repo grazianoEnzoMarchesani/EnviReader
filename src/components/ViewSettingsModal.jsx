@@ -2,6 +2,7 @@ import { useAppState } from '../state/AppStateContext';
 import { useI18n } from '../i18n/I18nContext';
 import Slider from './controls/Slider';
 import Segmented from './controls/Segmented';
+import Select from './controls/Select';
 import Toggle from './controls/Toggle';
 import { DEFAULT_SECTION_LINE_COLOR } from './views/AnalysisView';
 
@@ -16,10 +17,28 @@ export default function ViewSettingsModal() {
   // modale mostra lì solo lo slider dimensione widget, valido per entrambe le viste.
   const is3D = state.appView === 'model';
 
+  const styleOptions = [
+    { value: 'default', label: tr('style_default') },
+    { value: 'style1', label: tr('style_style1') },
+    { value: 'style2', label: tr('style_style2') },
+    { value: 'style3', label: tr('style_style3') },
+  ];
+
+  const currentObjectStyle = state.objectStyle || (state.style1 ? 'style1' : 'default');
+
   return (
     <div className="modal-backdrop" onClick={close}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">{tr('btn_view_settings')}</div>
+
+        <div className="modal-section-title">{tr('label_object_style')}</div>
+        <div className="view-bar-group" style={{ marginBottom: '16px' }}>
+          <Select
+            value={currentObjectStyle}
+            options={styleOptions}
+            onChange={(val) => set({ objectStyle: val, style1: val === 'style1' })}
+          />
+        </div>
 
         {is3D && (
           <>
@@ -47,11 +66,13 @@ export default function ViewSettingsModal() {
                   onSelect={(key) => set({ gizmoNorthMode: key })}
                 />
               </div>
-            </div>
-
-            <div className="modal-section-title">{tr('group_vegetation')}</div>
-            <div className="view-bar-group">
-              <Toggle label={tr('toggle_veg_style1')} on={state.style1} onToggle={() => toggle('style1')} />
+              <div className="modal-field" style={{ marginTop: '8px' }}>
+                <Toggle
+                  label={tr('toggle_ambient_occlusion')}
+                  on={state.ambientOcclusion}
+                  onToggle={() => toggle('ambientOcclusion')}
+                />
+              </div>
             </div>
           </>
         )}
@@ -84,7 +105,6 @@ export default function ViewSettingsModal() {
             <div className="modal-section-title">{tr('toggle_objects_overlay')}</div>
             <div className="view-bar-group">
               <Slider label={tr('slider_objects_opacity')} value={state.objOverlayOpacity} min={0} max={100} unit="%" onChange={(v) => set({ objOverlayOpacity: v })} />
-              <Toggle label={tr('toggle_style1')} on={state.style1} onToggle={() => toggle('style1')} />
             </div>
           </>
         )}

@@ -90,14 +90,9 @@ const initialState = {
   showBuildings: true,
   showVegetation: true,
   showTerrain: true,
-  // "Stile 1": preset di rendering unico, condiviso tra l'overlay Objects 2D
-  // e il viewer 3D (stesso toggle, sincronizzato tra le due viste — vedi
-  // ViewSettingsModal). In 2D copre sia gli edifici (contorno + retino a 45°,
-  // invece del riempimento piatto grigio) sia la vegetazione (rv 11-15:
-  // cerchi invece che pixel pieni, col raggio legato al LAD — vedi
-  // colormap.js); nel 3D riguarda solo la vegetazione (sfere invece di voxel
-  // a parallelepipedo, stesso raggio per LAD). Spento, tutto torna al
-  // rendering di default. Il primo di una futura serie di stili selezionabili.
+  // Stile di resa degli oggetti (edifici, vegetazione, terreno), condiviso tra 2D e 3D:
+  // 'default' | 'style1' | 'style2' | 'style3'
+  objectStyle: 'default',
   style1: false,
   showReceptors: false,
   showGrid: false,
@@ -128,6 +123,7 @@ const initialState = {
   // orientamento (zoom e pan restano indipendenti); attivo di default perché è
   // il caso d'uso più comune nel confronto A/B
   syncCamera3D: true,
+  ambientOcclusion: true, // Occlusione ambientale (AO) nel viewer 3D per migliorare la resa tridimensionale
   sunPathEnabled: false, // simulazione percorso solare + ombre nel modello 3D: segue state.time (vedi src/lib/sunLink.js)
   // condizioni al contorno: fileset mostrato, periodo dei grafici FOX,
   // eventuale file FOX aperto a mano quando non è nella cartella risultati
@@ -350,7 +346,7 @@ export function AppStateProvider({ children }) {
         if (s.sectionX != null) patch.sectionX = dims ? clampTo(s.sectionX, dims.x - 1) : s.sectionX;
         if (s.sectionY != null) patch.sectionY = dims ? clampTo(s.sectionY, dims.y - 1) : s.sectionY;
         if (s.levelOutHeight != null) patch.levelOutHeight = Math.max(1, dims ? clampTo(s.levelOutHeight, dims.z - 1) : s.levelOutHeight);
-        for (const k of ['sectionAngle', 'followTerrain', 'fixBiometSections', 'levelOut', 'showWindField', 'showObjectsOverlay', 'windStyle', 'windOpacity', 'windSize', 'windDensity', 'scaleType', 'palette', 'paletteReversed', 'diffPalette', 'diffPaletteReversed']) {
+        for (const k of ['sectionAngle', 'followTerrain', 'fixBiometSections', 'levelOut', 'showWindField', 'showObjectsOverlay', 'windStyle', 'windOpacity', 'windSize', 'windDensity', 'scaleType', 'palette', 'paletteReversed', 'diffPalette', 'diffPaletteReversed', 'ambientOcclusion']) {
           if (s[k] != null) patch[k] = s[k];
         }
         // showWindField e showWindVolume sono mutuamente esclusivi (vedi toggle);
