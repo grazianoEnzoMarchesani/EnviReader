@@ -1056,55 +1056,190 @@ function contourFineSize(n) {
 const CONTOUR_LINE_COLOR = 0x1f2430;
 const CONTOUR_LINE_WIDTH = 0.12; // m, spessore del nastro (una vera linea GL non ha larghezza affidabile multi-piattaforma)
 
+// Interseca un poligono convesso i cui vertici portano un valore scalare `v`
+// affine (interpolato linearmente) con la soglia v = threshold: restituisce
+// i due sotto-poligoni below/above e, se la soglia attraversa il poligono, i
+// due punti di intersezione — il segmento esatto dell'isolinea a quel
+// livello. Sutherland-Hodgman applicato allo spazio dei valori invece che a
+// un piano geometrico: siccome v resta affine sui sotto-poligoni generati da
+// un taglio, si può richiamare più volte in sequenza (vedi isobandTriangle).
+function clipConvexByValue(poly, threshold) {
+  const below = [];
+  const above = [];
+  const crossPts = [];
+  const n = poly.length;
+  for (let i = 0; i < n; i++) {
+    const a = poly[i];
+    const b = poly[(i + 1) % n];
+    const aBelow = a.v <= threshold;
+    const bBelow = b.v <= threshold;
+    if (aBelow) below.push(a); else above.push(a);
+    if (aBelow !== bBelow) {
+      const f = (threshold - a.v) / (b.v - a.v);
+      const p = {
+        x: a.x + f * (b.x - a.x),
+        y: a.y + f * (b.y - a.y),
+        z: a.z + f * (b.z - a.z),
+        v: threshold,
+      };
+      below.push(p);
+      above.push(p);
+      crossPts.push(p);
+    }
+  }
+  return { below, above, crossPts };
+}
+
+function clampBand(band) {
+  return Math.max(0, Math.min(CONTOUR_BANDS - 1, band));
+}
+
+// Marching triangles: suddivide un triangolo (valore v ai 3 vertici, lineare
+// all'interno) nelle sue fasce di colore tagliandolo alle soglie che
+// attraversa. Caso comune (bandLo === bandHi, il triangolo sta in una sola
+// fascia): nessun taglio, stesso costo di un quad piatto. Dove il dato
+// attraversa una o più soglie il confine di fascia — e quindi l'isolinea —
+// segue il punto esatto di attraversamento invece del bordo della cella
+// della griglia fine, eliminando lo scalettato a griglia in 3D a parità di
+// risoluzione di campionamento (stesso principio del contour vettoriale,
+// applicato qui per fasce+isolinee invece che a un canvas 2D sovracampionato
+// come sliceToContourImageData).
+function isobandTriangle(v0, v1, v2) {
+  const minV = Math.min(v0.v, v1.v, v2.v);
+  const maxV = Math.max(v0.v, v1.v, v2.v);
+  const bandLo = clampBand(Math.floor(minV * CONTOUR_BANDS));
+  const bandHi = clampBand(Math.floor(maxV * CONTOUR_BANDS));
+  if (bandLo === bandHi) {
+    return { regions: [{ band: bandLo, poly: [v0, v1, v2] }], segments: [] };
+  }
+  const regions = [];
+  const segments = [];
+  let current = [v0, v1, v2];
+  for (let k = bandLo + 1; k <= bandHi && current.length >= 3; k++) {
+    const { below, above, crossPts } = clipConvexByValue(current, k / CONTOUR_BANDS);
+    if (below.length >= 3) regions.push({ band: k - 1, poly: below });
+    if (crossPts.length === 2) segments.push([crossPts[0], crossPts[1]]);
+    current = above;
+  }
+  if (current.length >= 3) regions.push({ band: bandHi, poly: current });
+  return { regions, segments };
+}
+
 // Superficie a fasce piatte + isolinee, condivisa da pianta e sezioni: riceve
 // una griglia di punti (pointX/Y/Z, pointT normalizzato 0..1 o NaN) di
 // dimensione nPX x nPY e restituisce { mesh, lines, maxHeight }. Ogni cella
-// fine diventa un quad a colore piatto (vertici non condivisi: niente
-// sfumatura tra fasce, stesso principio del posterize 2D in
-// sliceToContourImageData); dove la fascia cambia tra celle fini adiacenti si
-// aggiunge un nastro sottile (due triangoli, coincidente col confine — vince
-// lo z-fighting via polygonOffset, non uno spostamento in world-space) la cui
-// larghezza è orientata da `normal`, la normale della superficie costante per
-// l'intera pianta/sezione.
+// fine è divisa in 2 triangoli (stesso taglio diagonale del quad piatto
+// usato altrove nel file) e ciascuno viene suddiviso in fasce con
+// isobandTriangle: dove il triangolo sta in un'unica fascia si ottiene un
+// solo triangolo a colore piatto (niente sfumatura tra fasce, stesso
+// principio del posterize 2D in sliceToContourImageData); dove attraversa un
+// confine di fascia si ottengono più sotto-poligoni colorati e un segmento
+// di isolinea esatto, reso come nastro sottile (due triangoli — vince lo
+// z-fighting via polygonOffset, non uno spostamento in world-space) la cui
+// larghezza è orientata da `normal`, la normale della superficie costante
+// per l'intera pianta/sezione.
 function buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, normal) {
   const nCellsX = nPX - 1;
   const nCellsY = nPY - 1;
   if (nCellsX < 1 || nCellsY < 1) return null;
   const idx = (pc, pr) => pr * nPX + pc;
-  const cellIdx = (ci, cj) => cj * nCellsX + ci;
-  const bandOf = new Int16Array(nCellsX * nCellsY).fill(-1);
+
+  // Colore per fascia precalcolato una sola volta: dipende solo dal band
+  // index, non dalla cella. setHex (non setRGB): interpreta i byte come
+  // sRGB, coerente con lutColor() usato altrove in questo file — setRGB
+  // tratterebbe gli stessi byte come già lineari, "lavando" i colori con il
+  // color management di three.js.
+  const bandColors = [];
+  {
+    const c = new THREE.Color();
+    for (let band = 0; band < CONTOUR_BANDS; band++) {
+      const tBand = (band + 0.5) / CONTOUR_BANDS;
+      const k = Math.min(255, (tBand * 255) | 0);
+      c.setHex((lut[k * 3] << 16) | (lut[k * 3 + 1] << 8) | lut[k * 3 + 2]);
+      bandColors.push([c.r, c.g, c.b]);
+    }
+  }
 
   const positions = [];
   const colors = [];
-  const c = new THREE.Color();
   let maxHeight = 0;
+
+  const emitPoly = (poly, band) => {
+    const col = bandColors[band];
+    for (let i = 1; i < poly.length - 1; i++) {
+      for (const p of [poly[0], poly[i], poly[i + 1]]) {
+        positions.push(p.x, p.y, p.z);
+        colors.push(col[0], col[1], col[2]);
+      }
+    }
+  };
+
+  // Nastro dell'isolinea lungo un segmento pa-pb: larghezza nel piano
+  // (cross(normal, direzione segmento)), geometricamente coincidente col
+  // bordo di fascia sottostante — a vincere lo z-fighting contro di esso è
+  // il polygonOffset del materiale (più aggressivo di quello della
+  // superficie, vedi sotto), non uno spostamento in world-space: quest'ultimo
+  // richiederebbe di indovinare un epsilon adeguato alla scala della scena
+  // (metri di un giardino o di un intero quartiere), mentre il
+  // polygonOffset agisce sul depth buffer ed è quindi indipendente dalla
+  // scala.
+  const [nx, ny, nz] = normal;
+  const linePositions = [];
+  const addEdge = (pa, pb) => {
+    const dx = pb.x - pa.x, dy = pb.y - pa.y, dz = pb.z - pa.z;
+    const len = Math.hypot(dx, dy, dz) || 1;
+    const ex = dx / len, ey = dy / len, ez = dz / len;
+    let wx = ny * ez - nz * ey;
+    let wy = nz * ex - nx * ez;
+    let wz = nx * ey - ny * ex;
+    const wlen = Math.hypot(wx, wy, wz) || 1;
+    const half = CONTOUR_LINE_WIDTH / 2;
+    wx = (wx / wlen) * half; wy = (wy / wlen) * half; wz = (wz / wlen) * half;
+    const a0 = [pa.x + wx, pa.y + wy, pa.z + wz];
+    const a1 = [pa.x - wx, pa.y - wy, pa.z - wz];
+    const b0 = [pb.x + wx, pb.y + wy, pb.z + wz];
+    const b1 = [pb.x - wx, pb.y - wy, pb.z - wz];
+    for (const p of [a0, b0, b1, a0, b1, a1]) linePositions.push(p[0], p[1], p[2]);
+  };
 
   for (let cj = 0; cj < nCellsY; cj++) {
     for (let ci = 0; ci < nCellsX; ci++) {
-      const t00 = pointT[idx(ci, cj)];
-      const t10 = pointT[idx(ci + 1, cj)];
-      const t01 = pointT[idx(ci, cj + 1)];
-      const t11 = pointT[idx(ci + 1, cj + 1)];
-      if (Number.isNaN(t00) || Number.isNaN(t10) || Number.isNaN(t01) || Number.isNaN(t11)) continue;
-      const t = (t00 + t10 + t01 + t11) / 4;
-      const band = Math.min(CONTOUR_BANDS - 1, Math.floor(t * CONTOUR_BANDS));
-      bandOf[cellIdx(ci, cj)] = band;
-      const tBand = (band + 0.5) / CONTOUR_BANDS;
-      const k = Math.min(255, (tBand * 255) | 0);
-      // setHex (non setRGB): interpreta i byte come sRGB, coerente con lutColor()
-      // usato altrove in questo file — setRGB tratterebbe gli stessi byte come
-      // già lineari, "lavando" i colori con il color management di three.js.
-      c.setHex((lut[k * 3] << 16) | (lut[k * 3 + 1] << 8) | lut[k * 3 + 2]);
+      const i00 = idx(ci, cj), i10 = idx(ci + 1, cj), i01 = idx(ci, cj + 1), i11 = idx(ci + 1, cj + 1);
+      const t00 = pointT[i00], t10 = pointT[i10], t01 = pointT[i01], t11 = pointT[i11];
 
-      const p00 = [pointX[idx(ci, cj)], pointY[idx(ci, cj)], pointZ[idx(ci, cj)]];
-      const p10 = [pointX[idx(ci + 1, cj)], pointY[idx(ci + 1, cj)], pointZ[idx(ci + 1, cj)]];
-      const p01 = [pointX[idx(ci, cj + 1)], pointY[idx(ci, cj + 1)], pointZ[idx(ci, cj + 1)]];
-      const p11 = [pointX[idx(ci + 1, cj + 1)], pointY[idx(ci + 1, cj + 1)], pointZ[idx(ci + 1, cj + 1)]];
-      maxHeight = Math.max(maxHeight, p00[1], p10[1], p01[1], p11[1]);
-      const quad = [p00, p10, p11, p00, p11, p01];
-      for (const p of quad) {
-        positions.push(p[0], p[1], p[2]);
-        colors.push(c.r, c.g, c.b);
+      // La quota (pointY) è definita ovunque (terreno), solo il dato (t) è
+      // NaN dove mascherato (es. sotto un edificio): il conteggio del
+      // massimo non deve dipendere dalla validità del dato.
+      const p00xyz = { x: pointX[i00], y: pointY[i00], z: pointZ[i00] };
+      const p10xyz = { x: pointX[i10], y: pointY[i10], z: pointZ[i10] };
+      const p01xyz = { x: pointX[i01], y: pointY[i01], z: pointZ[i01] };
+      const p11xyz = { x: pointX[i11], y: pointY[i11], z: pointZ[i11] };
+      maxHeight = Math.max(maxHeight, p00xyz.y, p10xyz.y, p01xyz.y, p11xyz.y);
+
+      for (const tri of [
+        [p00xyz, p10xyz, p11xyz, t00, t10, t11],
+        [p00xyz, p11xyz, p01xyz, t00, t11, t01],
+      ]) {
+        const [pa, pb, pc, va, vb, vc] = tri;
+        // Scarta il triangolo solo se il dato è mascherato ovunque (es.
+        // completamente sotto un edificio, dove tanto è coperto dalla mesh
+        // dell'edificio); dove il triangolo è a cavallo del confine di una
+        // zona mascherata, il vertice NaN viene sostituito con la media dei
+        // vertici validi invece di scartare l'intero triangolo — altrimenti
+        // resterebbe scoperta una fascia larga fino a una cella intera
+        // attorno a ogni edificio, assente in modalità pixel (dove ogni
+        // cella è indipendente) e nel contour 2D (dove bilinearSample
+        // applica lo stesso principio per singolo pixel, non per cella).
+        const validVals = [va, vb, vc].filter((v) => !Number.isNaN(v));
+        if (validVals.length === 0) continue;
+        const fallback = validVals.reduce((s, v) => s + v, 0) / validVals.length;
+        const v0 = { ...pa, v: Number.isNaN(va) ? fallback : va };
+        const v1 = { ...pb, v: Number.isNaN(vb) ? fallback : vb };
+        const v2 = { ...pc, v: Number.isNaN(vc) ? fallback : vc };
+
+        const { regions, segments } = isobandTriangle(v0, v1, v2);
+        for (const r of regions) emitPoly(r.poly, r.band);
+        for (const seg of segments) addEdge(seg[0], seg[1]);
       }
     }
   }
@@ -1115,58 +1250,6 @@ function buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, norma
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
   const mesh = new THREE.Mesh(geometry, overlayMaterial({ vertexColors: true, side: THREE.DoubleSide }));
-
-  // Nastro dell'isolinea lungo un bordo condiviso pa-pb: larghezza nel piano
-  // (cross(normal, direzione bordo)), geometricamente coincidente col bordo
-  // della superficie sottostante — a vincere lo z-fighting contro di essa è
-  // il polygonOffset del materiale (più aggressivo di quello della superficie,
-  // vedi sotto), non uno spostamento in world-space: quest'ultimo richiederebbe
-  // di indovinare un epsilon adeguato alla scala della scena (metri di un
-  // giardino o di un intero quartiere), mentre il polygonOffset agisce sul
-  // depth buffer ed è quindi indipendente dalla scala.
-  const [nx, ny, nz] = normal;
-  const linePositions = [];
-  const addEdge = (pa, pb) => {
-    const dx = pb[0] - pa[0], dy = pb[1] - pa[1], dz = pb[2] - pa[2];
-    const len = Math.hypot(dx, dy, dz) || 1;
-    const ex = dx / len, ey = dy / len, ez = dz / len;
-    let wx = ny * ez - nz * ey;
-    let wy = nz * ex - nx * ez;
-    let wz = nx * ey - ny * ex;
-    const wlen = Math.hypot(wx, wy, wz) || 1;
-    const half = CONTOUR_LINE_WIDTH / 2;
-    wx = (wx / wlen) * half; wy = (wy / wlen) * half; wz = (wz / wlen) * half;
-    const a0 = [pa[0] + wx, pa[1] + wy, pa[2] + wz];
-    const a1 = [pa[0] - wx, pa[1] - wy, pa[2] - wz];
-    const b0 = [pb[0] + wx, pb[1] + wy, pb[2] + wz];
-    const b1 = [pb[0] - wx, pb[1] - wy, pb[2] - wz];
-    for (const p of [a0, b0, b1, a0, b1, a1]) linePositions.push(p[0], p[1], p[2]);
-  };
-
-  for (let cj = 0; cj < nCellsY; cj++) {
-    for (let ci = 0; ci < nCellsX; ci++) {
-      const band = bandOf[cellIdx(ci, cj)];
-      if (band < 0) continue;
-      if (ci + 1 < nCellsX) {
-        const rightBand = bandOf[cellIdx(ci + 1, cj)];
-        if (rightBand >= 0 && rightBand !== band) {
-          addEdge(
-            [pointX[idx(ci + 1, cj)], pointY[idx(ci + 1, cj)], pointZ[idx(ci + 1, cj)]],
-            [pointX[idx(ci + 1, cj + 1)], pointY[idx(ci + 1, cj + 1)], pointZ[idx(ci + 1, cj + 1)]],
-          );
-        }
-      }
-      if (cj + 1 < nCellsY) {
-        const downBand = bandOf[cellIdx(ci, cj + 1)];
-        if (downBand >= 0 && downBand !== band) {
-          addEdge(
-            [pointX[idx(ci, cj + 1)], pointY[idx(ci, cj + 1)], pointZ[idx(ci, cj + 1)]],
-            [pointX[idx(ci + 1, cj + 1)], pointY[idx(ci + 1, cj + 1)], pointZ[idx(ci + 1, cj + 1)]],
-          );
-        }
-      }
-    }
-  }
 
   let lines = null;
   if (linePositions.length) {
