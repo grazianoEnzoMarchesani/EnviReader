@@ -382,7 +382,7 @@ export const FALLBACK_I18N = {
     "help_render_style_contour_title": "Filled contour",
     "help_render_style_contour_body": "Interpolates the data between cells and groups it into color bands with isolines at the boundaries, like a filled contour plot / isarithmic map. Reads more like a smooth field, at the cost of hiding the exact per-cell values.",
     "help_hd_mode_title": "HD mode",
-    "help_hd_mode_body": "Resamples the 2D map at the screen's physical resolution (frame size × pixel ratio) instead of a fixed size, for a sharper image at high zoom levels — most noticeable in Contour mode. Has no effect in Pixel mode, which always renders one flat color per grid cell at native resolution. Heavier to compute, so it's off by default.",
+    "help_hd_mode_body": "Resamples the 2D map at the screen's physical resolution (frame size × pixel ratio) instead of a fixed size, for a sharper image at high zoom levels — most noticeable in Contour mode. In Pixel mode the effect is subtle, mostly cleaner cell edges, since each cell still renders as one flat color. Heavier to compute — turn it off if the map feels sluggish.",
 
     "help_objects_overlay_title": "3D layer overlay",
     "help_objects_overlay_body": "Overlays a lightweight 3D silhouette of the model (buildings, terrain, vegetation) on top of the 2D chart, to give spatial context to the data without leaving the 2D view.",

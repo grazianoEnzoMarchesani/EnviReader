@@ -20,9 +20,9 @@ const initialState = {
   // Ricampiona la mappa raster 2D (mappa colore + contour) alla risoluzione
   // fisica dello schermo (frame CSS × devicePixelRatio) invece del MAX_DIM
   // fisso di colormap.js: elimina la pixelatura visibile a zoom elevati (vedi
-  // "View zoom"), a costo di un ricampionamento più pesante. Spento di
+  // "View zoom"), a costo di un ricampionamento più pesante. Acceso di
   // default (non persistito, si azzera al reload come renderStyle/scaleFactor).
-  hdMode: false,
+  hdMode: true,
   filesetAOpen: false,
   filesetBOpen: false,
   loadingFileset: null, // 'A' | 'B' mentre la cartella scelta viene letta e analizzata
