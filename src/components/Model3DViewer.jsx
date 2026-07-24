@@ -20,6 +20,24 @@ import HelpTooltip from './controls/HelpTooltip';
 const DEG = Math.PI / 180;
 const UP_Y = new THREE.Vector3(0, 1, 0);
 
+// Antialiasing della composizione: il renderer nasce con antialias:true, ma
+// quello vale solo quando si disegna direttamente sul canvas. Non appena si
+// passa da composer.render() (necessario per GTAO/silhouette, quindi sempre
+// quando ambientOcclusion è attivo, il default) il "beauty pass" scrive su un
+// WebGLRenderTarget offscreen di EffectComposer, che di suo ha samples:0 —
+// quindi zero antialiasing sui bordi netti dei voxel, il flag del renderer
+// resta lettera morta. Dare "samples" a quei render target riattiva il MSAA
+// hardware (tocca però ricrearli da zero per farlo avere effetto, vedi
+// applyHdMode più sotto). Il livello base la ripristina per tutti; la
+// modalità HD la spinge oltre, insieme al pixel ratio, per chi vuole il
+// massimo dettaglio a costo di qualche ms in più per frame — spenta di
+// default perché il costo è per-frame su tutta la scena e può mettere in
+// crisi GPU più modeste.
+const BASE_AA_SAMPLES = 4;
+const HD_AA_SAMPLES = 8;
+const BASE_DPR_CAP = 2;
+const HD_DPR_CAP = 3;
+
 // Risolve una custom property CSS (es. "--surface") in "rgb(r, g, b)" con
 // componenti 0-255, qualunque sia la sintassi con cui è definita nel tema
 // chiaro/scuro (hex, oklch, ...): serve per dare a scene.background lo stesso
@@ -59,7 +77,7 @@ function isOverlayObject(object) {
 // A ~3×FOLLOW_TAU l'inseguimento è visivamente concluso (vedi loop sotto).
 const FOLLOW_TAU = 0.12;
 
-export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, vegStyle1, objectStyle, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, ambientOcclusion, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
+export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, vegStyle1, objectStyle, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, ambientOcclusion, hdMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
   const { tr } = useI18n();
   const activeStyle = objectStyle || (vegStyle1 ? 'style1' : 'default');
   const containerRef = useRef(null);
@@ -97,7 +115,8 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
   useEffect(() => {
     const container = containerRef.current;
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // pixel ratio reale impostato più sotto da applyHdMode(), una volta che il
+    // composer esiste (deve restare in sync con i suoi render target)
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     container.appendChild(renderer.domElement);
@@ -406,6 +425,42 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       orthoCam.right = (vh / 2) * aspect;
       orthoCam.updateProjectionMatrix();
     };
+
+    // vedi commento su BASE_AA_SAMPLES sopra. Il WebGLRenderer "classico" (non
+    // il renderer unificato più recente) crea il framebuffer multisample di un
+    // render target una volta sola, alla prima setRenderTarget() in cui trova
+    // renderTargetProperties.__webglFramebuffer ancora undefined (vedi
+    // WebGLRenderer.js: setRenderTarget → textures.setupRenderTarget()).
+    // Cambiare renderTarget.samples su un target già usato (con o senza un
+    // dispose() esplicito dopo) non lo rifà ricreare in modo affidabile: da
+    // qui lo spegnimento "bloccato" finché qualcos'altro (es. toggle Data
+    // overlay) non forzava comunque un giro diverso di aggiornamento. L'unico
+    // modo deterministico è sostituire i render target del composer con
+    // istanze nuove — mai passate a setRenderTarget, quindi sicuramente non
+    // ancora inizializzate — con il sample count voluto.
+    const applyHdMode = (hd) => {
+      const dpr = Math.min(window.devicePixelRatio || 1, hd ? HD_DPR_CAP : BASE_DPR_CAP);
+      const samples = hd ? HD_AA_SAMPLES : BASE_AA_SAMPLES;
+      if (composer.renderTarget1.samples !== samples) {
+        const old1 = composer.renderTarget1;
+        const old2 = composer.renderTarget2;
+        const rt1 = new THREE.WebGLRenderTarget(old1.width, old1.height, { type: THREE.HalfFloatType, samples });
+        rt1.texture.name = 'EffectComposer.rt1';
+        const rt2 = rt1.clone();
+        rt2.texture.name = 'EffectComposer.rt2';
+        composer.renderTarget1 = rt1;
+        composer.renderTarget2 = rt2;
+        composer.writeBuffer = rt1;
+        composer.readBuffer = rt2;
+        old1.dispose();
+        old2.dispose();
+      }
+      renderer.setPixelRatio(dpr);
+      composer.setPixelRatio(dpr); // ridimensiona i render target (nuovi o no) e tutte le pass alla risoluzione fisica corrente
+    };
+    stage.applyHdMode = applyHdMode;
+    applyHdMode(hdMode);
+
     const observer = new ResizeObserver(resize);
     observer.observe(container);
     resize();
@@ -790,6 +845,12 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       gizmoApiRef.current = null;
     };
   }, []);
+
+  // toggle "Modalità HD" dalla toolbar: niente da ricostruire, solo
+  // samples/pixel ratio del composer (vedi applyHdMode sopra)
+  useEffect(() => {
+    stageRef.current?.applyHdMode?.(hdMode);
+  }, [hdMode]);
 
   // riferimento dei cardinali del gizmo: nord vero (ruotato di modelRotation,
   // letto dall'INX) oppure lato piatto del modello (griglia, rotazione 0)

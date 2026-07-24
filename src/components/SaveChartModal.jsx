@@ -3,6 +3,7 @@ import { useAppState } from '../state/AppStateContext';
 import { useI18n } from '../i18n/I18nContext';
 import { exportCharts } from '../lib/exportUtils';
 import Segmented from './controls/Segmented';
+import { useModalKeyboard } from '../lib/useModalKeyboard';
 
 export default function SaveChartModal({ onClose }) {
   const { state, set } = useAppState();
@@ -49,6 +50,8 @@ export default function SaveChartModal({ onClose }) {
       setTimeout(() => setExporting(false), 3000);
     }
   };
+
+  useModalKeyboard(true, exporting ? null : handleExport, exporting ? null : onClose);
 
   const compareOptions = [
     { key: 'single', label: tr('compare_single') || 'Solo A' },

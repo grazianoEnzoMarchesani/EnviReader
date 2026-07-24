@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAppState } from '../state/AppStateContext';
 import { useI18n } from '../i18n/I18nContext';
+import { useModalKeyboard } from '../lib/useModalKeyboard';
 
 const roundForDisplay = (n) => Math.round(n * 100) / 100;
 
@@ -18,8 +19,6 @@ export default function CustomRangeModal() {
       setMaxVal(modalData.max != null ? String(roundForDisplay(modalData.max)) : '');
     }
   }, [modalData]);
-
-  if (!modalData) return null;
 
   const handleSave = () => {
     const numMin = parseFloat(minVal);
@@ -40,6 +39,10 @@ export default function CustomRangeModal() {
   const handleClose = () => {
     set({ customRangeModal: null });
   };
+
+  useModalKeyboard(!!modalData, handleSave, handleClose);
+
+  if (!modalData) return null;
 
   return (
     <div className="modal-backdrop" onClick={handleClose}>

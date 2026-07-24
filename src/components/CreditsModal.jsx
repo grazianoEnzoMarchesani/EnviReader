@@ -1,15 +1,19 @@
 import { GITHUB_URL } from '../data/constants';
 import { useAppState } from '../state/AppStateContext';
 import { useI18n } from '../i18n/I18nContext';
+import { useModalKeyboard } from '../lib/useModalKeyboard';
 
 export default function CreditsModal() {
   const { state, toggle } = useAppState();
   const { tr } = useI18n();
 
+  const close = () => toggle('showCredits');
+  useModalKeyboard(state.showCredits, close, close);
+
   if (!state.showCredits) return null;
 
   return (
-    <div className="modal-backdrop" onClick={() => toggle('showCredits')}>
+    <div className="modal-backdrop" onClick={close}>
       <div className="modal-card credits-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">{tr('credits_title')}</div>
         
@@ -37,7 +41,7 @@ export default function CreditsModal() {
           </div>
         </div>
 
-        <button className="primary-btn" onClick={() => toggle('showCredits')}>
+        <button className="primary-btn" onClick={close}>
           {tr('btn_close')}
         </button>
       </div>

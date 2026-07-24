@@ -1,9 +1,26 @@
-import { useMemo, useRef } from 'react';
+import { Fragment, useMemo, useRef } from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { useI18n } from '../../i18n/I18nContext';
 import { useForcing } from '../../lib/useForcing';
+import { useFlip } from '../../lib/useFlip';
 import ForcingChart from '../ForcingChart';
 import Segmented from '../controls/Segmented';
+import Slider from '../controls/Slider';
+
+// Colonne massime a zoom minimo (1x): oltre, i grafici andrebbero troppo
+// stretti per essere leggibili — stessa idea dello zoom di AnalysisView, ma
+// qui il numero di grafici (fino a 8-9 con gli inquinanti) non è già limitato
+// a monte come lì (max 4 mappe in confronto).
+const BOUNDARY_MAX_COLS = 4;
+
+// Larghezza card via flex-basis in %, stessa logica di AnalysisView: a z=1
+// occupano una riga di effN colonne, a z=effN una card copre il 100% (vedi
+// commento su scaleFactor in AnalysisView.jsx per la derivazione dei termini).
+function boundaryCardWidth(n, z) {
+  const effN = n <= 1 ? 3 : Math.min(n, BOUNDARY_MAX_COLS);
+  const gapBack = ((z - 1) * 18).toFixed(2);
+  return `min(100%, calc(${z} * (100% - ${(effN - 1) * 18}px) / ${effN} + ${gapBack}px - 0.5px))`;
+}
 
 // Condizioni al contorno: contenuto del SIMX (impostazioni + eventuale Simple
 // Forcing orario) e serie meteo del FOX quando la simulazione è in Full Forcing.
@@ -160,6 +177,18 @@ export default function BoundaryView() {
   const md = forcing?.simx?.mainData;
   const isFull = forcing?.mode === 'full';
 
+  // Zoom dei grafici FOX/Simple Forcing: stessa logica di scaleFactor in
+  // AnalysisView, ma il tetto dello slider segue il numero di grafici
+  // effettivamente mostrati (charts.length, o 1-2 per il Simple Forcing) così
+  // il valore massimo porta sempre a una singola colonna piena larghezza.
+  const simpleCount = forcing?.simple ? (forcing.simple.q ? 2 : 1) : 0;
+  const chartCount = fox ? charts.length : simpleCount;
+  const zoomMax = chartCount <= 1 ? 3 : Math.min(chartCount, BOUNDARY_MAX_COLS);
+  const zoom = Math.min(state.boundaryScaleFactor, zoomMax);
+  const chartWidth = boundaryCardWidth(chartCount, zoom);
+  const foxGridRef = useFlip();
+  const simpleGridRef = useFlip();
+
   const foxLocationRows = fox
     ? [
         { key: 'name', label: tr('fox_location'), value: fox.location?.name ?? '—' },
@@ -173,24 +202,44 @@ export default function BoundaryView() {
       ]
     : [];
 
-  return (
-    <>
-      <div className="status-strip">
-        {(state.filesetA || state.filesetB) && (
-          <Segmented
-            options={[
-              { key: 'A', label: filesetLabel('A'), disabled: !state.filesetA },
-              { key: 'B', label: filesetLabel('B'), disabled: !state.filesetB },
-            ]}
-            value={shown}
-            onSelect={(key) => set({ boundaryFileset: key })}
-          />
-        )}
-        {forcing && <div className="chip accent">{tr(isFull ? 'source_full' : 'source_simple')}</div>}
+  const barGroups = [
+    (state.filesetA || state.filesetB) && (
+      <Segmented
+        options={[
+          { key: 'A', label: filesetLabel('A'), disabled: !state.filesetA },
+          { key: 'B', label: filesetLabel('B'), disabled: !state.filesetB },
+        ]}
+        value={shown}
+        onSelect={(key) => set({ boundaryFileset: key })}
+      />
+    ),
+    forcing && <div className="chip accent">{tr(isFull ? 'source_full' : 'source_simple')}</div>,
+    (forcing?.simxFileName || (forcing?.foxFileName && fox)) && (
+      <>
         {forcing?.simxFileName && <div className="chip">SIMX · {forcing.simxFileName}</div>}
         {forcing?.foxFileName && fox && <div className="chip">FOX · {forcing.foxFileName}</div>}
-        {fox?.location?.name && <div className="chip">{fox.location.name}</div>}
-      </div>
+      </>
+    ),
+    fox?.location?.name && <div className="chip">{fox.location.name}</div>,
+    chartCount > 0 && <Slider label={tr('slider_scale')} value={zoom} min={1} max={zoomMax} step={0.25} unit="x" onChange={(v) => set({ boundaryScaleFactor: v })} />,
+  ].filter(Boolean);
+
+  return (
+    <>
+      {barGroups.length > 0 && (
+        <div className="view-bar">
+          <div className="view-bar-top">
+            <div className="view-bar-panel">
+              {barGroups.map((group, i) => (
+                <Fragment key={i}>
+                  {i > 0 && <div className="vertical-divider" />}
+                  <div className="view-bar-group">{group}</div>
+                </Fragment>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {!fileset && (
         <div className="boundary-empty">
@@ -293,9 +342,9 @@ export default function BoundaryView() {
                   />
                 </div>
               </div>
-              <div className="boundary-grid">
+              <div className="boundary-grid" ref={foxGridRef} style={{ '--chart-w': chartWidth }}>
                 {charts.map((chart) => (
-                  <div key={chart.key} className="chart-card">
+                  <div key={chart.key} data-flip-key={chart.key} className="chart-card">
                     <div className="chart-header">
                       <div className="chart-title">{chart.title}</div>
                       <span className="chart-caption">{chart.unit}</span>
@@ -319,8 +368,8 @@ export default function BoundaryView() {
 
           {/* Simple Forcing: serie orarie scritte nel SIMX stesso */}
           {!isFull && forcing.simple && (
-            <div className="boundary-grid">
-              <div className="chart-card">
+            <div className="boundary-grid" ref={simpleGridRef} style={{ '--chart-w': chartWidth }}>
+              <div data-flip-key="temp" className="chart-card">
                 <div className="chart-header">
                   <div className="chart-title">{tr('boundary_param_temp')}</div>
                   <span className="chart-caption">°C</span>
@@ -335,7 +384,7 @@ export default function BoundaryView() {
                 </div>
               </div>
               {forcing.simple.q && (
-                <div className="chart-card">
+                <div data-flip-key="humidity" className="chart-card">
                   <div className="chart-header">
                     <div className="chart-title">{tr('boundary_param_humidity')}</div>
                     <span className="chart-caption">%</span>

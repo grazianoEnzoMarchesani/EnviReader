@@ -5,14 +5,16 @@ import Segmented from './controls/Segmented';
 import Select from './controls/Select';
 import Toggle from './controls/Toggle';
 import { DEFAULT_SECTION_LINE_COLOR } from './views/AnalysisView';
+import { useModalKeyboard } from '../lib/useModalKeyboard';
 
 export default function ViewSettingsModal() {
   const { state, set, toggle } = useAppState();
   const { tr } = useI18n();
 
-  if (!state.viewSettingsOpen) return null;
-
   const close = () => set({ viewSettingsOpen: false });
+  useModalKeyboard(state.viewSettingsOpen, close, close);
+
+  if (!state.viewSettingsOpen) return null;
   // Nel viewer 3D non esistono linea di sezione né overlay oggetti in 2D: il
   // modale mostra lì solo lo slider dimensione widget, valido per entrambe le viste.
   const is3D = state.appView === 'model';

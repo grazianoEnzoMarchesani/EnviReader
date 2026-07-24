@@ -13,7 +13,7 @@ import Segmented from '../controls/Segmented';
 import IconToggle from '../controls/IconToggle';
 import WindModeToggle from '../controls/WindModeToggle';
 import HelpTooltip from '../controls/HelpTooltip';
-import { IconBuilding, IconTree, IconTerrain, IconTerrainFix, IconReceptor, IconGrid, IconWireframe, IconSun, IconLayers3D, IconSectionX, IconSectionY, IconSmoothSurface, IconSyncRotate, IconCalendar, IconClock, IconSettings } from '../icons/ToolbarIcons';
+import { IconBuilding, IconTree, IconTerrain, IconTerrainFix, IconReceptor, IconGrid, IconWireframe, IconSun, IconLayers3D, IconSectionX, IconSectionY, IconSmoothSurface, IconSyncRotate, IconCalendar, IconClock, IconSettings, IconHD } from '../icons/ToolbarIcons';
 import ViewSettingsModal from '../ViewSettingsModal';
 import { useFlip } from '../../lib/useFlip';
 import { usePointSeries, useSlices, useTerrainCut, useWindFields, useWindVolumeCells } from '../../lib/useSlice';
@@ -253,7 +253,7 @@ function computeStats(model) {
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
-function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, vegStyle1, objectStyle, projection, gizmoNorthMode, ambientOcclusion, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
+function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, vegStyle1, objectStyle, projection, gizmoNorthMode, ambientOcclusion, hdMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
   const { tr } = useI18n();
   const model = loaded?.model;
   const showModel = model && !blockedNoVerticalExtent;
@@ -298,6 +298,7 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dat
               sunDiagram={sunDiagram}
               gizmoNorthMode={gizmoNorthMode}
               ambientOcclusion={ambientOcclusion}
+              hdMode={hdMode}
               sectionX={sectionX}
               sectionY={sectionY}
               sectionAngle={sectionAngle}
@@ -603,6 +604,7 @@ export default function ModelView() {
                 <div className="view-bar-group">
                   <IconToggle icon={IconWireframe} label={tr('btn_wireframe')} on={state.wireframe} onToggle={() => toggle('wireframe')} help={{ title: tr('help_wireframe_title'), body: tr('help_wireframe_body') }} />
                   <Segmented options={renderStyleOptions} value={state.renderStyle} onSelect={(v) => set({ renderStyle: v })} variant="dark" />
+                  <IconToggle icon={IconHD} label={tr('toggle_hd_mode')} on={state.hdMode3D} onToggle={() => toggle('hdMode3D')} help={{ title: tr('help_hd_mode_3d_title'), body: tr('help_hd_mode_3d_body') }} />
                 </div>
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
@@ -682,6 +684,7 @@ export default function ModelView() {
             projection={state.cameraProjection}
             gizmoNorthMode={state.gizmoNorthMode}
             ambientOcclusion={state.ambientOcclusion}
+            hdMode={state.hdMode3D}
             sunPathEnabled={state.sunPathEnabled}
             showCalendarWidget={state.showCalendarWidget}
             showClockWidget={state.showClockWidget}

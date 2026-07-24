@@ -23,6 +23,11 @@ const initialState = {
   // "View zoom"), a costo di un ricampionamento più pesante. Acceso di
   // default (non persistito, si azzera al reload come renderStyle/scaleFactor).
   hdMode: true,
+  // Stesso principio applicato al viewer 3D (MSAA + pixel ratio più alti sul
+  // composer, vedi applyHdMode in Model3DViewer.jsx), ma spento di default:
+  // lì il costo è per-frame su tutta la scena (non un ricampionamento
+  // puntuale come in 2D) e può mettere in crisi GPU più modeste.
+  hdMode3D: false,
   filesetAOpen: false,
   filesetBOpen: false,
   loadingFileset: null, // 'A' | 'B' mentre la cartella scelta viene letta e analizzata
@@ -136,6 +141,7 @@ const initialState = {
   boundaryFileset: 'A',
   boundaryPeriod: 'all', // 'all' | 'sim' | 'custom' | 'm:YYYY-MM'
   boundaryRange: null, // [i0, i1] della selezione manuale (brush)
+  boundaryScaleFactor: 1, // zoom dei grafici FOX (stesso principio di scaleFactor in 2D)
   foxFileA: null,
   foxFileB: null,
 };
