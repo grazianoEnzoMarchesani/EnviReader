@@ -1532,6 +1532,7 @@ function arrowGeometry() {
   }
   _arrowGeometry = new THREE.LatheGeometry(points, 8);
   _arrowGeometry.rotateZ(-Math.PI / 2);
+  _arrowGeometry.userData.shared = true; // vedi disposeGroup: mai disposta insieme al layer che la usa
   return _arrowGeometry;
 }
 const ARROW_TAPER_EXPONENT = 0.5; // <1 = concavo (piano alla coda, brusco in punta); 1 = cono dritto
@@ -1543,6 +1544,7 @@ function headGeometry() {
   if (_headGeometry) return _headGeometry;
   _headGeometry = new THREE.ConeGeometry(1, 1, 8);
   _headGeometry.rotateZ(-Math.PI / 2);
+  _headGeometry.userData.shared = true; // vedi disposeGroup: mai disposta insieme al layer che la usa
   return _headGeometry;
 }
 
@@ -1565,6 +1567,7 @@ function segmentGeometry() {
   if (_segmentGeometry) return _segmentGeometry;
   _segmentGeometry = new THREE.CylinderGeometry(0.5, 0.5, 1, 6, 1);
   _segmentGeometry.rotateZ(-Math.PI / 2);
+  _segmentGeometry.userData.shared = true; // vedi disposeGroup: mai disposta insieme al layer che la usa
   return _segmentGeometry;
 }
 
@@ -2301,7 +2304,11 @@ export function setWireframe(layers, on) {
 
 export function disposeGroup(group) {
   group.traverse((obj) => {
-    obj.geometry?.dispose();
+    // Le geometrie del vento (arrowGeometry/headGeometry/segmentGeometry) sono
+    // cache condivise a livello di modulo, riusate da entrambi i pannelli A/B:
+    // disporle qui le renderebbe invalide per l'altro pannello mentre è ancora
+    // in scena, forzando un re-upload GPU non necessario al frame successivo.
+    if (!obj.geometry?.userData?.shared) obj.geometry?.dispose();
     if (obj.material) {
       obj.material.map?.dispose();
       obj.material.dispose();

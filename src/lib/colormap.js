@@ -50,6 +50,13 @@ export function orientColors(colors, reversed) {
 export function buildLUT(colors, reversed = false) {
   const stops = orientColors(colors, reversed).map(hexToRgb);
   const lut = new Uint8ClampedArray(LUT_STEPS * 3);
+  if (stops.length < 2) {
+    // Palette degenere (0 o 1 colore): tinta piatta invece di interpolare
+    // tra due stop che non esistono.
+    const [r, g, b] = stops[0] ?? [0, 0, 0];
+    for (let i = 0; i < LUT_STEPS; i++) { lut[i * 3] = r; lut[i * 3 + 1] = g; lut[i * 3 + 2] = b; }
+    return lut;
+  }
   for (let i = 0; i < LUT_STEPS; i++) {
     const pos = (i / (LUT_STEPS - 1)) * (stops.length - 1);
     const k = Math.min(Math.floor(pos), stops.length - 2);
@@ -66,7 +73,7 @@ export function buildLUT(colors, reversed = false) {
 // Se spacingX e spacingY sono forniti, esegue un ricampionamento fulmineo su
 // una risoluzione maggiore per preservare le proporzioni variabili dei tasselli.
 export function sliceToImageData(data, w, h, min, max, lut, spacingX, spacingY, extentW, extentH, maxDim = 1024) {
-  if (!spacingX || !spacingY) {
+  if (!spacingX?.length || !spacingY?.length) {
     const img = new ImageData(w, h);
     const px = img.data;
     const range = max - min || 1;
@@ -162,7 +169,7 @@ export function axisCenters(spacing, n, extent) {
   const centers = new Float64Array(n);
   let cur = 0;
   for (let i = 0; i < n; i++) {
-    const s = spacing ? spacing[i] : extent / n;
+    const s = spacing?.length ? spacing[i] : extent / n;
     centers[i] = cur + s / 2;
     cur += s;
   }
@@ -328,10 +335,18 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
   } = opts;
   const opF = opacity / 100;
   const activeStyle = objectStyle || (style1 ? 'style1' : 'default');
+  // Senza spacing reale (EDX senza <spacing_x/y>) si assume una cella di
+  // dimensione costante extent/w: si passa comunque dal ramo ricampionato qui
+  // sotto, perché gli stili edificio (bordo/retino) e i cerchi della
+  // vegetazione hanno bisogno di più pixel per cella di quanti la risoluzione
+  // griglia nativa ne offra — altrimenti lo stile scelto dall'utente viene
+  // silenziosamente ignorato (vedi paintBuilding).
+  if (!spacingX?.length) spacingX = new Array(w).fill((extentW || w) / w);
+  if (!spacingY?.length) spacingY = new Array(h).fill((extentH || h) / h);
 
   // Riquadro di pixel di output occupato da ciascuna cella sorgente (indicizzato
-  // per riga/colonna dati), popolato più sotto solo nel percorso ricampionato:
-  // serve sia al contorno degli edifici sia ai cerchi della vegetazione.
+  // per riga/colonna dati): serve sia al contorno degli edifici sia ai cerchi
+  // della vegetazione.
   let colStart, colEnd, rowStart, rowEnd;
 
   const isBuildingAt = (r, c) => r >= 0 && r < h && c >= 0 && c < w && Math.round(data[r * w + c]) === 1;
@@ -341,7 +356,7 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
   };
 
   const paintBuilding = (pxArr, o, px, py, r, c) => {
-    if (colStart == null || activeStyle === 'default') {
+    if (activeStyle === 'default') {
       // Stile di default: riempimento piatto grigio slate.
       paintBuildingDefault(pxArr, o);
       return;
@@ -406,20 +421,6 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
       pxArr[o+3] = 0; // Trasparente
     }
   };
-
-  if (!spacingX || !spacingY) {
-    const img = new ImageData(w, h);
-    const px = img.data;
-    for (let row = 0; row < h; row++) {
-      const srcRow = h - 1 - row;
-      for (let col = 0; col < w; col++) {
-        const v = data[srcRow * w + col];
-        if (Number.isNaN(v)) continue;
-        assignPixel(px, (row * w + col) * 4, v, col, row, srcRow, col);
-      }
-    }
-    return img;
-  }
 
   const MAX_DIM = maxDim;
   let targetW, targetH;

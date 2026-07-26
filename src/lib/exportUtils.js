@@ -280,15 +280,16 @@ function getStyledSvgString(svgElement) {
 }
 
 export async function exportCharts({ state, setState, exportMode, zipAll, groupFolders, saveSvg, saveBoundarySvg, saveGif, fps, saveDatasheet, datasheetFormat, datasheetDecimals, tr, onProgress }) {
+  // Dichiarate fuori dal try: servono anche nel catch per ripristinare lo
+  // stato dell'app se l'export fallisce (es. libreria non caricata).
+  const { seriesLabels, time: originalTime, compareMode: originalCompareMode, filesetBOpen } = state;
+  const numSteps = seriesLabels?.length || 0;
+  const originalViewType = state.viewType;
+  const originalAppView = state.appView;
   try {
     if (!window.htmlToImage) {
       throw new Error("html-to-image library is not loaded.");
     }
-
-    const { seriesLabels, time: originalTime, compareMode: originalCompareMode, filesetBOpen } = state;
-    const numSteps = seriesLabels?.length || 0;
-    const originalViewType = state.viewType;
-    const originalAppView = state.appView;
 
     if (originalAppView !== 'analysis') {
       onProgress('Preparing map views...');

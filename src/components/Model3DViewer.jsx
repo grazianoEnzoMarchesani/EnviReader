@@ -836,11 +836,14 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       window.removeEventListener('pointerup', onWindowUp);
       gtaoPass.dispose();
       for (const pass of outlinePasses) pass.dispose();
+      outputPass.dispose();
       composer.dispose();
       gizmo.dispose();
       stage.controls.dispose();
       renderer.dispose();
       renderer.domElement.remove();
+      depthOnlyMaterialRef.current?.dispose();
+      depthOnlyMaterialRef.current = null;
       stageRef.current = null;
       gizmoApiRef.current = null;
     };

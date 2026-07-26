@@ -445,9 +445,9 @@ export async function loadPointSeries(series, variableName, { x, y, level, terra
       const dims = edx.dimensions;
       const varIndex = edx.variableNames.indexOf(variableName);
       if (varIndex === -1) return NaN;
-      const cx = Math.min(x, dims.x - 1);
-      const cy = Math.min(y, dims.y - 1);
-      let k = Math.min(level, dims.z - 1);
+      const cx = Math.max(0, Math.min(x, dims.x - 1));
+      const cy = Math.max(0, Math.min(y, dims.y - 1));
+      let k = Math.max(0, Math.min(level, dims.z - 1));
       if (terrain) k = Math.min(Math.floor(terrain.data[cy * dims.x + cx] * terrain.gain + terrain.base), dims.z - 1);
       const offset = (((varIndex * dims.z + k) * dims.y + cy) * dims.x + cx) * 4;
       const buffer = await pair.EDT.slice(offset, offset + 4).arrayBuffer();

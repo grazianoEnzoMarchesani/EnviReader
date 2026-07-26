@@ -41,7 +41,10 @@ export function parseValueList(text) {
 // se la mediana supera 200 sono Kelvin
 export function toCelsius(values) {
   const finite = values.filter((v) => !Number.isNaN(v)).sort((a, b) => a - b);
-  if (!finite.length || finite[(finite.length / 2) | 0] < 200) return values;
+  if (!finite.length) return values;
+  const mid = finite.length >> 1;
+  const median = finite.length % 2 ? finite[mid] : (finite[mid - 1] + finite[mid]) / 2;
+  if (median < 200) return values;
   return values.map((v) => (Number.isNaN(v) ? v : v - 273.15));
 }
 

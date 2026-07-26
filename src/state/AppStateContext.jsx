@@ -171,6 +171,17 @@ function clampPatch(prev, edxMeta) {
 export function AppStateProvider({ children }) {
   const [state, setState] = useState(initialState);
   const stateRef = useRef(state);
+  // Contatore di richieste per i caricamenti async di gruppo dati
+  // (setDataGroup, applyPreset): se l'utente ne avvia una seconda prima che
+  // la prima abbia finito di leggere l'EDX, la risposta più vecchia arriva
+  // comunque e non va scritta sopra quella più recente.
+  const groupLoadRequestRef = useRef(0);
+  // Blocca le chiamate concorrenti a openFileset tra il click e il momento in
+  // cui l'utente concede il permesso: state.loadingFileset da solo non basta,
+  // perché si accende solo DENTRO il callback di pickDirectory (vedi sotto),
+  // lasciando una finestra prima del dialogo nativo in cui un secondo click
+  // (es. "Apri A" poi subito "Apri B") non verrebbe bloccato.
+  const openingFilesetRef = useRef(false);
 
   useEffect(() => {
     stateRef.current = state;
@@ -242,7 +253,8 @@ export function AppStateProvider({ children }) {
     };
 
     const openFileset = async (key) => {
-      if (stateRef.current.loadingFileset) return;
+      if (stateRef.current.loadingFileset || openingFilesetRef.current) return;
+      openingFilesetRef.current = true;
       try {
         // il flag si accende solo dopo che l'utente ha concesso il permesso:
         // prima c'è il dialogo nativo del browser, che fa da sé da indicatore
@@ -252,6 +264,8 @@ export function AppStateProvider({ children }) {
       } catch (err) {
         set({ loadingFileset: null });
         throw err;
+      } finally {
+        openingFilesetRef.current = false;
       }
     };
 
@@ -314,7 +328,9 @@ export function AppStateProvider({ children }) {
           set({ dataGroup: path });
           return;
         }
+        const requestId = ++groupLoadRequestRef.current;
         const { edxMeta, seriesLabels } = await analyzeGroup(lead, path);
+        if (groupLoadRequestRef.current !== requestId) return; // superata da una richiesta più recente
         const variables = edxMeta?.variableNames ?? [];
         set({
           dataGroup: path,
@@ -344,7 +360,9 @@ export function AppStateProvider({ children }) {
         let { edxMeta, seriesLabels } = prev;
         const patch = {};
         if (s.dataGroup != null && lead && prev.dataGroups.includes(s.dataGroup) && s.dataGroup !== prev.dataGroup) {
+          const requestId = ++groupLoadRequestRef.current;
           ({ edxMeta, seriesLabels } = await analyzeGroup(lead, s.dataGroup));
+          if (groupLoadRequestRef.current !== requestId) return; // superata da una richiesta più recente
           Object.assign(patch, { dataGroup: s.dataGroup, edxMeta, seriesLabels });
         }
         const variables = edxMeta?.variableNames ?? [];
