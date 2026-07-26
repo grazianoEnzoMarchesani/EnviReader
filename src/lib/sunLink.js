@@ -51,13 +51,3 @@ export function getSunSample(state) {
   };
 }
 
-export function formatDateLabel(date) {
-  return date.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
-export function formatHourLabel(hour) {
-  const wrapped = ((hour % 24) + 24) % 24;
-  const h = Math.floor(wrapped);
-  const m = Math.round((wrapped - h) * 60) % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}

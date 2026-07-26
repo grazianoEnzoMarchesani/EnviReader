@@ -68,6 +68,39 @@ export function buildLUT(colors, reversed = false) {
   return lut;
 }
 
+/* ---------- ricampionamento: griglia dati → pixel di output ---------- */
+
+// Dimensione del canvas di output: il lato maggiore va a maxDim, l'altro segue
+// le proporzioni fisiche dell'estensione (mai meno di 1 px). Condivisa da tutte
+// le funzioni di rendering di questo file, così mappa colore, contour e overlay
+// oggetti hanno sempre esattamente la stessa risoluzione.
+function targetSize(extentW, extentH, maxDim) {
+  if (extentW > extentH) {
+    return { targetW: maxDim, targetH: Math.max(1, Math.round(maxDim * (extentH / extentW))) };
+  }
+  return { targetH: maxDim, targetW: Math.max(1, Math.round(maxDim * (extentW / extentH))) };
+}
+
+// Per ogni pixel di output lungo un asse, l'indice della cella dati che lo
+// copre: i confini di cella vengono dai passi reali (spacing), quindi celle di
+// dimensioni diverse occupano un numero diverso di pixel. flip=true per l'asse
+// Y, dove la riga 0 dei dati è a sud ma l'alto del canvas è il nord: sia i
+// passi che l'indice risultante vengono percorsi al contrario.
+function axisCellMap(spacing, n, extent, target, flip) {
+  const bounds = new Float64Array(n + 1);
+  let cur = 0;
+  for (let i = 0; i < n; i++) { bounds[i] = cur; cur += spacing[flip ? n - 1 - i : i]; }
+  bounds[n] = extent;
+  const map = new Int32Array(target);
+  let c = 0;
+  for (let p = 0; p < target; p++) {
+    const v = (p + 0.5) * (extent / target);
+    while (c < n - 1 && v >= bounds[c + 1]) c++;
+    map[p] = flip ? n - 1 - c : c;
+  }
+  return map;
+}
+
 // La riga 0 dei dati ENVI-met è a sud: il canvas viene riempito capovolto
 // così il nord resta in alto (pianta) e l'alto resta in alto (sezioni).
 // Se spacingX e spacingY sono forniti, esegue un ricampionamento fulmineo su
@@ -95,41 +128,9 @@ export function sliceToImageData(data, w, h, min, max, lut, spacingX, spacingY, 
     return img;
   }
 
-  const MAX_DIM = maxDim;
-  let targetW, targetH;
-  if (extentW > extentH) {
-    targetW = MAX_DIM;
-    targetH = Math.max(1, Math.round(MAX_DIM * (extentH / extentW)));
-  } else {
-    targetH = MAX_DIM;
-    targetW = Math.max(1, Math.round(MAX_DIM * (extentW / extentH)));
-  }
-
-  const boundsX = new Float64Array(w + 1);
-  let curX = 0;
-  for (let i = 0; i < w; i++) { boundsX[i] = curX; curX += spacingX[i]; }
-  boundsX[w] = extentW;
-
-  const boundsY = new Float64Array(h + 1);
-  let curY = 0;
-  for (let i = 0; i < h; i++) { boundsY[i] = curY; curY += spacingY[h - 1 - i]; }
-  boundsY[h] = extentH;
-
-  const mapX = new Int32Array(targetW);
-  let cx = 0;
-  for (let px = 0; px < targetW; px++) {
-    const x = (px + 0.5) * (extentW / targetW);
-    while (cx < w - 1 && x >= boundsX[cx + 1]) cx++;
-    mapX[px] = cx;
-  }
-
-  const mapY = new Int32Array(targetH);
-  let cy = 0;
-  for (let py = 0; py < targetH; py++) {
-    const y = (py + 0.5) * (extentH / targetH);
-    while (cy < h - 1 && y >= boundsY[cy + 1]) cy++;
-    mapY[py] = h - 1 - cy;
-  }
+  const { targetW, targetH } = targetSize(extentW, extentH, maxDim);
+  const mapX = axisCellMap(spacingX, w, extentW, targetW, false);
+  const mapY = axisCellMap(spacingY, h, extentH, targetH, true);
 
   const img = new ImageData(targetW, targetH);
   const pxArr = img.data;
@@ -240,15 +241,7 @@ export function bilinearSample(data, w, h, colF, rowF) {
 export function sliceToContourImageData(data, w, h, min, max, lut, spacingX, spacingY, extentW, extentH, maxDim = 1024) {
   const extW = extentW || w;
   const extH = extentH || h;
-  const MAX_DIM = maxDim;
-  let targetW, targetH;
-  if (extW > extH) {
-    targetW = MAX_DIM;
-    targetH = Math.max(1, Math.round(MAX_DIM * (extH / extW)));
-  } else {
-    targetH = MAX_DIM;
-    targetW = Math.max(1, Math.round(MAX_DIM * (extW / extH)));
-  }
+  const { targetW, targetH } = targetSize(extW, extH, maxDim);
 
   const centersX = axisCenters(spacingX, w, extW);
   const centersY = axisCenters(spacingY, h, extH);
@@ -330,11 +323,10 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
     showBuildings = true,
     showTerrain = true,
     showVegetation = true,
-    style1 = false,
-    objectStyle = null,
+    objectStyle = 'default',
   } = opts;
   const opF = opacity / 100;
-  const activeStyle = objectStyle || (style1 ? 'style1' : 'default');
+  const activeStyle = objectStyle || 'default';
   // Senza spacing reale (EDX senza <spacing_x/y>) si assume una cella di
   // dimensione costante extent/w: si passa comunque dal ramo ricampionato qui
   // sotto, perché gli stili edificio (bordo/retino) e i cerchi della
@@ -422,41 +414,9 @@ export function objectsToImageData(data, w, h, spacingX, spacingY, extentW, exte
     }
   };
 
-  const MAX_DIM = maxDim;
-  let targetW, targetH;
-  if (extentW > extentH) {
-    targetW = MAX_DIM;
-    targetH = Math.max(1, Math.round(MAX_DIM * (extentH / extentW)));
-  } else {
-    targetH = MAX_DIM;
-    targetW = Math.max(1, Math.round(MAX_DIM * (extentW / extentH)));
-  }
-
-  const boundsX = new Float64Array(w + 1);
-  let curX = 0;
-  for (let i = 0; i < w; i++) { boundsX[i] = curX; curX += spacingX[i]; }
-  boundsX[w] = extentW;
-
-  const boundsY = new Float64Array(h + 1);
-  let curY = 0;
-  for (let i = 0; i < h; i++) { boundsY[i] = curY; curY += spacingY[h - 1 - i]; }
-  boundsY[h] = extentH;
-
-  const mapX = new Int32Array(targetW);
-  let cx = 0;
-  for (let px = 0; px < targetW; px++) {
-    const x = (px + 0.5) * (extentW / targetW);
-    while (cx < w - 1 && x >= boundsX[cx + 1]) cx++;
-    mapX[px] = cx;
-  }
-
-  const mapY = new Int32Array(targetH);
-  let cy = 0;
-  for (let py = 0; py < targetH; py++) {
-    const y = (py + 0.5) * (extentH / targetH);
-    while (cy < h - 1 && y >= boundsY[cy + 1]) cy++;
-    mapY[py] = h - 1 - cy;
-  }
+  const { targetW, targetH } = targetSize(extentW, extentH, maxDim);
+  const mapX = axisCellMap(spacingX, w, extentW, targetW, false);
+  const mapY = axisCellMap(spacingY, h, extentH, targetH, true);
 
   // Riquadro di pixel di output occupato da ciascuna cella
   colStart = new Int32Array(w).fill(-1);

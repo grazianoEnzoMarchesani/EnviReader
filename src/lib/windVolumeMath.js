@@ -1,7 +1,8 @@
-// Matematica pura per il campo di vento volumetrico 3D: nessuna dipendenza
-// da three.js/DOM, così questo file è importabile sia da windVolumeWorker.js
-// (gira in un Web Worker, niente contesto WebGL) sia — se mai servisse — dal
-// thread principale. resolveZLevels/levelBoundaries duplicano volutamente le
+// Matematica pura del campo di vento 3D: nessuna dipendenza da three.js/DOM,
+// così questo file è importabile sia da windVolumeWorker.js (gira in un Web
+// Worker, niente contesto WebGL) sia da inxScene.js sul thread principale —
+// che infatti riusa le stesse celle di segmento/testina per il vento disegnato
+// sulle fette dati. resolveZLevels/windCellHeight duplicano volutamente le
 // omonime di inxScene.js (che importa three.js in testa): tenerle qui separate
 // evita di trascinare three.js nel worker solo per due funzioni di aritmetica,
 // senza toccare il codice 3D già in produzione (buildModelScene, buildDataOverlay, ...).
@@ -22,17 +23,10 @@ export function resolveZLevels(geometry, K, spacingZ) {
   return levels;
 }
 
-export function levelBoundaries(zLevels) {
-  const boundaries = Array.from({ length: zLevels.length + 1 });
-  boundaries[0] = 0;
-  for (let k = 0; k < zLevels.length; k++) boundaries[k + 1] = zLevels[k].base + zLevels[k].height;
-  return boundaries;
-}
-
 // Quota mondo del centro verticale della cella di livello frazionario kf:
 // stessa formula/motivazione di windCellHeight in inxScene.js (vedi lì per il
 // perché "centro cella" invece di "quota di superficie").
-export function windCellHeight(zLevels, boundaries, kf) {
+export function windCellHeight(zLevels, kf) {
   const kMax = zLevels.length - 1;
   const k0 = Math.min(kMax, Math.max(0, Math.floor(kf)));
   const frac = Math.min(1, Math.max(0, kf - k0));
@@ -60,4 +54,47 @@ export function volumeStreamSep(dims, density) {
   const total = dims.x * dims.y * dims.z;
   const targetSeeds = Math.max(20, Math.min(WIND_VOLUME_MAX_SEEDS, 50 + (density / 100) * (WIND_VOLUME_MAX_SEEDS - 50)));
   return Math.max(1, Math.cbrt(total / targetSeeds));
+}
+
+/* ---------- celle di streamline (condivise con inxScene.js) ---------- */
+
+// Dimensione dei marcatori di direzione della modalità "combined" (solo punta,
+// nessuna asta): raggio come frazione della lunghezza, per un cono tozzo (largo
+// quasi quanto lungo) che legge bene la direzione da qualunque angolo di vista
+// senza somigliare a un ago.
+export const COMBINED_MARKER_LEN_FACTOR = 0.42;
+export const COMBINED_MARKER_ASPECT = 0.4;
+
+// Converte una polilinea (punti in coordinate mondo) in celle di segmento
+// cilindrico tra ogni coppia di punti consecutivi: un unico InstancedMesh per
+// tutte le streamline di un piano/volume, invece di un THREE.Line per linea
+// (la maggior parte dei driver WebGL ignora `linewidth`, vedi segmentGeometry
+// in inxScene.js).
+export function lineToSegmentCells(points, radius) {
+  const cells = [];
+  for (let i = 1; i < points.length; i++) {
+    const [x0, y0, z0] = points[i - 1];
+    const [x1, y1, z1] = points[i];
+    const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+    const length = Math.hypot(dx, dy, dz);
+    if (length < 1e-6) continue;
+    cells.push({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: (z0 + z1) / 2, dirX: dx, dirY: dy, dirZ: dz, length, radius });
+  }
+  return cells;
+}
+
+// Testina di direzione "combined" centrata sul punto points[p]: la tangente è
+// presa dai vertici REALI già proiettati in mondo (p-1 → p+1), gli stessi di
+// lineToSegmentCells, non da un campo ricampionato in un punto isolato — così
+// punta e base restano sulla curva anche dove questa flette parecchio, invece
+// di proiettare in avanti una freccia rigida che se ne stacca visibilmente.
+export function pushArrowhead(headCells, points, p, headLen, headRadius) {
+  const [x0, y0, z0] = points[p - 1];
+  const [x1, y1, z1] = points[p + 1];
+  const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+  const segLen = Math.hypot(dx, dy, dz);
+  if (segLen < 1e-6) return;
+  const nx = dx / segLen, ny = dy / segLen, nz = dz / segLen;
+  const [cx, cy, cz] = points[p];
+  headCells.push({ x: cx, y: cy, z: cz, dirX: nx, dirY: ny, dirZ: nz, length: headLen, radius: headRadius });
 }

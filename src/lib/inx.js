@@ -3,26 +3,19 @@
 // valori con spazi rendono inaffidabile il DOMParser, quindi il parsing è
 // fatto a righe con regex. Gestisce sia i modelli 2.5D sia quelli full 3D.
 
+import { findFileBy } from './envimet';
+
 /* ---------- individuazione del file nel fileset ---------- */
 
-export function findInxFile(structure) {
-  for (const file of structure.files || []) {
-    if (/\.inx$/i.test(file.name)) return file;
-  }
-  for (const [key, value] of Object.entries(structure)) {
-    if (key === 'files' || typeof value !== 'object' || Array.isArray(value)) continue;
-    const found = findInxFile(value);
-    if (found) return found;
-  }
-  return null;
-}
+export const findInxFile = (structure) => findFileBy(structure, (name) => /\.inx$/i.test(name));
 
 /* ---------- parsing di basso livello ---------- */
 
-// Divide il testo in blocchi <tag>...</tag> di primo livello (dentro la radice)
+// Divide il testo in blocchi <tag>...</tag> di primo livello (dentro la radice).
+// \w copre anche i tag che iniziano per cifra come <3Dplants>.
 function splitBlocks(text) {
   const blocks = [];
-  const regex = /<([\w-]+|3Dplants)((?:\s+[\w-]+="[^"]*")*)\s*>([\s\S]*?)<\/\1>/g;
+  const regex = /<([\w-]+)((?:\s+[\w-]+="[^"]*")*)\s*>([\s\S]*?)<\/\1>/g;
   const inner = text.replace(/^[\s\S]*?<ENVI-MET_Datafile>/, '').replace(/<\/ENVI-MET_Datafile>[\s\S]*$/, '');
   let match;
   while ((match = regex.exec(inner)) !== null) {
@@ -85,20 +78,21 @@ function parseSparse(body, attrs) {
 
 /* ---------- parsing del modello ---------- */
 
-const MATRIX_STRING_IDS = new Set(['ID_plants1D', 'ID_soilprofile', 'ID_sources']);
-
+// Il modello raccoglie solo ciò che la scena 3D e le viste usano davvero: i
+// blocchi non elencati qui (Header, 3Dplants, ID_plants1D, WallDB, ...) non
+// vengono nemmeno parsati — su un INX reale sono migliaia di blocchi e
+// matrici I×J che finirebbero solo in memoria senza mai essere letti.
 export function parseINX(text) {
   const model = {
-    header: {}, geometry: {}, geometry3D: null, location: {},
-    buildings2D: {}, soils: null, plants1D: null, terrain: null, demReference: 0,
-    plants3D: [], receptors: [], buildingInfo: new Map(),
-    buildings3D: null, wallDB: null,
+    geometry: {}, geometry3D: null, location: {},
+    buildings2D: {}, soils: null, terrain: null, demReference: 0,
+    receptors: [], buildingInfo: new Map(),
+    buildings3D: null,
   };
 
   for (const block of splitBlocks(text)) {
     const { tag, body } = block;
-    if (tag === 'Header') model.header = parseLeaves(body);
-    else if (tag === 'modelGeometry') {
+    if (tag === 'modelGeometry') {
       const g = parseLeaves(body);
       model.geometry = {
         I: num(g['grids-I']), J: num(g['grids-J']), Z: num(g['grids-Z']),
@@ -125,21 +119,14 @@ export function parseINX(text) {
       for (const sub of splitBlocks(`<ENVI-MET_Datafile>${body}</ENVI-MET_Datafile>`)) {
         if (sub.attrs.type === 'matrix-data') model.buildings2D[sub.tag] = parseMatrix(sub.body, sub.attrs);
       }
-    } else if (tag === 'simpleplants2D' || tag === 'soils2D' || tag === 'dem') {
+    } else if (tag === 'soils2D' || tag === 'dem') {
       for (const sub of splitBlocks(`<ENVI-MET_Datafile>${body}</ENVI-MET_Datafile>`)) {
         if (sub.tag === 'DEMReference') { model.demReference = num(sub.body) || 0; continue; }
         if (sub.attrs.type !== 'matrix-data') continue;
-        const matrix = parseMatrix(sub.body, sub.attrs, !MATRIX_STRING_IDS.has(sub.tag));
-        if (sub.tag === 'ID_plants1D') model.plants1D = matrix;
-        else if (sub.tag === 'ID_soilprofile') model.soils = matrix;
-        else if (sub.tag === 'terrainheight') model.terrain = matrix;
+        // ID_soilprofile contiene ID materiale (stringhe), terrainheight quote (numeri)
+        if (sub.tag === 'ID_soilprofile') model.soils = parseMatrix(sub.body, sub.attrs, false);
+        else if (sub.tag === 'terrainheight') model.terrain = parseMatrix(sub.body, sub.attrs);
       }
-    } else if (tag === '3Dplants') {
-      const p = parseLeaves(body);
-      model.plants3D.push({
-        i: num(p.rootcell_i), j: num(p.rootcell_j), k: num(p.rootcell_k) || 0,
-        plantID: p.plantID ?? '', name: p.name ?? '',
-      });
     } else if (tag === 'Receptors') {
       const r = parseLeaves(body);
       model.receptors.push({ i: num(r.cell_i), j: num(r.cell_j), name: r.name ?? '' });
@@ -152,11 +139,13 @@ export function parseINX(text) {
         facadeGreening: b.BuildingFacadeGreening ?? '',
         roofGreening: b.BuildingRoofGreening ?? '',
       });
-    } else if (tag === 'buildings3D' || tag === 'dem3D' || tag === 'WallDB') {
+    // buildingFlagAndNr può comparire in una delle due sezioni 3D a seconda
+    // della versione che ha scritto il file: si accettano entrambe, come prima
+    } else if (tag === 'buildings3D' || tag === 'dem3D') {
       for (const sub of splitBlocks(`<ENVI-MET_Datafile>${body}</ENVI-MET_Datafile>`)) {
-        if (sub.attrs.type !== 'sparematrix-3D') continue;
-        if (sub.tag === 'buildingFlagAndNr') model.buildings3D = parseSparse(sub.body, sub.attrs);
-        else if (sub.tag === 'ID_wallDB') model.wallDB = parseSparse(sub.body, sub.attrs);
+        if (sub.attrs.type === 'sparematrix-3D' && sub.tag === 'buildingFlagAndNr') {
+          model.buildings3D = parseSparse(sub.body, sub.attrs);
+        }
       }
     }
   }

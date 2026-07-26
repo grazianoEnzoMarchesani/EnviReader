@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { SIDEBAR_TABS, DATA_GROUPS, DATASETS, SCALE_TYPES } from '../../data/constants';
+import { SIDEBAR_TABS } from '../../data/constants';
 import { paletteGroups, findPalette } from '../../data/palettes';
 import { makeId, uniqueName, decodePaletteCode, parsePaletteFile, paletteFilePayload } from '../../lib/paletteStore';
 import { settingsFromState, parsePresetFile, presetFilePayload } from '../../lib/presetStore';

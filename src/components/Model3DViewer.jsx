@@ -77,9 +77,9 @@ function isOverlayObject(object) {
 // A ~3×FOLLOW_TAU l'inseguimento è visivamente concluso (vedi loop sotto).
 const FOLLOW_TAU = 0.12;
 
-export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, vegStyle1, objectStyle, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, ambientOcclusion, hdMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
+export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, objectStyle, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, ambientOcclusion, hdMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
   const { tr } = useI18n();
-  const activeStyle = objectStyle || (vegStyle1 ? 'style1' : 'default');
+  const activeStyle = objectStyle || 'default';
   const containerRef = useRef(null);
   const gizmoRef = useRef(null); // div overlay che intercetta i click del gizmo
   const stageRef = useRef(null); // { renderer, composer, renderPass, gtaoPass, scene, camera, controls, layers, resetView, setProjection }
@@ -257,7 +257,6 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     };
     const outlinePass = makeOutlinePass();
     composer.addPass(outlinePass);
-    const outlinePasses = [outlinePass];
 
     const outputPass = new OutputPass();
     composer.addPass(outputPass);
@@ -277,7 +276,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     };
 
     const stage = {
-      renderer, composer, renderPass, gtaoPass, outlinePass, outlinePasses, updateOutlineSelection,
+      renderer, composer, renderPass, gtaoPass, outlinePass, updateOutlineSelection,
       scene, perspCam, orthoCam, camera: perspCam, controls,
       layers: null, resetView: () => {}, setProjection: () => {},
     };
@@ -365,7 +364,6 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       const target = stage.controls.target;
       const dir = cur.position.clone().sub(target);
       const aspect = (container.clientWidth || 1) / (container.clientHeight || 1);
-      const halfFov = (perspCam.fov * DEG) / 2;
 
       if (next === orthoCam) {
         const dist = dir.length();
@@ -399,7 +397,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       stage.camera = next;
       renderPass.camera = next;
       gtaoPass.camera = next;
-      for (const pass of outlinePasses) pass.renderCamera = next;
+      outlinePass.renderCamera = next;
       if (gtaoPass.gtaoMaterial) {
         gtaoPass.gtaoMaterial.defines.PERSPECTIVE_CAMERA = next.isPerspectiveCamera ? 1 : 0;
         gtaoPass.gtaoMaterial.needsUpdate = true;
@@ -414,7 +412,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       renderer.setSize(w, h, false);
       composer.setSize(w, h);
       gtaoPass.setSize(w, h);
-      for (const pass of outlinePasses) pass.setSize(w, h);
+      outlinePass.setSize(w, h);
       const aspect = w / h;
       perspCam.aspect = aspect;
       perspCam.updateProjectionMatrix();
@@ -835,7 +833,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       window.removeEventListener('pointermove', onWindowMove);
       window.removeEventListener('pointerup', onWindowUp);
       gtaoPass.dispose();
-      for (const pass of outlinePasses) pass.dispose();
+      outlinePass.dispose();
       outputPass.dispose();
       composer.dispose();
       gizmo.dispose();

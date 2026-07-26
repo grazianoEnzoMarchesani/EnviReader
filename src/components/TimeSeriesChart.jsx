@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatValue } from '../lib/colormap';
+import { niceTicks } from '../lib/chartAxis';
 
 // Grafico a linee della serie temporale nel punto selezionato, in SVG puro.
 // La linea verticale piena marca l'istante mostrato nelle mappe; il crosshair
@@ -7,16 +8,6 @@ import { formatValue } from '../lib/colormap';
 const HEIGHT = 240;
 const M = { top: 22, right: 16, bottom: 26, left: 56 };
 const MAX_MARKERS = 60; // oltre, i punti diventano rumore: resta la sola linea
-
-// Tacche "pulite" per l'asse y (1/2/2.5/5 per potenza di dieci)
-function niceTicks(min, max, count = 5) {
-  const span = max - min || 1;
-  const mag = 10 ** Math.floor(Math.log10(span / count));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => span / s <= count) || 10 * mag;
-  const ticks = [];
-  for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-6; v += step) ticks.push(v);
-  return ticks;
-}
 
 // Spezza la polilinea sui NaN (i "no data" di ENVI-met) invece di collegarli
 function linePath(values, xAt, yAt) {
@@ -67,7 +58,7 @@ export default function TimeSeriesChart({ series, labels, time, onSelectTime }) 
   const innerH = HEIGHT - M.top - M.bottom;
   const xAt = (i) => M.left + (n > 1 ? (i / (n - 1)) * innerW : innerW / 2);
   const yAt = (v) => M.top + (1 - (v - min) / span) * innerH;
-  const yTicks = niceTicks(min, max);
+  const yTicks = niceTicks(min, max, 5);
   const xStep = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(innerW / 90))));
   // delle etichette "2023-06-21 · 14:00" sull'asse resta la sola ora
   const shortLabel = (i) => (labels[i] ?? String(i)).split(' · ').pop();

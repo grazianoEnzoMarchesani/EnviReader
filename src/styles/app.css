@@ -151,18 +151,6 @@ button { font-family: inherit; }
 .theme-switch { display: flex; align-items: center; gap: 8px; background: transparent; border: none; cursor: pointer; padding: 4px; }
 .theme-switch-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
 
-.info-btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-secondary);
-  font-style: italic;
-  font-weight: 700;
-  cursor: pointer;
-  font-size: 13px;
-}
 
 /* ---------- nav bar ---------- */
 .navbar {
@@ -801,7 +789,6 @@ button { font-family: inherit; }
 .chip.accent { background: var(--accent-soft); color: var(--accent-text); border-color: var(--accent-soft); }
 
 /* ---------- segmented ---------- */
-.segmented-row { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
 .segmented { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; width: fit-content; flex-shrink: 0; }
 .segmented > button {
   flex: 0 0 auto;
@@ -819,7 +806,6 @@ button { font-family: inherit; }
 .segmented > button:disabled { color: var(--text-faint); cursor: not-allowed; }
 .segmented > button.active-accent { background: var(--accent); color: #fff; }
 .segmented > button.active-dark { background: var(--text); color: var(--surface); }
-.hint-text { font-size: 12px; color: var(--text-faint); font-style: italic; }
 
 /* ---------- chart cards ---------- */
 /* Riga di card a capo automatico: la larghezza arriva dallo zoom viste
@@ -1280,7 +1266,6 @@ button { font-family: inherit; }
   background-image: repeating-linear-gradient(45deg, var(--stripe-a) 0 16px, transparent 16px 32px);
 }
 .model-hint { font-size: 11px; color: var(--text-faint); font-style: italic; }
-.sidebar-field { display: flex; flex-direction: column; gap: 6px; margin: 4px 0; }
 
 /* viewer 3D attivo: il canvas riempie il riquadro, niente trama a righe */
 .model-viewer.is-3d {
@@ -1361,9 +1346,6 @@ button { font-family: inherit; }
   pointer-events: none;
   opacity: 0.94;
 }
-.sun-info-row { display: flex; align-items: center; gap: 14px; justify-content: space-between; }
-.sun-info-row span { color: var(--text-faint); }
-.sun-info-row strong { color: var(--text); font-family: var(--mono); font-weight: 600; }
 .sun-info-warning { color: var(--text-faint); font-style: italic; font-size: 11px; max-width: 220px; }
 
 /* Comparsa/scomparsa dei badge calendario/orologio (sia in 2D dentro .map-frame
@@ -1409,15 +1391,6 @@ button { font-family: inherit; }
 }
 .model-sun-badge svg { width: 14px; height: 14px; color: var(--text-secondary); flex-shrink: 0; }
 
-.sun-linked-date { display: block; margin: -4px 0 8px; }
-.sun-timeline-label {
-  display: block;
-  margin-top: 6px;
-  font-family: var(--mono);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 /* ---------- boundary view ---------- */
 /* min-height (non height) così la pagina riempie lo spazio quando è vuota ma

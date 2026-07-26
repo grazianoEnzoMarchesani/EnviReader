@@ -181,19 +181,9 @@ export function IconSun(props) {
   );
 }
 
-export function IconWindVolume(props) {
-  return (
-    <svg {...base} width="18" height="18" {...props}>
-      <path d="M2 7h11.5a2.5 2.5 0 1 0-2.4-3.2" />
-      <path d="M2 12h15.5a2.5 2.5 0 1 1-2.4 3.2" />
-      <path d="M2 17h9" />
-    </svg>
-  );
-}
-
 // Icona compatta per il pulsante ciclico "Wind display" della toolbar 3D
-// (off → 2D → 3D): due sole linee di soffio, più corte di IconWindVolume,
-// per lasciare spazio al badge "2D"/"3D" sovrapposto in basso a destra.
+// (off → 2D → 3D): due sole linee di soffio, corte, per lasciare spazio al
+// badge "2D"/"3D" sovrapposto in basso a destra.
 export function IconWindGust(props) {
   return (
     <svg {...base} width="18" height="18" {...props}>

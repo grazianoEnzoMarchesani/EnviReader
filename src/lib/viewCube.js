@@ -460,9 +460,6 @@ export function createViewCube(stage, hitEl, { onUserGoTo } = {}) {
   hitEl.addEventListener('click', onClick);
 
   return {
-    get animating() {
-      return !!anim;
-    },
     // annulla lo stato interno del gizmo che sopravvive a un reset "Home":
     // un'animazione goTo/rotate in corso (altrimenti l'update() successivo
     // sovrascrive la posizione appena impostata da resetView) e la vista

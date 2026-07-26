@@ -12,7 +12,10 @@
 // per costruire le mesh — l'unica parte che deve restare lì.
 import { loadWindVolume } from './envimet';
 import { niceCeil, traceStreamlines3D } from './windField';
-import { resolveZLevels, levelBoundaries, windCellHeight, volumeArrowStride, volumeStreamSep } from './windVolumeMath';
+import {
+  resolveZLevels, windCellHeight, volumeArrowStride, volumeStreamSep,
+  lineToSegmentCells, pushArrowhead, COMBINED_MARKER_LEN_FACTOR, COMBINED_MARKER_ASPECT,
+} from './windVolumeMath';
 
 function packCells(list) {
   const out = new Float32Array(list.length * 8);
@@ -38,7 +41,6 @@ function computeCells({ structure, groupPath, timeIndex, geometry, spacingZ, sty
     const toX = (i) => (I * dx) / 2 - (i + 0.5) * dx;
     const toZ = (j) => (J * dy) / 2 - (j + 0.5) * dy;
     const zLevels = resolveZLevels(geometry, dims.z, spacingZ);
-    const boundaries = levelBoundaries(zLevels);
     const cellSize = Math.min(dx, dy);
 
     const arrowCells = [];
@@ -66,7 +68,7 @@ function computeCells({ structure, groupPath, timeIndex, geometry, spacingZ, sty
             const length = speed * lenScale;
             if (length < cellSize * 0.15) continue;
             arrowCells.push({
-              x: toX(i), y: windCellHeight(zLevels, boundaries, k), z: toZ(j),
+              x: toX(i), y: windCellHeight(zLevels, k), z: toZ(j),
               dirX: -u, dirY: w, dirZ: v, length, radius: cellSize * (0.05 + 0.1 * (size / 100)),
             });
           }
@@ -78,43 +80,19 @@ function computeCells({ structure, groupPath, timeIndex, geometry, spacingZ, sty
       const sep = volumeStreamSep(dims, density);
       const lines = traceStreamlines3D(volume, sep, refValue);
       const radius = cellSize * (0.035 + 0.07 * (size / 100));
-      // Solo punta (nessuna asta, vedi headGeometry/instancedFromCells in
-      // inxScene.js), tozza e centrata sul punto della curva — non ancorata
-      // alla coda e proiettata in avanti, altrimenti su una streamline curva
-      // se ne stacca visibilmente (vedi pushArrowhead, inxScene.js).
-      const headLen = cellSize * 0.42;
-      const headRadius = headLen * 0.4;
+      const headLen = cellSize * COMBINED_MARKER_LEN_FACTOR;
+      const headRadius = headLen * COMBINED_MARKER_ASPECT;
       const headSpacing = Math.max(2, sep * 1.4);
       for (const line of lines) {
-        const points = line.map(([gi, gj, gk]) => [toX(gi), windCellHeight(zLevels, boundaries, gk) + cellSize * 0.01, toZ(J - 1 - gj)]);
-        for (let p = 1; p < points.length; p++) {
-          const [x0, y0, z0] = points[p - 1];
-          const [x1, y1, z1] = points[p];
-          const ddx = x1 - x0, ddy = y1 - y0, ddz = z1 - z0;
-          const length = Math.hypot(ddx, ddy, ddz);
-          if (length < 1e-6) continue;
-          segCells.push({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: (z0 + z1) / 2, dirX: ddx, dirY: ddy, dirZ: ddz, length, radius });
-        }
+        const points = line.map(([gi, gj, gk]) => [toX(gi), windCellHeight(zLevels, gk) + cellSize * 0.01, toZ(J - 1 - gj)]);
+        segCells.push(...lineToSegmentCells(points, radius));
         if (style === 'combined') {
-          // Testina centrata sul punto points[p] (mondo), tangente presa dai
-          // vertici REALI p-1→p+1 già usati per i segCells — non dal campo
-          // u/v/w ricampionato in un punto isolato — così coda e punta
-          // restano sulla curva anche dove questa flette parecchio, invece
-          // di proiettare una freccia rigida in avanti che se ne stacca
-          // visibilmente (vedi stessa logica in pushArrowhead, inxScene.js).
           let acc = headSpacing / 2;
           for (let p = 1; p < points.length - 1; p++) {
             acc += 1;
             if (acc < headSpacing) continue;
             acc = 0;
-            const [x0, y0, z0] = points[p - 1];
-            const [x1, y1, z1] = points[p + 1];
-            const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
-            const segLen = Math.hypot(dx, dy, dz);
-            if (segLen < 1e-6) continue;
-            const nx = dx / segLen, ny = dy / segLen, nz = dz / segLen;
-            const [cx, cy, cz] = points[p];
-            headCells.push({ x: cx, y: cy, z: cz, dirX: nx, dirY: ny, dirZ: nz, length: headLen, radius: headRadius });
+            pushArrowhead(headCells, points, p, headLen, headRadius);
           }
         }
       }

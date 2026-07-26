@@ -57,3 +57,8 @@ export const SCALE_TYPES = [
 export const SCALE_TYPES_3D = SCALE_TYPES.filter((s) => s.value === 'filesetGlobal' || s.value === 'allFilesets' || s.value === 'custom');
 
 export const GITHUB_URL = 'https://github.com/grazianoEnzoMarchesani/EnviReader';
+
+// Valore mostrato dal color picker della linea di sezione quando
+// sectionLineColor è null (colore di tema): un grigio neutro, dato che l'input
+// nativo non sa rendere "auto".
+export const DEFAULT_SECTION_LINE_COLOR = '#808080';

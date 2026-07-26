@@ -4,7 +4,7 @@ import Slider from './controls/Slider';
 import Segmented from './controls/Segmented';
 import Select from './controls/Select';
 import Toggle from './controls/Toggle';
-import { DEFAULT_SECTION_LINE_COLOR } from './views/AnalysisView';
+import { DEFAULT_SECTION_LINE_COLOR } from '../data/constants';
 import { useModalKeyboard } from '../lib/useModalKeyboard';
 
 export default function ViewSettingsModal() {
@@ -26,8 +26,6 @@ export default function ViewSettingsModal() {
     { value: 'style3', label: tr('style_style3') },
   ];
 
-  const currentObjectStyle = state.objectStyle || (state.style1 ? 'style1' : 'default');
-
   return (
     <div className="modal-backdrop" onClick={close}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -36,9 +34,9 @@ export default function ViewSettingsModal() {
         <div className="modal-section-title">{tr('label_object_style')}</div>
         <div className="view-bar-group" style={{ marginBottom: is3D ? 0 : '16px' }}>
           <Select
-            value={currentObjectStyle}
+            value={state.objectStyle}
             options={styleOptions}
-            onChange={(val) => set({ objectStyle: val, style1: val === 'style1' })}
+            onChange={(val) => set({ objectStyle: val })}
           />
         </div>
         {is3D && (

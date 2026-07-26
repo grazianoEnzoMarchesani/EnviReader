@@ -105,7 +105,6 @@ const initialState = {
   // Stile di resa degli oggetti (edifici, vegetazione, terreno), condiviso tra 2D e 3D:
   // 'default' | 'style1' | 'style2' | 'style3'
   objectStyle: 'default',
-  style1: false,
   showReceptors: false,
   showGrid: false,
   showNorthArrow: true,
@@ -282,15 +281,21 @@ export function AppStateProvider({ children }) {
       // la sovrapposizione dei due layer).
       toggle: (key) => set((s) => {
         const next = !s[key];
-        // "Wind field" richiede sia "Data overlay" (showDataVoxels) acceso sia
-        // i voxel smussati (dataVoxelSmooth): in modalità a box il vento sulle
-        // fette viene coperto materialmente. Se l'utente accende il vento
-        // mentre una delle due condizioni è spenta, le accendiamo entrambe
-        // insieme al vento invece di lasciare il toggle senza effetto visibile.
+        // Nel viewer 3D "Wind field" richiede sia "Data overlay"
+        // (showDataVoxels) acceso sia i voxel smussati (dataVoxelSmooth): in
+        // modalità a box il vento sulle fette viene coperto materialmente. Se
+        // l'utente accende il vento mentre una delle due condizioni è spenta,
+        // le accendiamo entrambe insieme al vento invece di lasciare il toggle
+        // senza effetto visibile. Solo dal 3D, però: lo stesso toggle esiste
+        // nella toolbar 2D, dove quei due overlay non c'entrano nulla e
+        // verrebbero accesi di nascosto per la volta successiva in cui si apre
+        // il modello.
         if (key === 'showWindField' && next) {
           const patch = { showWindField: true, showWindVolume: false, windFieldAutoSuspended: false };
-          if (!s.showDataVoxels) patch.showDataVoxels = true;
-          if (!s.dataVoxelSmooth) patch.dataVoxelSmooth = true;
+          if (s.appView === 'model') {
+            if (!s.showDataVoxels) patch.showDataVoxels = true;
+            if (!s.dataVoxelSmooth) patch.dataVoxelSmooth = true;
+          }
           return patch;
         }
         if (key === 'showWindVolume' && next) return { showWindVolume: true, showWindField: false };

@@ -6,6 +6,11 @@ import { traceStreamlines2D } from '../lib/windField';
 // Mantiene le proporzioni fisiche: altezza fissa e larghezza proporzionale,
 // ridotta (senza deformare) solo se non entra nel riquadro.
 const THUMB_HEIGHT = 52;
+// La miniatura sta in ~52 px: ricampionarla al MAX_DIM di colormap (1024) era
+// ~20× il lavoro utile, per ogni canvas e fino a sei miniature per render. Si
+// ricampiona al doppio della dimensione a schermo, così il downscale del
+// browser ha comunque due campioni per pixel su cui fare antialias.
+const THUMB_SUPERSAMPLE = 2;
 
 // Modalità HD: ricampiona la mappa raster/contour alla risoluzione fisica
 // del frame (frameSize, già consapevole dello zoom perché "View zoom" allarga
@@ -43,25 +48,6 @@ export function MapThumb({ slice, objectsSlice, objectsOpts, colors, reversed, w
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (!slice || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const build = renderStyle === 'contour' ? sliceToContourImageData : sliceToImageData;
-    const imgData = build(slice.data, slice.w, slice.h, sliceMin, sliceMax, lut, slice.spacingX, slice.spacingY, slice.extentW, slice.extentH);
-    canvas.width = imgData.width;
-    canvas.height = imgData.height;
-    canvas.getContext('2d').putImageData(imgData, 0, 0);
-  }, [slice, sliceMin, sliceMax, lut, renderStyle]);
-
-  useEffect(() => {
-    if (!objectsSlice || !objectsCanvasRef.current) return;
-    const canvas = objectsCanvasRef.current;
-    const imgData = objectsToImageData(objectsSlice.data, objectsSlice.w, objectsSlice.h, objectsSlice.spacingX, objectsSlice.spacingY, objectsSlice.extentW, objectsSlice.extentH, objectsOpts);
-    canvas.width = imgData.width;
-    canvas.height = imgData.height;
-    canvas.getContext('2d').putImageData(imgData, 0, 0);
-  }, [objectsSlice, objectsOpts]);
-
   const ratio = slice ? slice.extentW / slice.extentH : 1;
   let cssW = THUMB_HEIGHT * ratio;
   let cssH = THUMB_HEIGHT;
@@ -69,6 +55,26 @@ export function MapThumb({ slice, objectsSlice, objectsOpts, colors, reversed, w
     cssW = boxWidth;
     cssH = boxWidth / ratio;
   }
+  const maxDim = Math.max(1, Math.round(Math.max(cssW, cssH) * THUMB_SUPERSAMPLE));
+
+  useEffect(() => {
+    if (!slice || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const build = renderStyle === 'contour' ? sliceToContourImageData : sliceToImageData;
+    const imgData = build(slice.data, slice.w, slice.h, sliceMin, sliceMax, lut, slice.spacingX, slice.spacingY, slice.extentW, slice.extentH, maxDim);
+    canvas.width = imgData.width;
+    canvas.height = imgData.height;
+    canvas.getContext('2d').putImageData(imgData, 0, 0);
+  }, [slice, sliceMin, sliceMax, lut, renderStyle, maxDim]);
+
+  useEffect(() => {
+    if (!objectsSlice || !objectsCanvasRef.current) return;
+    const canvas = objectsCanvasRef.current;
+    const imgData = objectsToImageData(objectsSlice.data, objectsSlice.w, objectsSlice.h, objectsSlice.spacingX, objectsSlice.spacingY, objectsSlice.extentW, objectsSlice.extentH, objectsOpts, maxDim);
+    canvas.width = imgData.width;
+    canvas.height = imgData.height;
+    canvas.getContext('2d').putImageData(imgData, 0, 0);
+  }, [objectsSlice, objectsOpts, maxDim]);
 
   useEffect(() => {
     if (wind && windCanvasRef.current && boxWidth) {
@@ -97,14 +103,25 @@ export function MapThumb({ slice, objectsSlice, objectsOpts, colors, reversed, w
 
 /* ---------- campo di vento a frecce ---------- */
 
+// Il disegno del vento è lo stesso sulla mappa grande e nella miniatura, ma i
+// suoi minimi in px sono tarati sulla mappa grande: in una thumb alta ~52 px
+// una freccia da 6 px e un triangolino ogni 130 px lascerebbero due o tre segni
+// in croce. La miniatura campiona quindi più fitto (meno frecce lungo l'asse
+// maggiore, ma su un lato molto più corto) e disegna più piccolo.
+const WIND_PRESETS = {
+  full: { acrossGain: 35, minArrowLen: 6, minDrawLen: 1.5, arrowHeadMin: 3, markSpacing: 130, markMin: 5, markMax: 12 },
+  thumb: { acrossGain: 15, minArrowLen: 2, minDrawLen: 0.5, arrowHeadMin: 1.5, markSpacing: 70, markMin: 3, markMax: 6 },
+};
+const windPreset = (isThumb) => (isThumb ? WIND_PRESETS.thumb : WIND_PRESETS.full);
+
 // Passo di campionamento della griglia e lunghezza (px CSS) della freccia di
 // riferimento; usato sia dal disegno sia dalla legenda, così coincidono sempre.
-function windLayout(field, frameSize, density, size, isThumb) {
-  const across = isThumb ? 10 + (density / 100) * 15 : 10 + (density / 100) * 35; // frecce lungo l'asse maggiore
+function windLayout(field, frameSize, density, size, isThumb = false) {
+  const preset = windPreset(isThumb);
+  const across = 10 + (density / 100) * preset.acrossGain; // frecce lungo l'asse maggiore
   const step = Math.max(1, Math.round(Math.max(field.w, field.h) / across));
   const cell = Math.min(frameSize.w / field.w, frameSize.h / field.h);
-  const minLen = isThumb ? 2 : 6;
-  const maxLen = Math.max(minLen, step * cell * (0.4 + 1.2 * (size / 100)));
+  const maxLen = Math.max(preset.minArrowLen, step * cell * (0.4 + 1.2 * (size / 100)));
   return { step, maxLen };
 }
 
@@ -126,6 +143,7 @@ export function renderWindOnCanvas(canvas, wind, frameSize) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const { field, refValue, opacity, size, density, style, isThumb } = wind;
+  const preset = windPreset(isThumb);
   const { step, maxLen } = windLayout(field, frameSize, density, size, isThumb);
   const alpha = Math.min(1, Math.max(0, opacity / 100));
   ctx.lineCap = 'round';
@@ -186,7 +204,7 @@ export function renderWindOnCanvas(canvas, wind, frameSize) {
       }
     }
     if (style === 'combined') {
-      drawStreamlineArrowheads(ctx, allLines, toPx, toPy, alpha, wMax, isThumb);
+      drawStreamlineArrowheads(ctx, allLines, toPx, toPy, alpha, wMax, preset);
     }
     return;
   }
@@ -207,22 +225,20 @@ export function renderWindOnCanvas(canvas, wind, frameSize) {
         const v = field.v[i];
         if (!Number.isFinite(u) || !Number.isFinite(v)) continue;
         const len = Math.hypot(u, v) * scale;
-        if (len < (isThumb ? 0.5 : 1.5)) continue;
-        drawArrow(ctx, toPx(gx), toPy(gy), Math.atan2(-v, u), len, isThumb);
+        if (len < preset.minDrawLen) continue;
+        drawArrow(ctx, toPx(gx), toPy(gy), Math.atan2(-v, u), len, preset);
       }
     }
   }
 }
 
 // Modalità "combined": sovrappone alle streamline piccoli triangolini di
-// direzione a spaziatura fissa in px CSS, così l'occhio legge il verso del
-// vento senza appesantire il disegno con code d'asta come in modalità frecce.
-const COMBINED_ARROW_SPACING = 130; // px CSS tra un triangolino e il successivo
-const COMBINED_ARROW_SPACING_THUMB = 70;
-
-function drawStreamlineArrowheads(ctx, lines, toPx, toPy, alpha, wMax, isThumb) {
-  const spacing = isThumb ? COMBINED_ARROW_SPACING_THUMB : COMBINED_ARROW_SPACING;
-  const head = Math.min(isThumb ? 6 : 12, Math.max(isThumb ? 3 : 5, wMax * 2.6));
+// direzione a spaziatura fissa in px CSS (markSpacing del preset, vedi
+// WIND_PRESETS), così l'occhio legge il verso del vento senza appesantire il
+// disegno con code d'asta come in modalità frecce.
+function drawStreamlineArrowheads(ctx, lines, toPx, toPy, alpha, wMax, preset) {
+  const spacing = preset.markSpacing;
+  const head = Math.min(preset.markMax, Math.max(preset.markMin, wMax * 2.6));
   const marks = [];
   for (const line of lines) {
     if (line.length < 2) continue;
@@ -267,8 +283,8 @@ function drawStreamlineArrowheads(ctx, lines, toPx, toPy, alpha, wMax, isThumb) 
   }
 }
 
-function drawArrow(ctx, x, y, angle, len, isThumb) {
-  const head = Math.min(6, Math.max(isThumb ? 1.5 : 3, len * 0.35));
+function drawArrow(ctx, x, y, angle, len, preset) {
+  const head = Math.min(6, Math.max(preset.arrowHeadMin, len * 0.35));
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);

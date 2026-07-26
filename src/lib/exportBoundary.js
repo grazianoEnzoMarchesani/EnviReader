@@ -1,100 +1,10 @@
 import { loadForcing } from './forcing';
-
-const SERIES_COLORS = ['--series-a', '--series-b', '--series-c'];
-
-function heightSeries(profile, pick) {
-  return profile.slice(0, 3).map((p, i) => ({
-    name: `${p.height} m`,
-    color: profile.length > 1 ? SERIES_COLORS[i] : '--series-b',
-    values: pick(p),
-  }));
-}
-
-function resolveRange(forcing, period, customRange) {
-  const fox = forcing?.fox;
-  if (!fox) return null;
-  if (period === 'sim') return forcing.window;
-  if (period === 'custom') return customRange;
-  if (period?.startsWith('m:')) {
-    const month = fox.months.find((m) => m.key === period.slice(2));
-    return month ? [month.start, month.end - 1] : null;
-  }
-  return null;
-}
-
-function buildFoxCharts(fox, tr) {
-  if (!fox) return [];
-  const charts = [];
-  if (fox.t.length) charts.push({ key: 't', title: tr('boundary_param_temp') || 'Air temperature', unit: '°C', series: heightSeries(fox.t, (p) => p.values) });
-  if (fox.q.length) charts.push({ key: 'q', title: tr('forcing_q') || 'Specific humidity', unit: 'g/kg', series: heightSeries(fox.q, (p) => p.values) });
-  if (fox.wind.length) {
-    charts.push({ key: 'wspd', title: tr('boundary_param_windspeed') || 'Wind speed', unit: 'm/s', series: heightSeries(fox.wind, (p) => p.speed) });
-    charts.push({
-      key: 'wdir',
-      title: tr('boundary_param_winddir') || 'Wind direction',
-      unit: '°',
-      yDomain: [0, 360],
-      yTickStep: 90,
-      series: heightSeries(fox.wind, (p) => p.dir).map((s) => ({ ...s, kind: 'dots' })),
-    });
-  }
-  const rad = [
-    fox.swDir && { name: tr('forcing_rad_dir') || 'Direct SW', color: SERIES_COLORS[0], values: fox.swDir },
-    fox.swDif && { name: tr('forcing_rad_dif') || 'Diffuse SW', color: SERIES_COLORS[1], values: fox.swDif },
-    fox.lwRad && { name: tr('forcing_rad_lw') || 'Longwave', color: SERIES_COLORS[2], values: fox.lwRad },
-  ].filter(Boolean);
-  if (rad.length) charts.push({ key: 'rad', title: tr('boundary_param_radiation') || 'Radiation', unit: 'W/m²', series: rad });
-  if (fox.precip) {
-    charts.push({ key: 'precip', title: tr('forcing_precip') || 'Precipitation', unit: 'mm', series: [{ name: tr('forcing_precip') || 'Precipitation', color: '--series-b', values: fox.precip, kind: 'area' }] });
-  }
-  if (fox.p.length) charts.push({ key: 'press', title: tr('forcing_press') || 'Pressure', unit: 'hPa', series: heightSeries(fox.p, (p) => p.values) });
-  if (fox.clouds) {
-    charts.push({
-      key: 'clouds',
-      title: tr('forcing_clouds') || 'Clouds',
-      unit: '/8',
-      series: [
-        { name: tr('forcing_clouds_l') || 'Low', color: SERIES_COLORS[0], values: fox.clouds.l },
-        { name: tr('forcing_clouds_m') || 'Medium', color: SERIES_COLORS[1], values: fox.clouds.m },
-        { name: tr('forcing_clouds_h') || 'High', color: SERIES_COLORS[2], values: fox.clouds.h },
-      ],
-    });
-  }
-  for (const [name, values] of Object.entries(fox.pollutants || {})) {
-    charts.push({ key: `poll-${name}`, title: `${tr('forcing_poll') || 'Pollutant'} · ${name}`, unit: 'µg/m³', series: [{ name, color: '--series-b', values }] });
-  }
-  return charts;
-}
-
-function niceTicks(min, max, count = 4) {
-  const span = max - min || 1;
-  const mag = 10 ** Math.floor(Math.log10(span / count));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => span / s <= count) || 10 * mag;
-  const ticks = [];
-  for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-6; v += step) ticks.push(v);
-  return ticks;
-}
-
-function formatValue(val, rangeSpan = null) {
-  if (val == null || Number.isNaN(val)) return '—';
-  const v = Number(val);
-  if (v === 0) return '0';
-  if (rangeSpan != null) {
-    if (rangeSpan <= 2) return v.toFixed(3);
-    if (rangeSpan <= 10) return v.toFixed(2);
-    if (rangeSpan <= 50) return v.toFixed(1);
-    return v.toFixed(0);
-  }
-  return v.toFixed(2);
-}
-
-function tickLabel(label, shortRange) {
-  const [date, time] = String(label).split(' · ');
-  if (!time) return date ?? '';
-  if (shortRange) return time;
-  const [, m, d] = date.split('-');
-  return `${d}/${m}`;
-}
+import { buildFoxCharts, resolveRange } from './foxCharts';
+import { niceTicks, tickLabel } from './chartAxis';
+// Stessa formattazione dei valori usata a schermo da ForcingChart: le etichette
+// degli assi dell'SVG esportato devono leggersi identiche a quelle del grafico
+// da cui l'utente lo sta esportando (prima qui si arrivava a 3 decimali).
+import { formatValue } from './colormap';
 
 const resolveColor = (name) => {
   const vars = {
@@ -239,18 +149,18 @@ export async function generateBoundarySVGs(fileset, type, foxFileOverride, tr, p
     const labels = forcing.simple.t.map((_, i) => `${String(i % 24).padStart(2, '0')}:00`);
     const tempChart = {
       key: 't',
-      title: tr('boundary_param_temp') || 'Air temperature',
+      title: tr('boundary_param_temp'),
       unit: '°C',
-      series: [{ name: tr('boundary_param_temp') || 'Air temperature', color: '--series-b', values: forcing.simple.t }]
+      series: [{ name: tr('boundary_param_temp'), color: '--series-b', values: forcing.simple.t }]
     };
     svgs.push({ filename: `Boundary_${type}_t.svg`, svgString: generateChartSvg(tempChart, labels, range) });
 
     if (forcing.simple.q) {
       const qChart = {
         key: 'q',
-        title: tr('boundary_param_humidity') || 'Specific humidity',
+        title: tr('boundary_param_humidity'),
         unit: '%',
-        series: [{ name: tr('boundary_param_humidity') || 'Specific humidity', color: '--series-b', values: forcing.simple.q }]
+        series: [{ name: tr('boundary_param_humidity'), color: '--series-b', values: forcing.simple.q }]
       };
       svgs.push({ filename: `Boundary_${type}_q.svg`, svgString: generateChartSvg(qChart, labels, range) });
     }

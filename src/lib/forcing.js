@@ -1,6 +1,8 @@
 // Condizioni al contorno ENVI-met: parsing del SIMX (quasi-XML) e del FOX
 // (JSON "Full Forcing"). Nessuna dipendenza esterna; -999 diventa NaN.
 
+import { findFileBy } from './envimet';
+
 const NO_DATA = -999;
 
 /* ---------- SIMX ---------- */
@@ -57,18 +59,6 @@ export function findFoxFile(structure, referencedName) {
     if (exact) return exact;
   }
   return findFileBy(structure, (name) => /\.fox$/i.test(name));
-}
-
-function findFileBy(structure, predicate) {
-  for (const file of structure.files || []) {
-    if (predicate(file.name)) return file;
-  }
-  for (const [key, value] of Object.entries(structure)) {
-    if (key === 'files' || typeof value !== 'object' || Array.isArray(value)) continue;
-    const found = findFileBy(value, predicate);
-    if (found) return found;
-  }
-  return null;
 }
 
 const clean = (v) => (v == null || v === NO_DATA ? NaN : v);

@@ -6,6 +6,36 @@ import { hasVerticalExtent } from './envimet';
 // Ritorna il tempo di attesa come Promise
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Righe dello slice per l'export tabellare, dalla prima riga in alto (nord)
+// come si vede nella mappa: `blank` è il valore per le celle senza dato
+// (stringa vuota nel testo, null in Excel) e `cast` converte il numero
+// arrotondato ai decimali richiesti.
+function sliceRows(slice, decimals, blank, cast) {
+  const rows = [];
+  for (let y = 0; y < slice.h; y++) {
+    const srcRow = slice.h - 1 - y;
+    const row = [];
+    for (let x = 0; x < slice.w; x++) {
+      const val = slice.data[srcRow * slice.w + x];
+      row.push(Number.isNaN(val) ? blank : cast(Number(val).toFixed(decimals)));
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+// Testo tabulato (una riga per riga di griglia) e foglio XLSX dello slice
+const sliceTsvBlob = (slice, decimals) =>
+  new Blob([sliceRows(slice, decimals, '', String).map((r) => r.join('\t')).join('\n') + '\n'], { type: 'text/tab-separated-values' });
+const sliceSheet = (slice, decimals) => XLSX.utils.aoa_to_sheet(sliceRows(slice, decimals, null, Number));
+
+// Caratteri riservati nei nomi file, sostituiti con "_": il nome del dataset
+// e quello della simulazione finiscono nel nome così come sono, e uno come
+// "Flow w (m/s)" spezzerebbe il percorso dentro lo ZIP creando sottocartelle
+// involontarie (gli altri caratteri sono riservati su Windows). Gli spazi
+// restano: sono legittimi e già presenti nei nomi esportati finora.
+const safeFilePart = (s) => String(s ?? '').replace(/[/\\:*?"<>|]/g, '_');
+
 // Ottiene un nome file parlante per la mappa corrente
 function getMapFilename(state, type, vType, timeIndex, isAnimation = false) {
   const { dataset, level, filesetA, filesetB, seriesLabels } = state;
@@ -17,9 +47,9 @@ function getMapFilename(state, type, vType, timeIndex, isAnimation = false) {
   }
   
   const viewStr = vType === 'plan' ? `Z=${level}` : (vType === 'sectionX' ? 'SectionX' : 'SectionY');
-  const timeStr = isAnimation ? 'Animation' : (seriesLabels[timeIndex] || `t=${timeIndex}`).replace(/[: \/]/g, '_');
+  const timeStr = isAnimation ? 'Animation' : (seriesLabels[timeIndex] || `t=${timeIndex}`).replace(/[: /]/g, '_');
 
-  return `${simName}_${dataset}_${viewStr}_${timeStr}`;
+  return `${safeFilePart(simName)}_${safeFilePart(dataset)}_${viewStr}_${timeStr}`;
 }
 
 // Genera un SVG "Ibrido": incorpora le mappe raster come immagini Base64 
@@ -92,7 +122,7 @@ async function generateHybridSvg(card) {
       let defs = '';
       if (bgImage && bgImage.includes('linear-gradient')) {
         const colorsStr = bgImage.substring(bgImage.indexOf('linear-gradient') + 15, bgImage.lastIndexOf(')'));
-        const parts = colorsStr.split(/,(?![^\(]*\))/);
+        const parts = colorsStr.split(/,(?![^(]*\))/);
         let colors = parts;
         if (parts[0].includes('deg') || parts[0].includes('to ')) colors = parts.slice(1);
         
@@ -269,10 +299,10 @@ function getStyledSvgString(svgElement) {
   let source = serializer.serializeToString(clonedSvg);
   
   // Aggiunge name spaces se mancanti
-  if (!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
+  if (!source.match(/^<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)) {
     source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
   }
-  if (!source.match(/^<svg[^>]+"http\:\/\/www\.w3\.org\/1999\/xlink"/)) {
+  if (!source.match(/^<svg[^>]+"http:\/\/www\.w3\.org\/1999\/xlink"/)) {
     source = source.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
   }
   
@@ -282,10 +312,12 @@ function getStyledSvgString(svgElement) {
 export async function exportCharts({ state, setState, exportMode, zipAll, groupFolders, saveSvg, saveBoundarySvg, saveGif, fps, saveDatasheet, datasheetFormat, datasheetDecimals, tr, onProgress }) {
   // Dichiarate fuori dal try: servono anche nel catch per ripristinare lo
   // stato dell'app se l'export fallisce (es. libreria non caricata).
-  const { seriesLabels, time: originalTime, compareMode: originalCompareMode, filesetBOpen } = state;
+  const { seriesLabels, time: originalTime, compareMode: originalCompareMode } = state;
   const numSteps = seriesLabels?.length || 0;
   const originalViewType = state.viewType;
   const originalAppView = state.appView;
+  // Dichiarato qui: se l'export fallisce a metà va rimosso comunque
+  let styleEl = null;
   try {
     if (!window.htmlToImage) {
       throw new Error("html-to-image library is not loaded.");
@@ -352,15 +384,8 @@ export async function exportCharts({ state, setState, exportMode, zipAll, groupF
       }
     }
 
-    const getMapTypes = () => {
-      if (exportMode === 'single') return ['A'];
-      if (exportMode === 'b') return ['B'];
-      if (exportMode === 'diff') return ['Diff'];
-      if (exportMode === 'ab') return ['A', 'B'];
-      if (exportMode === 'abdiff') return ['A', 'B', 'Diff'];
-      return ['A', 'B', 'Diff'];
-    };
-    const mapTypes = getMapTypes();
+    // exportMode viene dal selettore del modale: gli stessi valori di compareMode
+    const mapTypes = { single: ['A'], b: ['B'], ab: ['A', 'B'] }[exportMode] ?? ['A', 'B', 'Diff'];
     // Gruppi dati senza estensione verticale (es. Surface, un solo livello Z)
     // non hanno sezioni Longitudinal/Transverse sensate: si esporta solo la pianta.
     const allViewTypes = hasVerticalExtent(state.edxMeta?.dimensions) ? ['plan', 'sectionX', 'sectionY'] : ['plan'];
@@ -393,7 +418,7 @@ export async function exportCharts({ state, setState, exportMode, zipAll, groupF
     // INJECT FIXED SIZE CSS FOR EXPORT
     // This guarantees that all exports are completely independent of the screen size
     // and the compare mode, resulting in identical high-res images every time.
-    const styleEl = document.createElement('style');
+    styleEl = document.createElement('style');
     styleEl.textContent = `
       .chart-grid { display: block !important; width: 1200px !important; }
       .chart-grid > .chart-card { width: 1200px !important; flex: none !important; margin-bottom: 20px !important; }
@@ -417,40 +442,17 @@ export async function exportCharts({ state, setState, exportMode, zipAll, groupF
         
         let datasheetBlob = null;
         let datasheetExt = '';
-        if (saveDatasheet && !saveGif) {
-          const slice = currentSlices[type];
-          if (slice && slice.data) {
-            if (datasheetFormat === 'txt') {
-              let csvStr = '';
-              for (let y = 0; y < slice.h; y++) {
-                const srcRow = slice.h - 1 - y;
-                const row = [];
-                for (let x = 0; x < slice.w; x++) {
-                  const val = slice.data[srcRow * slice.w + x];
-                  row.push(Number.isNaN(val) ? '' : Number(val).toFixed(datasheetDecimals));
-                }
-                csvStr += row.join('\t') + '\n';
-              }
-              datasheetBlob = new Blob([csvStr], { type: 'text/tab-separated-values' });
-              datasheetExt = '.txt';
-            } else if (datasheetFormat === 'xlsx') {
-              const aoa = [];
-              for (let y = 0; y < slice.h; y++) {
-                const srcRow = slice.h - 1 - y;
-                const row = [];
-                for (let x = 0; x < slice.w; x++) {
-                  const val = slice.data[srcRow * slice.w + x];
-                  row.push(Number.isNaN(val) ? null : Number(Number(val).toFixed(datasheetDecimals)));
-                }
-                aoa.push(row);
-              }
-              const ws = XLSX.utils.aoa_to_sheet(aoa);
-              const wb = XLSX.utils.book_new();
-              XLSX.utils.book_append_sheet(wb, ws, "Data");
-              const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-              datasheetBlob = new Blob([wbout], { type: 'application/octet-stream' });
-              datasheetExt = '.xlsx';
-            }
+        const slice = currentSlices[type];
+        if (saveDatasheet && !saveGif && slice?.data) {
+          if (datasheetFormat === 'txt') {
+            datasheetBlob = sliceTsvBlob(slice, datasheetDecimals);
+            datasheetExt = '.txt';
+          } else if (datasheetFormat === 'xlsx') {
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, sliceSheet(slice, datasheetDecimals), 'Data');
+            const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            datasheetBlob = new Blob([wbout], { type: 'application/octet-stream' });
+            datasheetExt = '.xlsx';
           }
         }
         
@@ -547,33 +549,12 @@ export async function exportCharts({ state, setState, exportMode, zipAll, groupF
               const slice = currentSlices[type];
               const builder = datasheetBuilders.find(b => b.type === type && b.vType === vType);
               if (builder && slice && slice.data) {
-                const sheetName = (seriesLabels[t] || `t=${t}`).replace(/[: \/\\?*\[\]]/g, '-').substring(0, 31);
+                const sheetName = (seriesLabels[t] || `t=${t}`).replace(/[: /\\?*[\]]/g, '-').substring(0, 31);
                 
                 if (datasheetFormat === 'txt') {
-                  let csvStr = '';
-                  for (let y = 0; y < slice.h; y++) {
-                    const srcRow = slice.h - 1 - y;
-                    const row = [];
-                    for (let x = 0; x < slice.w; x++) {
-                      const val = slice.data[srcRow * slice.w + x];
-                      row.push(Number.isNaN(val) ? '' : Number(val).toFixed(datasheetDecimals));
-                    }
-                    csvStr += row.join('\t') + '\n';
-                  }
-                  builder.txtFiles.push({ name: sheetName, blob: new Blob([csvStr], { type: 'text/tab-separated-values' }) });
+                  builder.txtFiles.push({ name: sheetName, blob: sliceTsvBlob(slice, datasheetDecimals) });
                 } else if (datasheetFormat === 'xlsx') {
-                  const aoa = [];
-                  for (let y = 0; y < slice.h; y++) {
-                    const srcRow = slice.h - 1 - y;
-                    const row = [];
-                    for (let x = 0; x < slice.w; x++) {
-                      const val = slice.data[srcRow * slice.w + x];
-                      row.push(Number.isNaN(val) ? null : Number(Number(val).toFixed(datasheetDecimals)));
-                    }
-                    aoa.push(row);
-                  }
-                  const ws = XLSX.utils.aoa_to_sheet(aoa);
-                  XLSX.utils.book_append_sheet(builder.wb, ws, sheetName);
+                  XLSX.utils.book_append_sheet(builder.wb, sliceSheet(slice, datasheetDecimals), sheetName);
                 }
               }
             }
@@ -644,7 +625,8 @@ export async function exportCharts({ state, setState, exportMode, zipAll, groupF
     }
 
     // 4. Cleanup and restore
-    document.head.removeChild(styleEl);
+    styleEl.remove();
+    styleEl = null;
     setState({ time: originalTime, viewType: originalViewType, appView: originalAppView, compareMode: originalCompareMode });
     await wait(100);
 
@@ -665,11 +647,7 @@ export async function exportCharts({ state, setState, exportMode, zipAll, groupF
     await wait(500);
   } catch (err) {
     console.error('exportUtils error:', err);
-    // Assicuriamoci di ripulire lo stile in caso di errore (se esiste)
-    const injected = document.head.querySelector('style:last-of-type');
-    if (injected && injected.textContent.includes('1200px')) {
-      document.head.removeChild(injected);
-    }
+    styleEl?.remove();
     if (originalTime !== undefined) {
       setState({ time: originalTime, viewType: originalViewType, appView: originalAppView, compareMode: originalCompareMode });
     }

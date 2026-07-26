@@ -1,32 +1,24 @@
-import { useMemo, useEffect, useRef, useState } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { VIEW_TYPES, SCALE_TYPES } from '../../data/constants';
-import { findPalette } from '../../data/palettes';
+import { activePalette } from '../../data/palettes';
 import { useAppState } from '../../state/AppStateContext';
 import { useI18n } from '../../i18n/I18nContext';
 import Segmented from '../controls/Segmented';
 import Slider from '../controls/Slider';
-import Select from '../controls/Select';
 import IconToggle from '../controls/IconToggle';
 import HelpTooltip from '../controls/HelpTooltip';
 import { IconLayers3D, IconBuilding, IconTerrain, IconTerrainFix, IconTree, IconCompass, IconCalendar, IconClock, IconSettings, IconWindGust, IconHD } from '../icons/ToolbarIcons';
 import ViewSettingsModal from '../ViewSettingsModal';
 import MapChart, { MapThumb } from '../MapChart';
-import TimeSeriesChart from '../TimeSeriesChart';
-import { useSlices, usePointSeries, useInxRotation, useWindFields, useTerrainCut } from '../../lib/useSlice';
+import PointSeriesCard from '../PointSeriesCard';
+import { useSlices, useInxRotation, useWindFields, useTerrainCut } from '../../lib/useSlice';
 import { terrainCutProfile, isBiometDataset, hasVerticalExtent } from '../../lib/envimet';
 import { useFlip } from '../../lib/useFlip';
 import { formatValue } from '../../lib/colormap';
 import { niceCeil } from '../../lib/windField';
-
-function formatTime(time) {
-  const h = String(Math.floor(time / 4)).padStart(2, '0');
-  const m = String((time % 4) * 15).padStart(2, '0');
-  return `${h}:${m}`;
-}
-
-// Valore mostrato dal color picker quando sectionLineColor è null (colore di
-// tema): un grigio neutro, dato che l'input nativo non sa rendere "auto"
-export const DEFAULT_SECTION_LINE_COLOR = '#808080';
+import { viewRanges, VIEW_KEYS } from '../../lib/sliceRange';
+import { filesetLabel, timeLabel } from '../../lib/labels';
+import { useModesLayout } from '../../lib/useModesLayout';
 
 // Differenza cella per cella tra due slice della stessa griglia, con range
 // simmetrico attorno allo zero (il punto neutro della palette divergente)
@@ -93,14 +85,8 @@ export default function AnalysisView() {
   const { state, set, toggle, setCompareMode } = useAppState();
   const { tr } = useI18n();
 
-  // Con l'editor palette aperto le mappe mostrano il draft in tempo reale;
-  // i colori del draft sono già orientati, quindi l'inversione non si riapplica.
-  const draft = state.paletteDraft;
-  const draftPalette = draft && { id: '__draft', name: draft.name.trim() || tr('custom_default_name'), colors: draft.colors };
-  const activePalette = draft?.target === 'main' ? draftPalette : findPalette(state.palette, 'main', state.customPalettes);
-  const mainReversed = draft?.target === 'main' ? false : state.paletteReversed;
-  const activeDiffPalette = draft?.target === 'diff' ? draftPalette : findPalette(state.diffPalette, 'diff', state.customPalettes);
-  const diffReversed = draft?.target === 'diff' ? false : state.diffPaletteReversed;
+  const { palette: mainPalette, reversed: mainReversed } = activePalette(state, tr, 'main');
+  const { palette: diffPalette, reversed: diffReversed } = activePalette(state, tr, 'diff');
   const activeViewType = VIEW_TYPES.find((v) => v.key === state.viewType) || VIEW_TYPES[0];
   // Le sezioni Longitudinal/Transverse tagliano in altezza: su un gruppo dati
   // senza estensione verticale (es. Surface, un solo livello Z) non
@@ -110,7 +96,7 @@ export default function AnalysisView() {
 
   const loaded = !!state.edxMeta;
   const datasetLabel = loaded ? state.dataset : tr(state.dataset);
-  const timeLabel = state.seriesLabels[state.time] ?? `t · ${formatTime(state.time)}`;
+  const timeStamp = timeLabel(state);
   const diffOrderLabel = state.diffOrderAB ? tr('diff_order_ab') : tr('diff_order_ba');
 
   const terrainCutA = useTerrainCut(state.terrainA, state);
@@ -145,9 +131,8 @@ export default function AnalysisView() {
     showBuildings: state.objOverlayBuildings,
     showTerrain: state.objOverlayTerrain,
     showVegetation: state.objOverlayVegetation,
-    objectStyle: state.objectStyle || (state.style1 ? 'style1' : 'default'),
-    style1: state.style1,
-  }), [state.objOverlayOpacity, state.objOverlayBuildings, state.objOverlayTerrain, state.objOverlayVegetation, state.objectStyle, state.style1]);
+    objectStyle: state.objectStyle,
+  }), [state.objOverlayOpacity, state.objOverlayBuildings, state.objOverlayTerrain, state.objOverlayVegetation, state.objectStyle]);
 
   const objectsThumbsDiff = useMemo(() => ({
     plan: objectsSlicesA.plan || objectsSlicesB.plan,
@@ -163,12 +148,15 @@ export default function AnalysisView() {
   const windFieldsB = useWindFields(state.showWindField && state.compareMode !== 'single', state.filesetB, ...windArgs, terrainCutB);
   
   let maxMag = 0;
-  for (const k of ['plan', 'sectionX', 'sectionY']) {
+  for (const k of VIEW_KEYS) {
     if (windFieldsA[k] && windFieldsA[k].maxMag > maxMag) maxMag = windFieldsA[k].maxMag;
     if (windFieldsB[k] && windFieldsB[k].maxMag > maxMag) maxMag = windFieldsB[k].maxMag;
   }
   const windRef = niceCeil(maxMag);
 
+  // isThumb arriva fino al disegno (WIND_PRESETS in MapChart): oltre a limitare
+  // dimensione e densità scelte dall'utente, sceglie i minimi in px adatti a una
+  // miniatura alta ~52 px.
   const windFor = (field, isThumb = false) =>
     field && windRef > 0
       ? {
@@ -178,6 +166,7 @@ export default function AnalysisView() {
           opacity: state.windOpacity,
           size: isThumb ? Math.min(state.windSize, 50) : state.windSize,
           density: isThumb ? Math.min(state.windDensity, 20) : state.windDensity,
+          isThumb,
         }
       : null;
 
@@ -192,21 +181,17 @@ export default function AnalysisView() {
     sectionY: windFor(windFieldsB.sectionY, true),
   };
 
-  // Serie temporale nel punto selezionato (incrocio delle sezioni, livello corrente)
-  const pointArgs = [state.dataGroup, state.dataset, state.sectionX, state.sectionY, state.level];
-  const pointSeriesA = usePointSeries(state.filesetA, ...pointArgs, terrainCutA);
-  const pointSeriesB = usePointSeries(state.filesetB, ...pointArgs, terrainCutB);
-
   const sliceA = slicesA[state.viewType];
   const sliceB = slicesB[state.viewType];
   const sliceDiff = slicesDiff[state.viewType];
 
+  // Gli slice mostrati ora, letti dall'exporter (exportUtils) che gira fuori
+  // da React: azzerati allo smontaggio della vista, altrimenti i Float32Array
+  // dell'ultimo dataset aperto resterebbero vivi finché non se ne carica un
+  // altro (uscendo da Data Analysis o chiudendo il fileset).
   useEffect(() => {
-    window.__currentSlices = {
-      A: sliceA,
-      B: sliceB,
-      Diff: sliceDiff
-    };
+    window.__currentSlices = { A: sliceA, B: sliceB, Diff: sliceDiff };
+    return () => { window.__currentSlices = null; };
   }, [sliceA, sliceB, sliceDiff]);
 
   const objectsSliceA = objectsSlicesA[state.viewType];
@@ -215,7 +200,6 @@ export default function AnalysisView() {
   // Simbolo del nord solo sulle piante, orientato con modelRotation dell'INX
   const rotationA = useInxRotation(state.filesetA);
   const rotationB = useInxRotation(state.filesetB);
-  const isPlan = state.viewType === 'plan';
   // Sempre presente (non solo quando il toggle è attivo): "visible" pilota la
   // transizione CSS di comparsa/scomparsa, che altrimenti non potrebbe animare
   // l'uscita (l'elemento andrebbe smontato di scatto insieme al toggle).
@@ -223,85 +207,10 @@ export default function AnalysisView() {
   const compassB = { type: state.viewType, rotation: rotationB, sectionAngle: state.sectionAngle, visible: state.showNorthArrow };
   const compassDiff = { type: state.viewType, rotation: (rotationA ?? rotationB), sectionAngle: state.sectionAngle, visible: state.showNorthArrow };
 
-  // Calcolo dei range (min/max) per ciascuna vista in base allo scaleType
-  const minOf = (...slices) => {
-    let m = Infinity;
-    for (const s of slices) if (s && s.min < m) m = s.min;
-    return m === Infinity ? 0 : m;
-  };
-  const maxOf = (...slices) => {
-    let m = -Infinity;
-    for (const s of slices) if (s && s.max > m) m = s.max;
-    return m === -Infinity ? 0 : m;
-  };
-
-  const rangesA = {};
-  const rangesB = {};
-  const rangesDiff = {};
-  let thumbShowLegendA = false;
-  let thumbShowLegendB = false;
-  const thumbShowLegendDiff = true; // Diff è sempre individuale
-
-  for (const k of ['plan', 'sectionX', 'sectionY']) {
-    if (state.scaleType === 'custom' && state.customRanges[`Diff-${k}`]) {
-      rangesDiff[k] = state.customRanges[`Diff-${k}`];
-    } else {
-      rangesDiff[k] = slicesDiff[k] ? { min: slicesDiff[k].min, max: slicesDiff[k].max } : null;
-    }
-  }
-
-  if (state.scaleType === 'individual') {
-    for (const k of ['plan', 'sectionX', 'sectionY']) {
-      rangesA[k] = slicesA[k] ? { min: slicesA[k].min, max: slicesA[k].max } : null;
-      rangesB[k] = slicesB[k] ? { min: slicesB[k].min, max: slicesB[k].max } : null;
-    }
-    thumbShowLegendA = true;
-    thumbShowLegendB = true;
-  } else if (state.scaleType === 'syncedViews') {
-    for (const k of ['plan', 'sectionX', 'sectionY']) {
-      const mn = minOf(slicesA[k], slicesB[k]);
-      const mx = maxOf(slicesA[k], slicesB[k]);
-      const r = (slicesA[k] || slicesB[k]) ? { min: mn, max: mx } : null;
-      rangesA[k] = r;
-      rangesB[k] = r;
-    }
-    thumbShowLegendA = true; // Perché ogni vista ha il suo range
-    thumbShowLegendB = true;
-  } else if (state.scaleType === 'filesetGlobal') {
-    const minA = minOf(slicesA.plan, slicesA.sectionX, slicesA.sectionY);
-    const maxA = maxOf(slicesA.plan, slicesA.sectionX, slicesA.sectionY);
-    const rA = (slicesA.plan || slicesA.sectionX || slicesA.sectionY) ? { min: minA, max: maxA } : null;
-    
-    const minB = minOf(slicesB.plan, slicesB.sectionX, slicesB.sectionY);
-    const maxB = maxOf(slicesB.plan, slicesB.sectionX, slicesB.sectionY);
-    const rB = (slicesB.plan || slicesB.sectionX || slicesB.sectionY) ? { min: minB, max: maxB } : null;
-    
-    for (const k of ['plan', 'sectionX', 'sectionY']) {
-      rangesA[k] = rA;
-      rangesB[k] = rB;
-    }
-    thumbShowLegendA = false; // La legenda principale basta per tutti i grafici di quel fileset
-    thumbShowLegendB = false;
-  } else if (state.scaleType === 'allFilesets') {
-    const mn = minOf(slicesA.plan, slicesA.sectionX, slicesA.sectionY, slicesB.plan, slicesB.sectionX, slicesB.sectionY);
-    const mx = maxOf(slicesA.plan, slicesA.sectionX, slicesA.sectionY, slicesB.plan, slicesB.sectionX, slicesB.sectionY);
-    const r = (slicesA.plan || slicesA.sectionX || slicesA.sectionY || slicesB.plan || slicesB.sectionX || slicesB.sectionY) ? { min: mn, max: mx } : null;
-    
-    for (const k of ['plan', 'sectionX', 'sectionY']) {
-      rangesA[k] = r;
-      rangesB[k] = r;
-    }
-    thumbShowLegendA = false;
-    thumbShowLegendB = false;
-  } else if (state.scaleType === 'custom') {
-    // In custom mode, use the values from state.customRanges if defined, otherwise fallback to individual slice limits
-    for (const k of ['plan', 'sectionX', 'sectionY']) {
-      rangesA[k] = state.customRanges[`A-${k}`] ?? (slicesA[k] ? { min: slicesA[k].min, max: slicesA[k].max } : null);
-      rangesB[k] = state.customRanges[`B-${k}`] ?? (slicesB[k] ? { min: slicesB[k].min, max: slicesB[k].max } : null);
-    }
-    thumbShowLegendA = true;
-    thumbShowLegendB = true;
-  }
+  // Estremi della legenda per vista, secondo lo scope scelto in "Legend bounds"
+  const { rangesA, rangesB, rangesDiff, thumbLegendA, thumbLegendB } = viewRanges(
+    state.scaleType, state.customRanges, slicesA, slicesB, slicesDiff,
+  );
 
   const rangeA = rangesA[state.viewType];
   const rangeB = rangesB[state.viewType];
@@ -309,7 +218,7 @@ export default function AnalysisView() {
 
   const handleLegendClick = (filesetKey, vType, currentRange) => {
     const key = `${filesetKey}-${vType}`;
-    const fsName = filesetLabel(filesetKey);
+    const fsName = filesetLabel(state, tr, filesetKey);
     const viewLabel = tr(VIEW_TYPES.find(v => v.key === vType).labelKey);
     set({
       customRangeModal: {
@@ -386,18 +295,10 @@ export default function AnalysisView() {
   const rangeStats = (range) =>
     `${datasetLabel} · ${range ? `${formatValue(range.min, range.max - range.min)} – ${formatValue(range.max, range.max - range.min)} · ` : ''}${contextValueLabel}`;
 
-  // "Fileset A · nomeSimulazione": il prefisso A/B resta per leggere A − B / B − A
-  const filesetLabel = (key) => {
-    const fs = state[`fileset${key}`];
-    const name = fs?.name ?? fs?.rootDir;
-    const base = tr(key === 'A' ? 'chart_fileset_a' : 'chart_fileset_b');
-    return name ? `${base} · ${name}` : base;
-  };
-
   const allCharts = [
     {
       key: 'A',
-      title: filesetLabel('A'),
+      title: filesetLabel(state, tr, 'A'),
       stats: rangeStats(rangeA),
       stripe: 'a',
       caption: emptyCaption('A'),
@@ -405,18 +306,18 @@ export default function AnalysisView() {
       objectsThumbs: objectsSlicesA,
       objectsOpts: objectsOpts,
       thumbRanges: rangesA,
-      thumbShowLegend: thumbShowLegendA,
+      thumbShowLegend: thumbLegendA,
       thumbWinds: thumbWindsA,
-      colors: activePalette.colors,
+      colors: mainPalette.colors,
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('A', vType, range),
       body: sliceA ? (
-        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} renderStyle={state.renderStyle} hdMode={state.hdMode} />
+        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={mainPalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} renderStyle={state.renderStyle} hdMode={state.hdMode} />
       ) : null,
     },
     {
       key: 'B',
-      title: filesetLabel('B'),
+      title: filesetLabel(state, tr, 'B'),
       stats: rangeStats(rangeB),
       stripe: 'b',
       caption: emptyCaption('B'),
@@ -424,13 +325,13 @@ export default function AnalysisView() {
       objectsThumbs: objectsSlicesB,
       objectsOpts: objectsOpts,
       thumbRanges: rangesB,
-      thumbShowLegend: thumbShowLegendB,
+      thumbShowLegend: thumbLegendB,
       thumbWinds: thumbWindsB,
-      colors: activePalette.colors,
+      colors: mainPalette.colors,
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('B', vType, range),
       body: sliceB ? (
-        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={activePalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} renderStyle={state.renderStyle} hdMode={state.hdMode} />
+        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={mainPalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} renderStyle={state.renderStyle} hdMode={state.hdMode} />
       ) : null,
     },
     {
@@ -443,12 +344,12 @@ export default function AnalysisView() {
       objectsThumbs: objectsThumbsDiff,
       objectsOpts: objectsOpts,
       thumbRanges: rangesDiff,
-      thumbShowLegend: thumbShowLegendDiff,
-      colors: activeDiffPalette.colors,
+      thumbShowLegend: true, // il Diff ha sempre il suo range
+      colors: diffPalette.colors,
       reversed: diffReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('Diff', vType, range),
       body: sliceDiff ? (
-        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={activeDiffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeLabel} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} renderStyle={state.renderStyle} hdMode={state.hdMode} />
+        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={diffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} renderStyle={state.renderStyle} hdMode={state.hdMode} />
       ) : null,
     },
   ];
@@ -485,54 +386,19 @@ export default function AnalysisView() {
     if (!showSections && state.viewType !== 'plan') set({ viewType: 'plan' });
   }, [showSections, state.viewType]);
 
-  const viewBarTopRef = useRef(null);
-  const viewBarPanelRef = useRef(null);
-  const viewBarModesRef = useRef(null);
-  // 'inline'  -> affiancati, condividono la riga col pannello, ancorati a destra
-  // 'stacked' -> impilati (compatti), a destra: sulla riga del pannello se lo
-  //              spazio libero dopo di esso basta a contenerli anche solo
-  //              impilati, altrimenti scendono impilati su una riga propria
-  // 'wrapped' -> affiancati, ma solo quando anche impilati non condividerebbero
-  //              la riga col pannello: scendono su una riga propria, e siccome
-  //              lì hanno tutta la larghezza per stare in fila, tornano
-  //              affiancati, ancorati a sinistra
-  const [modesLayout, setModesLayout] = useState('stacked');
   const [viewBarCollapsed, setViewBarCollapsed] = useState(false);
-
-  useEffect(() => {
-    const topEl = viewBarTopRef.current;
-    const panelEl = viewBarPanelRef.current;
-    const modesEl = viewBarModesRef.current;
-    if (!topEl || !panelEl || !modesEl) return;
-    const measure = () => {
-      const widths = Array.from(modesEl.querySelectorAll('.segmented')).map((el) => el.getBoundingClientRect().width);
-      const gap = 12;
-      const unstackedWidth = widths.reduce((sum, w) => sum + w, 0) + gap * (widths.length - 1);
-      const stackedWidth = Math.max(0, ...widths);
-      const topWidth = topEl.getBoundingClientRect().width;
-      const leftover = topWidth - panelEl.getBoundingClientRect().width - 16;
-      if (unstackedWidth <= leftover) {
-        setModesLayout('inline');
-      } else if (stackedWidth > leftover && unstackedWidth <= topWidth) {
-        setModesLayout('wrapped');
-      } else {
-        setModesLayout('stacked');
-      }
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(topEl);
-    observer.observe(panelEl);
-    return () => observer.disconnect();
-  }, [state.compareMode, state.viewType, state.filesetBOpen, state.showObjectsOverlay]);
+  const { modesLayout, topRef, panelRef, modesRef } = useModesLayout(
+    '.segmented',
+    [state.compareMode, state.viewType, state.filesetBOpen, state.showObjectsOverlay],
+  );
 
   return (
     <>
       <div className={`view-bar${viewBarCollapsed ? ' view-bar-collapsed' : ''}`}>
         <div className="view-bar-collapse">
           <div className="view-bar-collapse-inner">
-            <div className="view-bar-top" ref={viewBarTopRef}>
-              <div className="view-bar-panel" ref={viewBarPanelRef}>
+            <div className="view-bar-top" ref={topRef}>
+              <div className="view-bar-panel" ref={panelRef}>
                 <div className="view-bar-group">
                   <Slider label={tr('slider_scale')} value={state.scaleFactor} min={1} max={3} step={0.25} unit="x" onChange={(v) => set({ scaleFactor: v })} />
                 </div>
@@ -594,7 +460,7 @@ export default function AnalysisView() {
                 </div>
               </div>
 
-              <div className={`view-bar-modes view-bar-modes--${modesLayout}`} ref={viewBarModesRef}>
+              <div className={`view-bar-modes view-bar-modes--${modesLayout}`} ref={modesRef}>
                 <Segmented options={compareOptions} value={state.compareMode} onSelect={setCompareMode} variant="accent" />
                 {showSections && <Segmented options={viewTypeOptions} value={state.viewType} onSelect={(v) => set({ viewType: v })} variant="accent" />}
               </div>
@@ -645,33 +511,7 @@ export default function AnalysisView() {
         ))}
       </div>
 
-      <div className="timeseries-card">
-        <div className="timeseries-header" onClick={() => toggle('timeSeriesOpen')}>
-          <span className="chart-title">{tr('group_time_series')}</span>
-          {pointSeriesA && (
-            <span className="chart-stats">
-              {datasetLabel} · {tr('chip_sectionx_prefix')} {state.sectionX}, {tr('chip_sectiony_prefix')} {state.sectionY} · {tr('chip_level_prefix')} {state.level}
-            </span>
-          )}
-          <span className={`chevron${state.timeSeriesOpen ? ' open' : ''}`} />
-        </div>
-        {state.timeSeriesOpen &&
-          (pointSeriesA ? (
-            <TimeSeriesChart
-              series={[
-                { name: filesetLabel('A'), color: 'var(--series-a)', values: pointSeriesA },
-                { name: filesetLabel('B'), color: 'var(--series-b)', values: state.compareMode !== 'single' ? pointSeriesB : null },
-              ]}
-              labels={state.seriesLabels}
-              time={state.time}
-              onSelectTime={(t) => set({ time: t })}
-            />
-          ) : (
-            <div className="timeseries-body">
-              <span className="chart-caption">{tr('ts_caption')}</span>
-            </div>
-          ))}
-      </div>
+      <PointSeriesCard showB={state.compareMode !== 'single'} />
     </>
   );
 }

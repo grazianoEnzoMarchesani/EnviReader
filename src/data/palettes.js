@@ -23,3 +23,21 @@ export function findPalette(id, variant, customPalettes) {
     builtin[0]
   );
 }
+
+// Palette e inversione da usare davvero per una variante ('main' | 'diff'):
+// con l'editor aperto su quella variante si mostra il draft in tempo reale, e
+// siccome i colori del draft sono già orientati l'inversione non si riapplica.
+export function activePalette(state, tr, variant) {
+  const draft = state.paletteDraft;
+  if (draft?.target === variant) {
+    return {
+      palette: { id: '__draft', name: draft.name.trim() || tr('custom_default_name'), colors: draft.colors },
+      reversed: false,
+    };
+  }
+  const isDiff = variant === 'diff';
+  return {
+    palette: findPalette(isDiff ? state.diffPalette : state.palette, variant, state.customPalettes),
+    reversed: isDiff ? state.diffPaletteReversed : state.paletteReversed,
+  };
+}

@@ -31,7 +31,7 @@ export default function SaveChartModal({ onClose }) {
   const handleExport = async () => {
     if (noData) return;
     setExporting(true);
-    setProgress(tr('exporting_start') || 'Starting export...');
+    setProgress(tr('exporting_start'));
     try {
       await exportCharts({
         state,
@@ -63,18 +63,18 @@ export default function SaveChartModal({ onClose }) {
   useModalKeyboard(true, exporting || noData ? null : handleExport, exporting ? null : onClose);
 
   const compareOptions = [
-    { key: 'single', label: tr('compare_single') || 'Solo A' },
-    { key: 'b', label: tr('compare_b') || 'Solo B', disabled: !state.filesetBOpen, title: !state.filesetBOpen ? (tr('hint_open_b') || 'Open fileset B to enable') : undefined },
-    { key: 'ab', label: tr('compare_ab') || 'A vs B', disabled: !state.filesetBOpen, title: !state.filesetBOpen ? (tr('hint_open_b') || 'Open fileset B to enable') : undefined },
-    { key: 'abdiff', label: tr('compare_abdiff') || 'A vs B vs Diff', disabled: !state.filesetBOpen, title: !state.filesetBOpen ? (tr('hint_open_b') || 'Open fileset B to enable') : undefined },
+    { key: 'single', label: tr('compare_single') },
+    { key: 'b', label: tr('compare_b'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined },
+    { key: 'ab', label: tr('compare_ab'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined },
+    { key: 'abdiff', label: tr('compare_abdiff'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined },
   ];
 
   return (
     <div className="modal-backdrop" onClick={!exporting ? onClose : undefined}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ minWidth: '350px' }}>
-        <div className="modal-title">{tr('modal_save_chart_title') || 'Save Charts'}</div>
+        <div className="modal-title">{tr('modal_save_chart_title')}</div>
         <p className="modal-text" style={{ marginBottom: '16px' }}>
-          {tr('modal_save_chart_desc') || 'Select the export options for the charts.'}
+          {tr('modal_save_chart_desc')}
         </p>
 
         <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'center' }}>
@@ -91,7 +91,7 @@ export default function SaveChartModal({ onClose }) {
                 onChange={(e) => setZipAll(e.target.checked)}
                 disabled={exporting}
               />
-              <span style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>{tr('modal_save_chart_zip') || 'Zip all outputs'}</span>
+              <span style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>{tr('modal_save_chart_zip')}</span>
             </label>
 
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', opacity: zipAll ? 1 : 0.5, marginLeft: '24px' }}>
@@ -101,7 +101,7 @@ export default function SaveChartModal({ onClose }) {
                 onChange={(e) => setGroupFolders(e.target.checked)}
                 disabled={exporting || !zipAll}
               />
-              <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{tr('modal_save_chart_folders') || 'Organizza i file in sottocartelle (PNG, SVG, GIF)'}</span>
+              <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{tr('modal_save_chart_folders')}</span>
             </label>
           </div>
 
@@ -112,7 +112,7 @@ export default function SaveChartModal({ onClose }) {
               onChange={(e) => setSaveSvg(e.target.checked)}
               disabled={exporting}
             />
-            <span style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>{tr('modal_save_chart_svg') || 'Export additional maps in editable vector format (SVG)'}</span>
+            <span style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>{tr('modal_save_chart_svg')}</span>
           </label>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
@@ -122,7 +122,7 @@ export default function SaveChartModal({ onClose }) {
               onChange={(e) => setSaveBoundarySvg(e.target.checked)}
               disabled={exporting}
             />
-            <span style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>{tr('modal_save_chart_boundary_svg') || 'Export boundary condition charts (SVG)'}</span>
+            <span style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>{tr('modal_save_chart_boundary_svg')}</span>
           </label>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -133,11 +133,11 @@ export default function SaveChartModal({ onClose }) {
                 onChange={(e) => setSaveGif(e.target.checked)}
                 disabled={exporting}
               />
-              <span style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>{tr('modal_save_chart_gif') || 'Save temporal trend as animated GIF'}</span>
+              <span style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>{tr('modal_save_chart_gif')}</span>
             </label>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '24px', opacity: saveGif ? 1 : 0.5, pointerEvents: saveGif ? 'auto' : 'none' }}>
-              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{tr('modal_save_chart_fps') || 'Frames per second (fps):'}</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{tr('modal_save_chart_fps')}</span>
               <input
                 type="number"
                 min="1"
@@ -158,24 +158,24 @@ export default function SaveChartModal({ onClose }) {
                 onChange={(e) => setSaveDatasheet(e.target.checked)}
                 disabled={exporting}
               />
-              <span style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>{tr('modal_save_chart_datasheet') || 'Salva dati in formato testuale o Excel (XLSX)'}</span>
+              <span style={{ fontSize: '14px', color: 'var(--text)', fontWeight: 500 }}>{tr('modal_save_chart_datasheet')}</span>
             </label>
 
             <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '16px', marginLeft: '24px', opacity: saveDatasheet ? 1 : 0.5, pointerEvents: saveDatasheet ? 'auto' : 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{tr('modal_save_chart_datasheet_format') || 'Formato:'}</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{tr('modal_save_chart_datasheet_format')}</span>
                 <select
                   value={datasheetFormat}
                   onChange={(e) => setDatasheetFormat(e.target.value)}
                   disabled={exporting || !saveDatasheet}
                   style={{ padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '13px' }}
                 >
-                  <option value="txt">{tr('format_text') || 'Testuale (CSV)'}</option>
-                  <option value="xlsx">{tr('format_excel') || 'Excel (XLSX)'}</option>
+                  <option value="txt">{tr('format_text')}</option>
+                  <option value="xlsx">{tr('format_excel')}</option>
                 </select>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{tr('modal_save_chart_datasheet_decimals') || 'Decimali:'}</span>
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{tr('modal_save_chart_datasheet_decimals')}</span>
                 <input
                   type="number"
                   min="0"
@@ -213,7 +213,7 @@ export default function SaveChartModal({ onClose }) {
             disabled={exporting || noData}
             title={noData ? tr('hint_export_no_fileset') : undefined}
           >
-            {tr('btn_export') || 'Export'}
+            {tr('btn_export')}
           </button>
         </div>
       </div>

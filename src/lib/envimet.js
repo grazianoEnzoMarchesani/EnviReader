@@ -73,12 +73,30 @@ export function structureFromFileList(files) {
   return { rootDir, structure };
 }
 
+/* ---------- ricerca di un file nella struttura ---------- */
+
+// Primo file (in profondità) il cui nome soddisfa il predicato: la struttura è
+// un albero { sottocartella: {...}, files: [File] } (vedi buildFromHandle).
+// Condivisa da chi cerca un file singolo per estensione o per nome esatto:
+// SIMX (readSimName qui sotto e forcing.js), INX (inx.js), FOX (forcing.js).
+export function findFileBy(structure, predicate) {
+  for (const file of structure.files || []) {
+    if (predicate(file.name)) return file;
+  }
+  for (const [key, value] of Object.entries(structure)) {
+    if (key === 'files' || typeof value !== 'object' || Array.isArray(value)) continue;
+    const found = findFileBy(value, predicate);
+    if (found) return found;
+  }
+  return null;
+}
+
 /* ---------- nome della simulazione dal file SIMX ---------- */
 
 // Il SIMX in inputData è quasi-XML (radice non standard, spazi nei valori):
 // si estrae <simName> con una regex invece del DOMParser.
 export async function readSimName(structure) {
-  const simx = findSimxFile(structure);
+  const simx = findFileBy(structure, (name) => /\.simx$/i.test(name));
   if (!simx) return null;
   try {
     const text = decodeEDXText(await simx.arrayBuffer());
@@ -87,18 +105,6 @@ export async function readSimName(structure) {
   } catch {
     return null;
   }
-}
-
-function findSimxFile(structure) {
-  for (const file of structure.files || []) {
-    if (/\.simx$/i.test(file.name)) return file;
-  }
-  for (const [key, value] of Object.entries(structure)) {
-    if (key === 'files' || typeof value !== 'object' || Array.isArray(value)) continue;
-    const found = findSimxFile(value);
-    if (found) return found;
-  }
-  return null;
 }
 
 /* ---------- navigazione della struttura ---------- */

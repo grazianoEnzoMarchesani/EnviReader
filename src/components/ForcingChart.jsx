@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatValue } from '../lib/colormap';
+import { niceTicks, tickLabel } from '../lib/chartAxis';
 
 // Grafico canvas per le serie meteo del forcing (fino a 8760 punti orari).
 // Quando i punti superano i pixel disponibili disegna l'inviluppo min–max per
@@ -7,24 +8,6 @@ import { formatValue } from '../lib/colormap';
 // Con brush attivo il trascinamento seleziona l'intervallo (onBrush), il
 // doppio click lo azzera.
 const M = { top: 12, right: 14, bottom: 24, left: 52 };
-
-function niceTicks(min, max, count = 4) {
-  const span = max - min || 1;
-  const mag = 10 ** Math.floor(Math.log10(span / count));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => span / s <= count) || 10 * mag;
-  const ticks = [];
-  for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-6; v += step) ticks.push(v);
-  return ticks;
-}
-
-// "2018-03-21 · 14:00" → etichetta asse breve (data, oppure ora se il range è corto)
-function tickLabel(label, shortRange) {
-  const [date, time] = String(label).split(' · ');
-  if (!time) return date ?? '';
-  if (shortRange) return time;
-  const [, m, d] = date.split('-');
-  return `${d}/${m}`;
-}
 
 export default function ForcingChart({
   series,

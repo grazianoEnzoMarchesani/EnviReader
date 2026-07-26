@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { buildZLevels, zLevelsFromSpacing } from './inx';
 import { VEGETATION_COLORS as VEGETATION_HEX, VEG_STYLE1_RADIUS_FRACTIONS, buildLUT, CONTOUR_BANDS, axisCenters, continuousIndex, bilinearSample } from './colormap';
 import { traceStreamlines2D } from './windField';
+import { COMBINED_MARKER_ASPECT, COMBINED_MARKER_LEN_FACTOR, lineToSegmentCells, pushArrowhead } from './windVolumeMath';
 
 const VEGETATION_COLORS = VEGETATION_HEX.map((hex) => Number(`0x${hex.slice(1)}`));
 const VEGETATION_RV_MIN = 11;
@@ -98,8 +99,7 @@ export function rebuildObjectLayers(model, objectsVolume, spacingZ, activeStyle 
   return { buildings, terrain, vegetation };
 }
 
-export function buildModelScene(model, objectsVolume = null, spacingZ = null, dimZ = null, vegStyle1Arg = false) {
-  const objectStyle = typeof vegStyle1Arg === 'boolean' ? (vegStyle1Arg ? 'style1' : 'default') : (vegStyle1Arg || 'default');
+export function buildModelScene(model, objectsVolume = null, spacingZ = null, dimZ = null, objectStyle = 'default') {
   const { I, J, dx, dy } = model.geometry;
   const W = I * dx;
   const H = J * dy;
@@ -725,9 +725,8 @@ function buildVoxelBuildings(model, { toX, toZ }, spacingZ, activeStyle = 'defau
 // "Objects" dei risultati (EDT/EDX) su tutti i livelli k, quota assoluta come
 // per terreno e building (nessun "segui il terreno"). rv 11-15 = vegetazione,
 // con le stesse tonalità di verde dell'overlay 2D "Objects".
-export function buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ, vegStyle1Arg = false) {
+function buildVegetation(model, objectsVolume, { toX, toZ }, spacingZ, activeStyle = 'default') {
   if (!objectsVolume) return null;
-  const activeStyle = typeof vegStyle1Arg === 'boolean' ? (vegStyle1Arg ? 'style1' : 'default') : (vegStyle1Arg || 'default');
   const { I, J, dx, dy } = model.geometry;
   const { dims, data } = objectsVolume;
   if (dims.x !== I || dims.y !== J) return null;
@@ -1548,13 +1547,6 @@ function headGeometry() {
   return _headGeometry;
 }
 
-// Dimensione dei marcatori di direzione "combined" (solo punta, vedi
-// pushArrowhead): raggio come frazione della lunghezza, per un cono tozzo
-// (largo quasi quanto lungo) che legge bene la direzione da qualunque
-// angolo di vista senza somigliare a un ago.
-const COMBINED_MARKER_LEN_FACTOR = 0.42;
-const COMBINED_MARKER_ASPECT = 0.4;
-
 // Segmento canonico (cilindro) lungo 1, lungo +X, CENTRATO sull'origine (a
 // differenza della freccia, che ha la coda a x=0): usato per le streamline
 // come catena di piccoli cilindri istanziati invece di THREE.Line — la
@@ -1624,22 +1616,6 @@ function instancedSegments(cells, material) {
   return instancedFromCells(segmentGeometry(), cells, material);
 }
 
-// Converte una polilinea (mondo) in celle di segmento cilindrico tra ogni
-// coppia di punti consecutivi: un unico InstancedMesh per tutte le
-// streamline di un piano/volume, invece di un THREE.Line per linea.
-function lineToSegmentCells(points, radius) {
-  const cells = [];
-  for (let i = 1; i < points.length; i++) {
-    const [x0, y0, z0] = points[i - 1];
-    const [x1, y1, z1] = points[i];
-    const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
-    const length = Math.hypot(dx, dy, dz);
-    if (length < 1e-6) continue;
-    cells.push({ x: (x0 + x1) / 2, y: (y0 + y1) / 2, z: (z0 + z1) / 2, dirX: dx, dirY: dy, dirZ: dz, length, radius });
-  }
-  return cells;
-}
-
 // Passo di campionamento della griglia (in celle) in funzione della densità:
 // stessa forma di windLayout in MapChart.jsx (più frecce lungo l'asse
 // maggiore quando density sale), qui parametrizzata sulle due dimensioni w/h
@@ -1661,7 +1637,7 @@ function windStep(w, h, density) {
 // frazionario (interpola tra il centro della cella k e quello della k+1)
 // così le streamline, che marciano a passo continuo, non saltano
 // bruscamente da un centro all'altro quando attraversano un confine di livello.
-function windCellHeight(zLevels, boundaries, kf) {
+function windCellHeight(zLevels, kf) {
   const kMax = zLevels.length - 1;
   const k0 = Math.min(kMax, Math.max(0, Math.floor(kf)));
   const frac = Math.min(1, Math.max(0, kf - k0));
@@ -1671,9 +1647,9 @@ function windCellHeight(zLevels, boundaries, kf) {
   return center0 + frac * (center1 - center0);
 }
 
-function planWindHeight(idx, level, terrainCut, zLevels, boundaries) {
+function planWindHeight(idx, level, terrainCut, zLevels) {
   const kf = terrainCut ? terrainCut.data[idx] * terrainCut.gain + terrainCut.base : level;
-  return windCellHeight(zLevels, boundaries, kf);
+  return windCellHeight(zLevels, kf);
 }
 
 // Posizione mondo (x, z) della colonna `col` (frazionaria) di una sezione,
@@ -1717,7 +1693,7 @@ function sectionTangentXZ(line, viewType, pivotX, pivotY, I, J, toX, toZ) {
 // (stessa forma della modalità "arrows" 2D), posizionate/orientate con
 // planWindHeight e la direzione fisica (u est+, v nord+) → mondo (-u, 0, v)
 // (riflessione coerente con toX/toZ, vedi intestazione del file).
-function planWindArrows(field, level, terrainCut, I, J, zLevels, boundaries, toX, toZ, refValue, size, density, cellSize) {
+function planWindArrows(field, level, terrainCut, I, J, zLevels, toX, toZ, refValue, size, density, cellSize) {
   const step = windStep(field.w, field.h, density);
   const start = Math.floor(step / 2);
   const lenScale = cellSize * step * (0.4 + 1.2 * (size / 100)) / refValue;
@@ -1733,7 +1709,7 @@ function planWindArrows(field, level, terrainCut, I, J, zLevels, boundaries, toX
       if (length < cellSize * 0.15) continue;
       const j = J - 1 - gy;
       cells.push({
-        x: toX(gx), y: planWindHeight(idx, level, terrainCut, zLevels, boundaries) + cellSize * 0.05, z: toZ(j),
+        x: toX(gx), y: planWindHeight(idx, level, terrainCut, zLevels) + cellSize * 0.05, z: toZ(j),
         dirX: -u, dirY: 0, dirZ: v, length, radius: cellSize * (0.05 + 0.1 * (size / 100)),
       });
     }
@@ -1741,34 +1717,12 @@ function planWindArrows(field, level, terrainCut, I, J, zLevels, boundaries, toX
   return cells;
 }
 
-// Testina di direzione "combined": SOLO punta (nessuna asta, vedi
-// instancedFromCells(headGeometry(), ...) nei chiamanti), centrata sul punto
-// points[p] (mondo) — non ancorata alla coda e proiettata in avanti come
-// nella versione precedente, che per una freccia (asta+punta) rigida su una
-// streamline che rigida non è finiva quasi sempre per staccarsene
-// visibilmente, specie nei tratti più curvi. headGeometry() è già centrata
-// (spanna -length/2..+length/2 lungo la tangente), quindi punta e base
-// sporgono dal punto della curva in egual misura e di poco: bastano a
-// leggere il verso del flusso senza mai "uscire" dalla linea. La tangente è
-// presa dai vertici REALI già proiettati in mondo (p-1 → p+1), gli stessi di
-// lineToSegmentCells, non da un campo ricampionato in un punto isolato.
-function pushArrowhead(headCells, points, p, headLen, headRadius) {
-  const [x0, y0, z0] = points[p - 1];
-  const [x1, y1, z1] = points[p + 1];
-  const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
-  const segLen = Math.hypot(dx, dy, dz);
-  if (segLen < 1e-6) return;
-  const nx = dx / segLen, ny = dy / segLen, nz = dz / segLen;
-  const [cx, cy, cz] = points[p];
-  headCells.push({ x: cx, y: cy, z: cz, dirX: nx, dirY: ny, dirZ: nz, length: headLen, radius: headRadius });
-}
-
 // Streamline del vento in pianta: traccia con lo stesso tracciatore 2D dei
 // grafici (traceStreamlines2D), poi rimappa ogni punto [gx,gy,speed] in
 // mondo con la stessa altezza/direzione delle frecce. Restituisce celle di
 // segmento (vedi lineToSegmentCells) invece di un THREE.Line, sempre visibili
 // indipendentemente dal supporto lineWidth del driver WebGL.
-function planWindLines(field, level, terrainCut, I, J, zLevels, boundaries, toX, toZ, refValue, size, density, arrowheads, cellSize) {
+function planWindLines(field, level, terrainCut, I, J, zLevels, toX, toZ, refValue, size, density, arrowheads, cellSize) {
   const step = windStep(field.w, field.h, density);
   const lines = traceStreamlines2D(field, step, refValue);
   const radius = cellSize * (0.035 + 0.07 * (size / 100));
@@ -1784,7 +1738,7 @@ function planWindLines(field, level, terrainCut, I, J, zLevels, boundaries, toX,
       const gy0 = Math.min(field.h - 1, Math.max(0, gy));
       const idx = Math.round(gy0) * field.w + Math.round(gx0);
       const j = J - 1 - gy;
-      points.push([toX(gx), planWindHeight(idx, level, terrainCut, zLevels, boundaries) + cellSize * 0.01, toZ(j)]);
+      points.push([toX(gx), planWindHeight(idx, level, terrainCut, zLevels) + cellSize * 0.01, toZ(j)]);
     }
     segCells.push(...lineToSegmentCells(points, radius));
     if (arrowheads) {
@@ -1806,15 +1760,15 @@ function planWindLines(field, level, terrainCut, I, J, zLevels, boundaries, toX,
 // stessa semantica di "combined" nel canvas 2D (drawStreamlineArrowheads in
 // MapChart.jsx). Aggiungere anche il campo di frecce pieno (ramo "arrows")
 // duplicava il vento in due rappresentazioni sovrapposte sullo stesso piano.
-function buildPlanWind(field, level, terrainCut, I, J, dx, dy, zLevels, boundaries, toX, toZ, refValue, style, size, density, material) {
+function buildPlanWind(field, level, terrainCut, I, J, dx, dy, zLevels, toX, toZ, refValue, style, size, density, material) {
   const group = new THREE.Group();
   const cellSize = Math.min(dx, dy);
   if (style === 'arrows') {
-    const cells = planWindArrows(field, level, terrainCut, I, J, zLevels, boundaries, toX, toZ, refValue, size, density, cellSize);
+    const cells = planWindArrows(field, level, terrainCut, I, J, zLevels, toX, toZ, refValue, size, density, cellSize);
     if (cells.length) group.add(instancedArrows(cells, material));
   }
   if (style === 'streamlines' || style === 'combined') {
-    const { segCells, headCells } = planWindLines(field, level, terrainCut, I, J, zLevels, boundaries, toX, toZ, refValue, size, density, style === 'combined', cellSize);
+    const { segCells, headCells } = planWindLines(field, level, terrainCut, I, J, zLevels, toX, toZ, refValue, size, density, style === 'combined', cellSize);
     if (segCells.length) group.add(instancedSegments(segCells, material));
     if (headCells.length) group.add(instancedFromCells(headGeometry(), headCells, material));
   }
@@ -1825,7 +1779,7 @@ function buildPlanWind(field, level, terrainCut, I, J, dx, dy, zLevels, boundari
 // stessa struttura del caso pianta ma con la posizione/tangente di
 // sectionColumnXZ/sectionTangentXZ e altezza fissa a centro riga (nessuna
 // ambiguità verticale come in pianta).
-function buildSectionWind(field, viewType, pivotX, pivotY, I, J, dx, dy, zLevels, boundaries, toX, toZ, refValue, style, size, density, material, line) {
+function buildSectionWind(field, viewType, pivotX, pivotY, I, J, dx, dy, zLevels, toX, toZ, refValue, style, size, density, material, line) {
   const group = new THREE.Group();
   const cellSize = Math.min(dx, dy);
   const [tx, tz] = sectionTangentXZ(line, viewType, pivotX, pivotY, I, J, toX, toZ);
@@ -1833,7 +1787,7 @@ function buildSectionWind(field, viewType, pivotX, pivotY, I, J, dx, dy, zLevels
   // delle streamline non cadono su interi): windCellHeight interpola tra i
   // centri di due celle invece di indicizzare boundaries[] con un float, che
   // in JS fallirebbe silenziosamente (le proprietà di un array non sono numeriche).
-  const rowY = (row) => windCellHeight(zLevels, boundaries, row);
+  const rowY = (row) => windCellHeight(zLevels, row);
 
   if (style === 'arrows') {
     const step = windStep(field.w, field.h, density);
@@ -1906,7 +1860,6 @@ export function buildWindOnSlices(model, windOverlay) {
   const toX = (i) => (I * dx) / 2 - (i + 0.5) * dx;
   const toZ = (j) => (J * dy) / 2 - (j + 0.5) * dy;
   const zLevels = resolveZLevels(model.geometry, dimZ, spacingZ);
-  const boundaries = levelBoundaries(zLevels);
   const alpha = Math.min(1, Math.max(0, opacity / 100));
   const material = new THREE.MeshBasicMaterial({
     color: windColor(), transparent: true, opacity: alpha,
@@ -1917,15 +1870,15 @@ export function buildWindOnSlices(model, windOverlay) {
   let any = false;
 
   if (views.plan) {
-    layer.add(buildPlanWind(views.plan, level, terrainCut, I, J, dx, dy, zLevels, boundaries, toX, toZ, refValue, style, size, density, material));
+    layer.add(buildPlanWind(views.plan, level, terrainCut, I, J, dx, dy, zLevels, toX, toZ, refValue, style, size, density, material));
     any = true;
   }
   if (views.sectionX) {
-    layer.add(buildSectionWind(views.sectionX, 'sectionX', pivot.sectionX, pivot.sectionY, I, J, dx, dy, zLevels, boundaries, toX, toZ, refValue, style, size, density, material, views.sectionX.line ?? null));
+    layer.add(buildSectionWind(views.sectionX, 'sectionX', pivot.sectionX, pivot.sectionY, I, J, dx, dy, zLevels, toX, toZ, refValue, style, size, density, material, views.sectionX.line ?? null));
     any = true;
   }
   if (views.sectionY) {
-    layer.add(buildSectionWind(views.sectionY, 'sectionY', pivot.sectionX, pivot.sectionY, I, J, dx, dy, zLevels, boundaries, toX, toZ, refValue, style, size, density, material, views.sectionY.line ?? null));
+    layer.add(buildSectionWind(views.sectionY, 'sectionY', pivot.sectionX, pivot.sectionY, I, J, dx, dy, zLevels, toX, toZ, refValue, style, size, density, material, views.sectionY.line ?? null));
     any = true;
   }
 
