@@ -40,7 +40,12 @@ export default function ViewSettingsModal() {
           />
         </div>
         {is3D && (
-          <div className="modal-field" style={{ marginTop: '14px', marginBottom: '16px' }}>
+          <div className="modal-field-group" style={{ marginTop: '14px', marginBottom: '16px' }}>
+            <Toggle
+              label={tr('btn_wireframe')}
+              on={state.wireframe}
+              onToggle={() => toggle('wireframe')}
+            />
             <Toggle
               label={tr('toggle_ambient_occlusion')}
               on={state.ambientOcclusion}

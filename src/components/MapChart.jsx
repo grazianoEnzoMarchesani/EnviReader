@@ -646,7 +646,56 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
         onMouseMove={sectionControl ? handleFrameMove : undefined}
         onMouseLeave={sectionControl ? () => { if (!rotDragging) setRotHandle(null); } : undefined}
       >
-        <canvas ref={canvasRef} className="map-canvas" style={{ imageRendering: renderStyle === 'contour' ? 'auto' : undefined }} onMouseMove={handleMove} onMouseLeave={() => setHover(null)} onClick={handleClick} />
+        {renderStyle === 'vector' ? (
+          <svg
+            className="map-canvas"
+            style={{ display: 'block', width: '100%', height: '100%', cursor: 'crosshair', position: 'relative' }}
+            viewBox={`0 0 ${slice.extentW} ${slice.extentH}`}
+            preserveAspectRatio="none"
+            onMouseMove={handleMove}
+            onMouseLeave={() => setHover(null)}
+            onClick={handleClick}
+          >
+            {(() => {
+              const rects = [];
+              let curY = 0;
+              for (let row = 0; row < slice.h; row++) {
+                const dataRow = slice.h - 1 - row;
+                const hY = slice.spacingY ? slice.spacingY[dataRow] : slice.extentH / slice.h;
+                let curX = 0;
+                for (let col = 0; col < slice.w; col++) {
+                  const wX = slice.spacingX ? slice.spacingX[col] : slice.extentW / slice.w;
+                  const val = slice.data[dataRow * slice.w + col];
+                  if (!Number.isNaN(val)) {
+                    let t = (val - min) / (max - min);
+                    t = Math.max(0, Math.min(1, t));
+                    const idx = Math.floor(t * 255);
+                    const c = lut[idx * 3];
+                    const c1 = lut[idx * 3 + 1];
+                    const c2 = lut[idx * 3 + 2];
+                    rects.push(
+                      <rect
+                        key={`${row}-${col}`}
+                        x={curX}
+                        y={curY}
+                        width={wX}
+                        height={hY}
+                        fill={`rgb(${c},${c1},${c2})`}
+                        shapeRendering="crispEdges"
+                        stroke="none"
+                      />
+                    );
+                  }
+                  curX += wX;
+                }
+                curY += hY;
+              }
+              return rects;
+            })()}
+          </svg>
+        ) : (
+          <canvas ref={canvasRef} className="map-canvas" style={{ imageRendering: renderStyle === 'contour' ? 'auto' : undefined }} onMouseMove={handleMove} onMouseLeave={() => setHover(null)} onClick={handleClick} />
+        )}
         {objectsSlice && <canvas ref={objectsCanvasRef} className="map-objects-canvas" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', imageRendering: 'pixelated' }} />}
         {wind && <canvas ref={windCanvasRef} className="map-wind-canvas" />}
         {!sectionControl && marks?.x != null && marks.x >= 0 && marks.x < slice.w && (
@@ -666,9 +715,10 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
           )
         )}
         {cross && (
-          <svg className="map-section-svg" width={frameSize.w} height={frameSize.h} opacity="0.6">
+          <svg className="map-section-svg" width={frameSize.w} height={frameSize.h}>
             {['v', 'h'].map((which) => {
               const [ux, uy] = cross.dirs[which];
+              const isHovered = rotHandle?.which === which || rotDragging && rotHandle?.which === which;
               return (
                 <line
                   key={which}
@@ -676,6 +726,16 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
                   y1={cross.cy - uy * crossLen}
                   x2={cross.cx + ux * crossLen}
                   y2={cross.cy + uy * crossLen}
+                  style={
+                    isHovered
+                      ? {
+                          opacity: 1,
+                          stroke: 'var(--accent)',
+                          strokeWidth: 'max(2px, calc(var(--section-line-width, 1px) * 2))',
+                          strokeDasharray: 'none',
+                        }
+                      : { opacity: 0.6 }
+                  }
                 />
               );
             })}

@@ -378,6 +378,7 @@ export default function AnalysisView() {
   const renderStyleOptions = [
     { key: 'pixel', label: tr('render_style_pixel'), help: { title: tr('help_render_style_pixel_title'), body: tr('help_render_style_pixel_body') } },
     { key: 'contour', label: tr('render_style_contour'), help: { title: tr('help_render_style_contour_title'), body: tr('help_render_style_contour_body') } },
+    { key: 'vector', label: tr('render_style_vector'), help: { title: tr('help_render_style_vector_title'), body: tr('help_render_style_vector_body') } },
   ];
 
   // Se il gruppo dati cambia e perde l'estensione verticale mentre una sezione
@@ -511,7 +512,7 @@ export default function AnalysisView() {
         ))}
       </div>
 
-      <PointSeriesCard showB={state.compareMode !== 'single'} />
+      <PointSeriesCard showA={state.compareMode !== 'b'} showB={state.compareMode !== 'single'} />
     </>
   );
 }

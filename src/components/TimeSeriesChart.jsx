@@ -138,7 +138,7 @@ export default function TimeSeriesChart({ series, labels, time, onSelectTime }) 
         </div>
       )}
 
-      {drawn.length > 1 && (
+      {drawn.length > 0 && (
         <div className="ts-legend">
           {drawn.map((s) => (
             <span key={s.name} className="ts-legend-item">

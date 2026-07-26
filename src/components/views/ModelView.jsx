@@ -13,7 +13,7 @@ import Segmented from '../controls/Segmented';
 import IconToggle from '../controls/IconToggle';
 import WindModeToggle from '../controls/WindModeToggle';
 import HelpTooltip from '../controls/HelpTooltip';
-import { IconBuilding, IconTree, IconTerrain, IconTerrainFix, IconReceptor, IconGrid, IconWireframe, IconSun, IconLayers3D, IconSectionX, IconSectionY, IconSmoothSurface, IconSyncRotate, IconCalendar, IconClock, IconSettings, IconHD } from '../icons/ToolbarIcons';
+import { IconBuilding, IconTree, IconTerrain, IconTerrainFix, IconReceptor, IconGrid, IconSun, IconLayers3D, IconSectionX, IconSectionY, IconSmoothSurface, IconSyncRotate, IconCalendar, IconClock, IconSettings, IconHD } from '../icons/ToolbarIcons';
 import ViewSettingsModal from '../ViewSettingsModal';
 import { useFlip } from '../../lib/useFlip';
 import { useSlices, useTerrainCut, useWindFields, useWindVolumeCells } from '../../lib/useSlice';
@@ -523,7 +523,6 @@ export default function ModelView() {
                 )}
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
-                  <IconToggle icon={IconWireframe} label={tr('btn_wireframe')} on={state.wireframe} onToggle={() => toggle('wireframe')} help={{ title: tr('help_wireframe_title'), body: tr('help_wireframe_body') }} />
                   <Segmented options={renderStyleOptions} value={state.renderStyle} onSelect={(v) => set({ renderStyle: v })} variant="dark" />
                   <IconToggle icon={IconHD} label={tr('toggle_hd_mode')} on={state.hdMode3D} onToggle={() => toggle('hdMode3D')} help={{ title: tr('help_hd_mode_3d_title'), body: tr('help_hd_mode_3d_body') }} />
                 </div>
@@ -623,7 +622,7 @@ export default function ModelView() {
         ))}
       </div>
 
-      <PointSeriesCard showB={state.compareMode3D !== 'single'} />
+      <PointSeriesCard showA={state.compareMode3D !== 'b'} showB={state.compareMode3D !== 'single'} />
     </div>
   );
 }

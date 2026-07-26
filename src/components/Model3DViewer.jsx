@@ -122,6 +122,14 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
+    
+    const highlightGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    const highlightMat = new THREE.LineBasicMaterial({ color: 0x000000, linewidth: 2, depthTest: false, transparent: true, opacity: 0.8 });
+    const highlightLine = new THREE.Line(highlightGeo, highlightMat);
+    highlightLine.visible = false;
+    highlightLine.renderOrder = 999;
+    scene.add(highlightLine);
+
     // sfondo della scena = colore del tema (chiaro/scuro) corrente: prima si
     // affidava alla trasparenza del canvas (alpha:true) che lasciava vedere la
     // card CSS sottostante, ma nel "cielo" vuoto sopra il modello questo dava
@@ -130,6 +138,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     // il modello, che viene renderizzato sopra normalmente dove presente.
     const applySceneBackground = () => {
       scene.background = new THREE.Color().setStyle(resolveCssColor('--surface'));
+      if (highlightMat) highlightMat.color.setStyle(resolveCssColor('--accent'));
       // frecce/streamline del vento: nero su sfondo chiaro si legge, ma si
       // perde su sfondo scuro, quindi seguono lo stesso cambio di tema
       // (vedi applyWindTheme in inxScene.js) senza ricostruire le mesh.
@@ -516,9 +525,31 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       return best?.which ?? null;
     };
 
+    const updateHighlightLine = (which, overrideAngle = null) => {
+      const { model: m, sectionX: sx, sectionY: sy, sectionAngle: sa } = interactionRef.current;
+      if (!which || !m) {
+        highlightLine.visible = false;
+        return;
+      }
+      const { I, J } = m.geometry;
+      const angle = overrideAngle !== null ? overrideAngle : sa;
+      const rad = (angle * Math.PI) / 180;
+      const span = Math.max(I, J) * 0.8;
+      const dirs = { v: [-Math.sin(rad), Math.cos(rad)], h: [Math.cos(rad), Math.sin(rad)] };
+      const [gx, gy] = dirs[which];
+      const p1 = gridToWorld(m, sx - gx * span, sy - gy * span);
+      const p2 = gridToWorld(m, sx + gx * span, sy + gy * span);
+      p1.y = 0.2;
+      p2.y = 0.2;
+      highlightGeo.setFromPoints([p1, p2]);
+      highlightLine.visible = true;
+    };
+
     const onHoverMove = (e) => {
       if (dragMode) return;
-      renderer.domElement.style.cursor = lineHitTest(e.clientX, e.clientY) ? 'grab' : '';
+      const which = lineHitTest(e.clientX, e.clientY);
+      renderer.domElement.style.cursor = which ? 'grab' : '';
+      updateHighlightLine(which);
     };
 
     const onWindowMove = (e) => {
@@ -537,8 +568,10 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
         if (Math.abs(deg) < 3) deg = 0; // snap: tornare all'ortogonale è facile
         if (deg === -90) deg = 90;
         interactionRef.current.onAngleChange?.(deg);
+        updateHighlightLine(dragWhich, deg);
       } else if (dragMode === 'maybe-click' && Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y) > 6) {
         dragMode = 'orbit'; // movimento oltre soglia: era un orbit, non un click
+        updateHighlightLine(null);
       }
     };
 
@@ -575,10 +608,12 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
         dragWhich = which;
         stage.controls.enabled = false;
         renderer.domElement.style.cursor = 'grabbing';
+        updateHighlightLine(which);
       } else {
         // altrove: potrebbe diventare un orbit (OrbitControls resta attivo e
         // gestisce il trascinamento) o restare un click che sposta il perno
         dragMode = 'maybe-click';
+        updateHighlightLine(null);
       }
       window.addEventListener('pointermove', onWindowMove);
       window.addEventListener('pointerup', onWindowUp);

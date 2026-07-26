@@ -25,14 +25,17 @@ export default function CustomRangeModal() {
     const numMax = parseFloat(maxVal);
 
     if (!isNaN(numMin) && !isNaN(numMax) && numMin <= numMax) {
-      set((s) => ({
-        customRanges: {
-          ...s.customRanges,
-          [modalData.key]: { min: numMin, max: numMax },
-        },
-        scaleType: 'custom',
-        customRangeModal: null,
-      }));
+      set((s) => {
+        const is3D = modalData.key.endsWith('-3d');
+        return {
+          customRanges: {
+            ...s.customRanges,
+            [modalData.key]: { min: numMin, max: numMax },
+          },
+          ...(is3D ? { scaleType3D: 'custom' } : { scaleType: 'custom' }),
+          customRangeModal: null,
+        };
+      });
     }
   };
 

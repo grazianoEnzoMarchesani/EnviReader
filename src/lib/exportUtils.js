@@ -198,7 +198,14 @@ async function generateHybridSvg(card) {
   };
 
   // 1. Canvases
-  svgContent += canvasToImageSvg(card.querySelector('.map-canvas'));
+  const mapCanvas = card.querySelector('.map-canvas');
+  if (mapCanvas) {
+    if (mapCanvas.tagName === 'CANVAS') {
+      svgContent += canvasToImageSvg(mapCanvas);
+    } else if (mapCanvas.tagName.toLowerCase() === 'svg') {
+      svgContent += extractSvgElement(mapCanvas);
+    }
+  }
   svgContent += canvasToImageSvg(card.querySelector('.map-wind-canvas'));
 
   // 2. SVG Overlays: crosshair marks in section views (one per axis), the
