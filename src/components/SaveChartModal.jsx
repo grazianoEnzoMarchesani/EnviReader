@@ -22,7 +22,14 @@ export default function SaveChartModal({ onClose }) {
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState('');
 
+  // Senza nessun fileset aperto non c'è niente da esportare: l'export
+  // produrrebbe uno ZIP di soli segnaposto ("Apri un fileset per vedere la
+  // mappa"). Si blocca a monte, spiegando il perché come già fa il selettore
+  // di confronto per il fileset B.
+  const noData = !state.filesetAOpen && !state.filesetBOpen;
+
   const handleExport = async () => {
+    if (noData) return;
     setExporting(true);
     setProgress(tr('exporting_start') || 'Starting export...');
     try {
@@ -51,7 +58,9 @@ export default function SaveChartModal({ onClose }) {
     }
   };
 
-  useModalKeyboard(true, exporting ? null : handleExport, exporting ? null : onClose);
+  // Invio conferma l'export solo quando è davvero possibile: durante un export
+  // in corso e senza dati caricati il tasto resta inerte, come il bottone.
+  useModalKeyboard(true, exporting || noData ? null : handleExport, exporting ? null : onClose);
 
   const compareOptions = [
     { key: 'single', label: tr('compare_single') || 'Solo A' },
@@ -188,11 +197,22 @@ export default function SaveChartModal({ onClose }) {
           </div>
         )}
 
+        {noData && (
+          <div className="modal-notice" role="status">
+            {tr('hint_export_no_fileset')}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
           <button className="primary-btn" onClick={onClose} disabled={exporting} style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)' }}>
             {tr('btn_cancel')}
           </button>
-          <button className="primary-btn" onClick={handleExport} disabled={exporting}>
+          <button
+            className="primary-btn"
+            onClick={handleExport}
+            disabled={exporting || noData}
+            title={noData ? tr('hint_export_no_fileset') : undefined}
+          >
             {tr('btn_export') || 'Export'}
           </button>
         </div>

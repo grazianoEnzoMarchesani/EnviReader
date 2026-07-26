@@ -134,6 +134,7 @@ export const FALLBACK_I18N = {
     "status_ab": "A vs B comparison",
     "status_abdiff": "A vs B vs Diff comparison",
     "hint_open_b": "Open fileset B from the top bar to enable comparison",
+    "hint_export_no_fileset": "Open a fileset to export the charts",
     "view_plan": "Plan",
     "view_sectionx": "Longitudinal section",
     "view_sectiony": "Transverse section",

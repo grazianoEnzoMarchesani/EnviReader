@@ -6,8 +6,11 @@
   --border: #e3e6ea;
   --border-strong: #d4d8dd;
   --text: #1c2024;
-  --text-secondary: #6b7280;
-  --text-faint: #9aa1a9;
+  /* Rampa testo a tre livelli: ogni gradino supera 4.5:1 (WCAG AA) sia su --bg
+     che su --surface, mantenendo uno scarto percepibile tra i livelli.
+     Contrasto su --bg: 15.3 : 1 / 6.3 : 1 / 4.9 : 1 */
+  --text-secondary: #555c67;
+  --text-faint: #666d79;
   --accent: oklch(58% 0.13 232);
   --accent-soft: oklch(94% 0.03 232);
   --accent-text: oklch(30% 0.09 232);
@@ -34,8 +37,10 @@
   --border: oklch(32% 0.01 240);
   --border-strong: oklch(38% 0.012 240);
   --text: oklch(93% 0.004 240);
-  --text-secondary: oklch(68% 0.01 240);
-  --text-faint: oklch(52% 0.01 240);
+  /* Stessa rampa a tre livelli del tema chiaro: qui il fondo vincolante è
+     --surface (il più chiaro dei due). Contrasto su --surface: 13.8 / 6.6 / 4.9 : 1 */
+  --text-secondary: oklch(71% 0.01 240);
+  --text-faint: oklch(63% 0.01 240);
   --accent: oklch(72% 0.13 232);
   --accent-soft: oklch(32% 0.05 232);
   --accent-text: oklch(90% 0.05 232);

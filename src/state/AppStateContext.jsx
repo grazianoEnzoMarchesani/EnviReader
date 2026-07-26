@@ -3,9 +3,10 @@ import { DATA_GROUPS, DATASETS } from '../data/constants';
 import { pickDirectory, listDataGroups, getFilesInFolder, getFileCoupleSeries, readEDX, seriesLabel, loadTerrain, readSimName } from '../lib/envimet';
 import { loadCustomPalettes, persistCustomPalettes } from '../lib/paletteStore';
 import { loadCustomPresets, persistCustomPresets, nearestTimeIndex } from '../lib/presetStore';
+import { loadTheme, persistTheme } from '../lib/prefsStore';
 
 const initialState = {
-  theme: 'light',
+  theme: loadTheme(), // scelta salvata, altrimenti il tema di sistema
   appView: 'analysis',
   activeTab: 'data',
   compareMode: 'single',
@@ -187,9 +188,11 @@ export function AppStateProvider({ children }) {
     stateRef.current = state;
   }, [state]);
 
-  // il tema è applicato come attributo sul <html>: i token CSS fanno il resto
+  // il tema è applicato come attributo sul <html>: i token CSS fanno il resto,
+  // e viene salvato così la scelta regge anche dopo un ricaricamento
   useEffect(() => {
     document.documentElement.dataset.theme = state.theme;
+    persistTheme(state.theme);
   }, [state.theme]);
 
   // le palette personalizzate sopravvivono alla chiusura del browser

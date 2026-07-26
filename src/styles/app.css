@@ -11,6 +11,46 @@ a { color: inherit; }
 
 button { font-family: inherit; }
 
+/* Anello di focus unico per tutta l'app: usa l'accent dei token invece
+   dell'outline predefinito del browser. Solo :focus-visible, così il mouse non
+   lascia l'anello attaccato ai controlli dopo il click. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Controlli che stanno a filo del proprio contenitore (righe di lista, tab,
+   segmented): l'offset positivo verrebbe tagliato, quindi l'anello va all'interno. */
+.palette-list-select:focus-visible,
+.sidebar-tab:focus-visible,
+.segmented > button:focus-visible,
+.lang-btn:focus-visible,
+.map-legend:focus-visible,
+.thumb-legend:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Preferenza di sistema "riduci animazioni": azzera transizioni e animazioni
+   decorative (collasso sidebar/view-bar, comparsa dei widget su mappa e 3D). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Gli spinner sono l'eccezione: comunicano "sto ancora lavorando", quindi
+     fermarli toglierebbe informazione invece di rumore. Restano in moto, più
+     lenti, così il feedback di caricamento non si perde. */
+  .btn-spinner,
+  .icon-spin {
+    animation-duration: 1.6s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
+
 .app-root {
   height: 100vh;
   width: 100%;
@@ -41,7 +81,11 @@ button { font-family: inherit; }
 .topbar-left { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
 .topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; margin-left: auto; }
 .nav-divider { flex-shrink: 0; }
-.brand { cursor: pointer; display: flex; flex-direction: column; line-height: 1.15; }
+
+/* Il blocco responsive della topbar sta in fondo al file (sezione "responsive"):
+   deve venire dopo le regole base di .navbar, altrimenti a pari specificità
+   vincerebbe il flex-shrink: 0 dichiarato più in basso. */
+.brand { cursor: pointer; display: flex; flex-direction: column; line-height: 1.15; border: none; background: none; padding: 0; margin: 0; font: inherit; color: inherit; text-align: left; }
 .brand-title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
 .brand-tagline { font-size: 10.5px; color: var(--text-faint); font-weight: 500; }
 .divider-v { width: 1px; height: 24px; background: var(--border); }
@@ -91,7 +135,7 @@ button { font-family: inherit; }
 
 .lang-row { display: flex; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
 .lang-btn {
-  padding: 5px 9px;
+  padding: 6px 9px; /* porta il bottone a 24px di altezza: minimo WCAG 2.5.8 */
   border: none;
   border-right: 1px solid var(--border);
   background: transparent;
@@ -299,10 +343,11 @@ button { font-family: inherit; }
   box-shadow: 0 0 0 2px var(--accent-soft);
 }
 .slider-row { display: flex; align-items: center; gap: 8px; }
+/* 24px = minimo WCAG 2.2 per la dimensione dei target (SC 2.5.8) */
 .step-btn {
-  width: 22px;
-  height: 22px;
-  min-width: 22px;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -382,11 +427,16 @@ button { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   padding: 9px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
   cursor: pointer;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
 }
 .swatch-row { display: flex; gap: 2px; }
 .swatch { width: 12px; height: 12px; border-radius: 2px; display: inline-block; }
@@ -411,7 +461,25 @@ button { font-family: inherit; }
   max-height: 320px;
   overflow-y: auto;
 }
-.palette-list-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; cursor: pointer; }
+/* Contenitore della riga: la padding orizzontale sta sui figli, così l'area
+   cliccabile della selezione copre tutta l'altezza della riga */
+.palette-list-row { display: flex; align-items: center; }
+.palette-list-select {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.palette-row-actions:last-child { padding-right: 12px; }
 .palette-list-row.selected { background: var(--accent-soft); }
 .palette-list-row.selected-diff { background: var(--diff-soft); }
 .palette-group-label {
@@ -428,8 +496,8 @@ button { font-family: inherit; }
 }
 .palette-row-actions { display: flex; gap: 4px; margin-left: auto; }
 .palette-row-btn {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: transparent;
@@ -877,6 +945,12 @@ button { font-family: inherit; }
   padding: 4px 0;
   cursor: pointer;
   box-sizing: border-box;
+  border: none;
+  background: none;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
 }
 .map-angle-chip {
   position: absolute;
@@ -1111,6 +1185,13 @@ button { font-family: inherit; }
 .thumb-legend {
   cursor: pointer;
   transition: opacity 0.1s;
+  border: none;
+  background: none;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
 }
 .thumb-legend:hover {
   opacity: 0.8;
@@ -1231,8 +1312,8 @@ button { font-family: inherit; }
 .view-gizmo-btn {
   position: absolute;
   z-index: 3;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   display: flex;
   align-items: center;
@@ -1251,7 +1332,9 @@ button { font-family: inherit; }
   transform: scale(1.1);
 }
 .view-gizmo-home { top: -4px; left: -4px; }
-.view-gizmo-rotate-ccw { top: -4px; right: 16px; }
+/* I due pulsanti di rotazione erano adiacenti a distanza zero: a 24px si
+   sarebbero sovrapposti, facendo scattare quello sbagliato. Il gap li separa. */
+.view-gizmo-rotate-ccw { top: -4px; right: 30px; }
 .view-gizmo-rotate-cw { top: -4px; right: -4px; }
 .model-overlay-hint {
   position: absolute;
@@ -1337,12 +1420,19 @@ button { font-family: inherit; }
 }
 
 /* ---------- boundary view ---------- */
+/* min-height (non height) così la pagina riempie lo spazio quando è vuota ma
+   cresce liberamente, lasciando scorrere .main, quando le card ci sono */
+.boundary-view-page { display: flex; flex-direction: column; min-height: 100%; }
 .boundary-stack { display: flex; flex-direction: column; gap: 18px; }
 .boundary-grid { display: flex; flex-wrap: wrap; gap: 18px; }
 .boundary-grid > .chart-card { flex: 0 0 auto; width: var(--chart-w, 320px); }
 .boundary-card-body { display: flex; flex-direction: column; gap: 14px; }
+/* Riempie l'altezza disponibile come già fanno .model-viewer e .map-frame nelle
+   altre viste: con un'altezza fissa lo stato vuoto lasciava la pagina
+   praticamente deserta, facendo sembrare la vista rotta invece che in attesa. */
 .boundary-empty {
-  height: 200px;
+  flex: 1;
+  min-height: 200px;
   border-radius: 10px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1438,6 +1528,30 @@ button { font-family: inherit; }
   cursor: pointer;
   margin-top: 6px;
 }
+/* Un bottone disabilitato deve *sembrare* disabilitato: senza questo stato
+   l'Export bloccato era indistinguibile da uno attivo. */
+.primary-btn:disabled {
+  background: var(--border);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+/* Avviso in coda a un modale: spiega perché l'azione primaria è bloccata,
+   invece di lasciare l'utente davanti a un bottone spento e muto. */
+.modal-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 2px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border: 1px solid transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+}
 
 /* ---------- help tooltip (tutorial-style, on hover-delay) ---------- */
 .help-tip-panel {
@@ -1474,9 +1588,9 @@ button { font-family: inherit; }
 
 /* ---------- time player (transport popover on the Time slider) ---------- */
 .time-player-trigger {
-  width: 22px;
-  height: 22px;
-  min-width: 22px;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--surface);
@@ -1534,3 +1648,28 @@ button { font-family: inherit; }
 }
 .time-player-speed .segmented { font-size: 11px; }
 .time-player-speed .segmented > button { padding: 5px 8px; font-size: 11px; }
+
+/* ---------- responsive ---------- */
+/* Finestre strette (laptop 13" con sidebar aperta, finestra non massimizzata,
+   split view): la topbar va a capo invece di uscire dai bordi.
+   Il flex-wrap da solo non basta: i tre gruppi hanno flex-shrink: 0, quindi
+   restano larghi quanto il contenuto e i loro figli non hanno mai motivo di
+   andare a capo. Qui si concede loro di restringersi, ed è allora che il wrap
+   entra in gioco. Deve stare dopo le regole base per vincere la cascata. */
+@media (max-width: 960px) {
+  .topbar { row-gap: 10px; }
+  .topbar-left,
+  .navbar,
+  .topbar-right {
+    flex-shrink: 1;
+    flex-wrap: wrap;
+    min-width: 0;
+    row-gap: 8px;
+  }
+  .topbar-right { margin-left: 0; }
+  /* Il payoff sotto il logo è la prima cosa sacrificabile: il nome resta */
+  .brand-tagline { display: none; }
+  /* I separatori verticali perdono senso quando le file vanno a capo */
+  .nav-divider,
+  .topbar-left .divider-v { display: none; }
+}

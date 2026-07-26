@@ -30,11 +30,11 @@ export default function PaletteSelector({ groups, selectedId, reversed, open, on
 
   return (
     <div className="palette-selector">
-      <div className="palette-head" onClick={onToggleOpen}>
+      <button type="button" className="palette-head" onClick={onToggleOpen} aria-expanded={open}>
         <SwatchRow colors={orderedColors(active, reversed)} />
         <span className="palette-name">{paletteLabel(active, tr)}</span>
         <span className="palette-arrow" />
-      </div>
+      </button>
       {open && (
         <div className="palette-list">
           {groups.map((g) =>
@@ -42,28 +42,40 @@ export default function PaletteSelector({ groups, selectedId, reversed, open, on
               <div key={g.labelKey}>
                 <div className="palette-group-label">{tr(g.labelKey)}</div>
                 {g.palettes.map((p) => (
+                  // La riga è un semplice contenitore: la selezione è un button
+                  // a sé, così i pulsanti modifica/elimina non finiscono
+                  // annidati dentro un altro elemento interattivo (ARIA non
+                  // valido, e con la tastiera diventerebbero irraggiungibili)
                   <div
                     key={p.id}
                     className={`palette-list-row${p.id === selectedId ? (variant === 'diff' ? ' selected-diff' : ' selected') : ''}`}
-                    onClick={() => onSelect(p.id)}
                   >
-                    <SwatchRow colors={p.colors} />
-                    <span className="palette-name">{paletteLabel(p, tr)}</span>
+                    <button
+                      type="button"
+                      className="palette-list-select"
+                      aria-pressed={p.id === selectedId}
+                      onClick={() => onSelect(p.id)}
+                    >
+                      <SwatchRow colors={p.colors} />
+                      <span className="palette-name">{paletteLabel(p, tr)}</span>
+                    </button>
                     {g.custom && (
                       <span className="palette-row-actions">
                         <button
+                          type="button"
                           className="palette-row-btn"
                           title={tr('title_edit_palette')}
                           aria-label={`${tr('title_edit_palette')} ${paletteLabel(p, tr)}`}
-                          onClick={(e) => { e.stopPropagation(); onEdit(p.id); }}
+                          onClick={() => onEdit(p.id)}
                         >
                           ✎
                         </button>
                         <button
+                          type="button"
                           className="palette-row-btn"
                           title={tr('title_delete_palette')}
                           aria-label={`${tr('title_delete_palette')} ${paletteLabel(p, tr)}`}
-                          onClick={(e) => { e.stopPropagation(); onDelete(p.id); }}
+                          onClick={() => onDelete(p.id)}
                         >
                           ×
                         </button>

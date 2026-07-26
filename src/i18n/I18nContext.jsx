@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { FALLBACK_I18N } from './fallbackEn';
+import { loadLang, persistLang } from '../lib/prefsStore';
 
 const I18nContext = createContext(null);
 
 export function I18nProvider({ children }) {
   const [i18n, setI18n] = useState(FALLBACK_I18N);
-  const [lang, setLang] = useState('en');
+  const [lang, setLang] = useState(loadLang);
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}translations.json`)
@@ -21,6 +22,14 @@ export function I18nProvider({ children }) {
       )
       .catch(() => {});
   }, []);
+
+  // La lingua scelta va salvata e riportata sul documento: senza lang aggiornato
+  // screen reader e traduttori del browser continuerebbero a leggere "inglese"
+  // mentre l'interfaccia è in un'altra lingua.
+  useEffect(() => {
+    persistLang(lang);
+    document.documentElement.lang = lang;
+  }, [lang]);
 
   const value = useMemo(() => {
     const tr = (key) => {

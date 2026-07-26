@@ -133,6 +133,7 @@
     "status_ab": "Confronto A vs B",
     "status_abdiff": "Confronto A vs B vs Diff",
     "hint_open_b": "Apri il fileset B dalla barra in alto per abilitare il confronto",
+    "hint_export_no_fileset": "Apri un fileset per esportare i grafici",
     "view_plan": "Pianta",
     "view_sectionx": "Sezione longitudinale",
     "view_sectiony": "Sezione trasversale",
@@ -360,7 +361,7 @@
     "help_hd_mode_title": "Modalità HD",
     "help_hd_mode_body": "Ricampiona la mappa 2D alla risoluzione fisica dello schermo (dimensione del frame × pixel ratio) invece che a una dimensione fissa, per un'immagine più nitida a zoom elevati — più evidente in modalità Contorno. In modalità Pixel l'effetto è minimo, soprattutto bordi delle celle più netti, dato che ogni cella resta comunque una tinta piatta. Più pesante da calcolare — disattivala se la mappa risulta lenta.",
     "help_hd_mode_3d_title": "Modalità HD",
-    "help_hd_mode_3d_body": "Aumenta la qualità dell'antialiasing e la densità di pixel del viewer 3D, smussando i bordi a scalini di edifici, terreno e vegetazione (più evidente con gli Stili 1-3 e l'Occlusione ambientale). Più pesante da calcolare — disattivala se il modello risulta lento.",
+    "help_hd_mode_3d_body": "Renderizza la scena 3D alla risoluzione fisica dello schermo (pixel ratio) invece che a una dimensione fissa, per un'immagine più nitida e meno frastagliata — più evidente su schermi ad alta densità. Più pesante da calcolare — disattivala se la vista 3D risulta lenta.",
     "help_objects_overlay_title": "Overlay livello 3D",
     "help_objects_overlay_body": "Sovrappone una silhouette 3D leggera del modello (edifici, terreno, vegetazione) sopra il grafico 2D, per dare contesto spaziale ai dati senza uscire dalla vista 2D.",
     "help_objects_overlay_note": "Abilita i sotto-interruttori edifici/terreno/vegetazione accanto ad esso.",
@@ -399,9 +400,7 @@
     "duration_day": "giorno",
     "duration_days": "giorni",
     "duration_hour": "ora",
-    "duration_hours": "ore",
-    "help_hd_mode_3d_title": "Modalità HD",
-    "help_hd_mode_3d_body": "Renderizza la scena 3D alla risoluzione fisica dello schermo (pixel ratio) invece che a una dimensione fissa, per un'immagine più nitida e meno frastagliata — più evidente su schermi ad alta densità. Più pesante da calcolare — disattivala se la vista 3D risulta lenta."
+    "duration_hours": "ore"
   },
   "en": {
     "lang_name": "English",
@@ -537,6 +536,7 @@
     "status_ab": "A vs B comparison",
     "status_abdiff": "A vs B vs Diff comparison",
     "hint_open_b": "Open fileset B from the top bar to enable comparison",
+    "hint_export_no_fileset": "Open a fileset to export the charts",
     "view_plan": "Plan",
     "view_sectionx": "Longitudinal section",
     "view_sectiony": "Transverse section",
@@ -764,7 +764,7 @@
     "help_hd_mode_title": "HD mode",
     "help_hd_mode_body": "Resamples the 2D map at the screen's physical resolution (frame size × pixel ratio) instead of a fixed size, for a sharper image at high zoom levels — most noticeable in Contour mode. In Pixel mode the effect is subtle, mostly cleaner cell edges, since each cell still renders as one flat color. Heavier to compute — turn it off if the map feels sluggish.",
     "help_hd_mode_3d_title": "HD mode",
-    "help_hd_mode_3d_body": "Raises the antialiasing quality and pixel density of the 3D viewer, smoothing the stair-stepped edges of buildings, terrain and vegetation (most visible with Style 1-3 and Ambient occlusion). Heavier to compute — turn it off if the model feels sluggish.",
+    "help_hd_mode_3d_body": "Renders the 3D scene at the screen's physical resolution (pixel ratio) instead of a fixed size, for a sharper, less aliased image — most noticeable on high-density displays. Heavier to compute — turn it off if the 3D view feels sluggish.",
     "help_objects_overlay_title": "3D layer overlay",
     "help_objects_overlay_body": "Overlays a lightweight 3D silhouette of the model (buildings, terrain, vegetation) on top of the 2D chart, to give spatial context to the data without leaving the 2D view.",
     "help_objects_overlay_note": "Enables the buildings/terrain/vegetation sub-toggles next to it.",
@@ -803,9 +803,7 @@
     "duration_day": "day",
     "duration_days": "days",
     "duration_hour": "hour",
-    "duration_hours": "hours",
-    "help_hd_mode_3d_title": "HD mode",
-    "help_hd_mode_3d_body": "Renders the 3D scene at the screen's physical resolution (pixel ratio) instead of a fixed size, for a sharper, less aliased image — most noticeable on high-density displays. Heavier to compute — turn it off if the 3D view feels sluggish."
+    "duration_hours": "hours"
   },
   "es": {
     "lang_name": "Español",
@@ -958,6 +956,7 @@
     "status_ab": "Comparación A vs B",
     "status_abdiff": "Comparación A vs B vs Dif",
     "hint_open_b": "Abre el fileset B desde la barra superior para habilitar la comparación",
+    "hint_export_no_fileset": "Abre un fileset para exportar los gráficos",
     "view_plan": "Planta",
     "view_sectionx": "Sección longitudinal",
     "view_sectiony": "Sección transversal",
@@ -1134,7 +1133,7 @@
     "help_gizmo_rotate_ccw_title": "Girar 90° a la izquierda",
     "help_gizmo_rotate_cw_body": "Gira la vista 3D 90° en sentido horario alrededor del objetivo actual, el equivalente especular del botón de giro a la izquierda.",
     "help_gizmo_rotate_cw_title": "Girar 90° a la derecha",
-    "help_hd_mode_3d_body": "Aumenta la calidad del antialiasing y la densidad de píxeles del visor 3D, suavizando los bordes escalonados de edificios, terreno y vegetación (más visible con los Estilos 1-3 y la Oclusión ambiental). Más pesado de calcular — desactívalo si el modelo va lento.",
+    "help_hd_mode_3d_body": "Renderiza la escena 3D a la resolución física de la pantalla (relación de píxeles) en lugar de un tamaño fijo, para una imagen más nítida y con menos dentado — más notable en pantallas de alta densidad. Más pesado de calcular — desactívalo si la vista 3D va lenta.",
     "help_hd_mode_3d_title": "Modo HD",
     "help_hd_mode_body": "Recalcula el mapa 2D a la resolución física de la pantalla (tamaño del fotograma × relación de píxeles) en lugar de un tamaño fijo, para una imagen más nítida en niveles de zoom altos — más notable en modo Contorno. En modo Píxel el efecto es sutil, sobre todo bordes de celda más limpios, ya que cada celda sigue siendo un color plano. Más pesado de calcular — desactívalo si el mapa va lento.",
     "help_hd_mode_title": "Modo HD",
@@ -1207,9 +1206,7 @@
     "toggle_wind_mode_3d_loading": "Visualización del viento: calculando volumen 3D…",
     "toggle_wind_mode_off": "Visualización del viento: apagada",
     "toggle_wind_volume": "Mostrar volumen de viento",
-    "toggle_wind_volume_loading": "Calculando volumen de viento…",
-    "help_hd_mode_3d_title": "Modo HD",
-    "help_hd_mode_3d_body": "Renderiza la escena 3D a la resolución física de la pantalla (relación de píxeles) en lugar de un tamaño fijo, para una imagen más nítida y con menos dentado — más notable en pantallas de alta densidad. Más pesado de calcular — desactívalo si la vista 3D va lenta."
+    "toggle_wind_volume_loading": "Calculando volumen de viento…"
   },
   "fr": {
     "lang_name": "Français",
@@ -1362,6 +1359,7 @@
     "status_ab": "Comparaison A vs B",
     "status_abdiff": "Comparaison A vs B vs Diff",
     "hint_open_b": "Ouvrez le fileset B depuis la barre supérieure pour activer la comparaison",
+    "hint_export_no_fileset": "Ouvrez un fileset pour exporter les graphiques",
     "view_plan": "Plan",
     "view_sectionx": "Section longitudinale",
     "view_sectiony": "Section transversale",
@@ -1540,7 +1538,7 @@
     "help_gizmo_rotate_cw_title": "Pivoter de 90° à droite",
     "help_hd_mode_body": "Rééchantillonne la carte 2D à la résolution physique de l'écran (taille du cadre × ratio de pixels) au lieu d'une taille fixe, pour une image plus nette à fort zoom — surtout visible en mode Contour. En mode Pixel, l'effet est subtil, principalement des bords de cellule plus nets, chaque cellule restant une couleur unie. Plus lourd à calculer — désactivez-le si la carte devient lente.",
     "help_hd_mode_title": "Mode HD",
-    "help_hd_mode_3d_body": "Augmente la qualité de l'anticrénelage et la densité de pixels du visualiseur 3D, en lissant les bords en escalier des bâtiments, du terrain et de la végétation (surtout visible avec les Styles 1-3 et l'Occlusion ambiante). Plus lourd à calculer — désactivez-le si le modèle devient lent.",
+    "help_hd_mode_3d_body": "Rend la scène 3D à la résolution physique de l'écran (ratio de pixels) au lieu d'une taille fixe, pour une image plus nette et moins crénelée — surtout visible sur les écrans haute densité. Plus lourd à calculer — désactivez-le si la vue 3D devient lente.",
     "help_hd_mode_3d_title": "Mode HD",
     "help_layer_buildings_body": "Affiche ou masque la géométrie des bâtiments dans la scène 3D. Désactivez-la pour voir à travers les volumes construits et inspecter le niveau du sol ou l'intérieur des cours.",
     "help_layer_buildings_title": "Calque des bâtiments",
@@ -1611,9 +1609,7 @@
     "toggle_wind_mode_3d_loading": "Affichage du vent : calcul du volume 3D…",
     "toggle_wind_mode_off": "Affichage du vent : désactivé",
     "toggle_wind_volume": "Afficher le volume de vent",
-    "toggle_wind_volume_loading": "Calcul du volume de vent…",
-    "help_hd_mode_3d_title": "Mode HD",
-    "help_hd_mode_3d_body": "Rend la scène 3D à la résolution physique de l'écran (ratio de pixels) au lieu d'une taille fixe, pour une image plus nette et moins crénelée — surtout visible sur les écrans haute densité. Plus lourd à calculer — désactivez-le si la vue 3D devient lente."
+    "toggle_wind_volume_loading": "Calcul du volume de vent…"
   },
   "de": {
     "lang_name": "Deutsch",
@@ -1766,6 +1762,7 @@
     "status_ab": "Vergleich A vs B",
     "status_abdiff": "Vergleich A vs B vs Diff",
     "hint_open_b": "Öffnen Sie Fileset B über die obere Leiste, um den Vergleich zu aktivieren",
+    "hint_export_no_fileset": "Öffnen Sie ein Fileset, um die Diagramme zu exportieren",
     "view_plan": "Grundriss",
     "view_sectionx": "Längsschnitt",
     "view_sectiony": "Querschnitt",
@@ -1944,7 +1941,7 @@
     "help_gizmo_rotate_cw_title": "90° nach rechts drehen",
     "help_hd_mode_body": "Rendert die 2D-Karte in der physischen Auflösung des Bildschirms (Bildgröße × Pixelverhältnis) statt in fester Größe, für ein schärferes Bild bei starkem Zoom — am deutlichsten im Konturmodus. Im Pixelmodus ist der Effekt subtil, hauptsächlich sauberere Zellkanten, da jede Zelle weiterhin eine flache Farbe darstellt. Rechenintensiver — deaktivieren Sie ihn, wenn die Karte träge wirkt.",
     "help_hd_mode_title": "HD-Modus",
-    "help_hd_mode_3d_body": "Erhöht die Antialiasing-Qualität und Pixeldichte des 3D-Viewers und glättet die stufigen Kanten von Gebäuden, Gelände und Vegetation (am deutlichsten bei den Stilen 1-3 und Umgebungsverdeckung). Rechenintensiver — deaktivieren Sie ihn, wenn das Modell träge wirkt.",
+    "help_hd_mode_3d_body": "Rendert die 3D-Szene in der physischen Auflösung des Bildschirms (Pixelverhältnis) statt in fester Größe, für ein schärferes, weniger verpixeltes Bild — am deutlichsten bei Displays mit hoher Pixeldichte. Rechenintensiver — deaktivieren Sie ihn, wenn die 3D-Ansicht träge wirkt.",
     "help_hd_mode_3d_title": "HD-Modus",
     "help_layer_buildings_body": "Zeigt oder verbirgt die Gebäudegeometrie in der 3D-Szene. Deaktivieren Sie sie, um durch bebaute Volumen hindurchzusehen und Bodenebene oder Innenhöfe zu untersuchen.",
     "help_layer_buildings_title": "Gebäudeebene",
@@ -2015,8 +2012,6 @@
     "toggle_wind_mode_3d_loading": "Windanzeige: 3D-Volumen wird berechnet…",
     "toggle_wind_mode_off": "Windanzeige: aus",
     "toggle_wind_volume": "Windvolumen anzeigen",
-    "toggle_wind_volume_loading": "Windvolumen wird berechnet…",
-    "help_hd_mode_3d_title": "HD-Modus",
-    "help_hd_mode_3d_body": "Rendert die 3D-Szene in der physischen Auflösung des Bildschirms (Pixelverhältnis) statt in fester Größe, für ein schärferes, weniger verpixeltes Bild — am deutlichsten bei Displays mit hoher Pixeldichte. Rechenintensiver — deaktivieren Sie ihn, wenn die 3D-Ansicht träge wirkt."
+    "toggle_wind_volume_loading": "Windvolumen wird berechnet…"
   }
 }

@@ -85,11 +85,11 @@ export function MapThumb({ slice, objectsSlice, objectsOpts, colors, reversed, w
         {wind && <canvas ref={windCanvasRef} className="thumb-wind-canvas" style={{ width: cssW, height: cssH, position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }} />}
       </span>
       {showLegend && slice && (
-        <span className="thumb-legend" onClick={onLegendClick} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '9px', width: '100%', padding: '0 4px 4px 4px', boxSizing: 'border-box' }}>
+        <button type="button" className="thumb-legend" onClick={onLegendClick} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '9px', width: '100%', padding: '0 4px 4px 4px', boxSizing: 'border-box' }}>
           <span style={{ color: 'var(--text-faint)' }}>{formatValue(sliceMin, sliceMax - sliceMin)}</span>
           <span style={{ flex: 1, height: '4px', background: renderStyle === 'contour' ? contourLegendGradient(colors, reversed) : `linear-gradient(90deg, ${orientColors(colors, reversed).join(',')})`, borderRadius: '2px' }} />
           <span style={{ color: 'var(--text-faint)' }}>{formatValue(sliceMax, sliceMax - sliceMin)}</span>
-        </span>
+        </button>
       )}
     </span>
   );
@@ -712,14 +712,14 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
           </div>
         )}
       </div>
-      <div className="map-legend" onClick={onLegendClick}>
+      <button type="button" className="map-legend" onClick={onLegendClick}>
         <span className="map-legend-label">{formatValue(min, span)}</span>
         <span
           className="map-legend-bar"
           style={{ background: renderStyle === 'contour' ? contourLegendGradient(colors, reversed) : `linear-gradient(90deg, ${orientColors(colors, reversed).join(',')})` }}
         />
         <span className="map-legend-label">{formatValue(max, span)}</span>
-      </div>
+      </button>
       {windLegend && (windLegend.style === 'streamlines' || windLegend.style === 'combined') && (
         <div className="map-wind-legend">
           <span className="map-legend-label">0</span>

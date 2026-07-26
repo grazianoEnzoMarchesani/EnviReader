@@ -284,7 +284,9 @@ export default function BoundaryView() {
   ].filter(Boolean);
 
   return (
-    <>
+    // Colonna flex alta quanto .main (come .model-view-page nella vista 3D):
+    // serve perché lo stato vuoto riempia lo spazio invece di lasciarlo deserto
+    <div className="boundary-view-page">
       {(barGroups.length > 0 || filesetSelector) && (
         <div className={`view-bar${viewBarCollapsed ? ' view-bar-collapsed' : ''}`}>
           <div className="view-bar-collapse">
@@ -490,6 +492,6 @@ export default function BoundaryView() {
           )}
         </div>
       )}
-    </>
+    </div>
   );
 }

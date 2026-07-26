@@ -28,10 +28,10 @@ export default function TopBar() {
       <header className="topbar">
         <div className="topbar-main">
           <div className="topbar-left">
-            <div className="brand" onClick={() => toggle('showCredits')}>
+            <button type="button" className="brand" onClick={() => toggle('showCredits')}>
               <span className="brand-title">EnviReader</span>
               <span className="brand-tagline">{tr('app_tagline')}</span>
-            </div>
+            </button>
             <div className="divider-v" />
             <button
               className={`btn btn-fileset-a${state.filesetAOpen ? ' open' : ''}`}

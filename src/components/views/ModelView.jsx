@@ -323,14 +323,14 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dat
         )}
       </div>
       {showModel && dataOverlay && (
-        <div className="map-legend" onClick={() => onLegendClick?.(dataOverlay.range)}>
+        <button type="button" className="map-legend" onClick={() => onLegendClick?.(dataOverlay.range)}>
           <span className="map-legend-label">{formatValue(dataOverlay.range.min, dataOverlay.range.max - dataOverlay.range.min)}</span>
           <span
             className="map-legend-bar"
             style={{ background: dataOverlay.contour ? contourLegendGradient(dataOverlay.colors, dataOverlay.reversed) : `linear-gradient(90deg, ${orientColors(dataOverlay.colors, dataOverlay.reversed).join(',')})` }}
           />
           <span className="map-legend-label">{formatValue(dataOverlay.range.max, dataOverlay.range.max - dataOverlay.range.min)}</span>
-        </div>
+        </button>
       )}
     </div>
   );
