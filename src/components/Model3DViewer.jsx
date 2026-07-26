@@ -77,7 +77,7 @@ function isOverlayObject(object) {
 // A ~3×FOLLOW_TAU l'inseguimento è visivamente concluso (vedi loop sotto).
 const FOLLOW_TAU = 0.12;
 
-export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, objectStyle, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, ambientOcclusion, hdMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, cameraSyncRef, cameraSyncEnabled }) {
+export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, objectStyle, projection, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints, sunDiagram, gizmoNorthMode, ambientOcclusion, hdMode, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onReceptorClick, cameraSyncRef, cameraSyncEnabled }) {
   const { tr } = useI18n();
   const activeStyle = objectStyle || 'default';
   const containerRef = useRef(null);
@@ -98,9 +98,9 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
   }, [cameraSyncEnabled]);
   // stato dell'incrocio sezioni sempre fresco per i listener del canvas,
   // registrati una sola volta al mount (vedi effetto sotto)
-  const interactionRef = useRef({ model, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange });
+  const interactionRef = useRef({ model, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onReceptorClick });
   useEffect(() => {
-    interactionRef.current = { model, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange };
+    interactionRef.current = { model, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onReceptorClick };
   });
   const flagsRef = useRef(flags);
   useEffect(() => {
@@ -129,6 +129,13 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     highlightLine.visible = false;
     highlightLine.renderOrder = 999;
     scene.add(highlightLine);
+
+    const receptorHighlightGeo = new THREE.SphereGeometry(0.8, 16, 16);
+    const receptorHighlightMat = new THREE.MeshBasicMaterial({ color: 0xffff00, wireframe: true, depthTest: false, transparent: true, opacity: 0.8 });
+    const receptorHighlight = new THREE.Mesh(receptorHighlightGeo, receptorHighlightMat);
+    receptorHighlight.visible = false;
+    receptorHighlight.renderOrder = 999;
+    scene.add(receptorHighlight);
 
     // sfondo della scena = colore del tema (chiaro/scuro) corrente: prima si
     // affidava alla trasparenza del canvas (alpha:true) che lasciava vedere la
@@ -547,8 +554,40 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
 
     const onHoverMove = (e) => {
       if (dragMode) return;
+      let hoverCursor = '';
+      let hoveredReceptorId = null;
+      let hoveredReceptorMesh = null;
+
+      if (flagsRef.current.showReceptors && stage.layers?.receptors?.visible) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera({ x, y }, stage.camera);
+        const intersects = raycaster.intersectObject(stage.layers.receptors, true);
+        if (intersects.length > 0) {
+          hoverCursor = 'pointer';
+          hoveredReceptorId = intersects[0].instanceId;
+          hoveredReceptorMesh = intersects[0].object;
+        }
+      }
+
+      if (hoveredReceptorId !== null && hoveredReceptorMesh?.getMatrixAt) {
+        const matrix = new THREE.Matrix4();
+        hoveredReceptorMesh.getMatrixAt(hoveredReceptorId, matrix);
+        receptorHighlight.position.setFromMatrixPosition(matrix);
+        // The scale of the receptor might vary, we can just apply the matrix scale
+        receptorHighlight.scale.setFromMatrixScale(matrix);
+        // Multiply scale a bit to wrap the receptor
+        receptorHighlight.scale.multiplyScalar(1.2);
+        receptorHighlight.visible = true;
+      } else {
+        receptorHighlight.visible = false;
+      }
+
       const which = lineHitTest(e.clientX, e.clientY);
-      renderer.domElement.style.cursor = which ? 'grab' : '';
+      if (which) hoverCursor = 'grab';
+
+      renderer.domElement.style.cursor = hoverCursor;
       updateHighlightLine(which);
     };
 
@@ -598,9 +637,26 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       downPos = null;
     };
 
+    const receptorHitTest = (clientX, clientY) => {
+      if (!flagsRef.current.showReceptors || !stage.layers?.receptors?.visible) return null;
+      const rect = renderer.domElement.getBoundingClientRect();
+      const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera({ x, y }, stage.camera);
+      const intersects = raycaster.intersectObject(stage.layers.receptors, true);
+      return intersects.length > 0 ? intersects[0].instanceId : null;
+    };
+
     const onPointerDown = (e) => {
       if (e.button !== 0 || !interactionRef.current.model) return;
       downPos = { x: e.clientX, y: e.clientY };
+      
+      const recId = receptorHitTest(e.clientX, e.clientY);
+      if (recId != null && interactionRef.current.onReceptorClick) {
+        interactionRef.current.onReceptorClick(interactionRef.current.model.receptors[recId]);
+        return; // Non attivare altri drag se si clicca il ricettore
+      }
+
       const which = lineHitTest(e.clientX, e.clientY);
       if (which) {
         // trascinamento vicino a una traccia: ruota le sezioni, camera ferma
@@ -1149,6 +1205,23 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     const rotation = model?.location?.rotation ?? 0;
     updateSunLayer(stage.sunLayer, rotation, sunAzimuth, sunAltitude, sunPathPoints);
   }, [model, sunEnabled, sunAzimuth, sunAltitude, sunPathPoints]);
+
+  // Ascolta le shortcut globali emesse da AppLayout per impostare viste rapide (Top, Front, Right)
+  useEffect(() => {
+    const onSnapCamera = (e) => {
+      if (!gizmoApiRef.current) return;
+      const detail = e.detail;
+      if (detail === 'top') {
+        gizmoApiRef.current.goTo(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1));
+      } else if (detail === 'right') {
+        gizmoApiRef.current.goTo(new THREE.Vector3(1, 0, 0));
+      } else if (detail === 'front') {
+        gizmoApiRef.current.goTo(new THREE.Vector3(0, 0, 1));
+      }
+    };
+    window.addEventListener('snap-camera-3d', onSnapCamera);
+    return () => window.removeEventListener('snap-camera-3d', onSnapCamera);
+  }, []);
 
   return (
     <>

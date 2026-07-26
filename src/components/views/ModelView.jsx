@@ -15,6 +15,7 @@ import WindModeToggle from '../controls/WindModeToggle';
 import HelpTooltip from '../controls/HelpTooltip';
 import { IconBuilding, IconTree, IconTerrain, IconTerrainFix, IconReceptor, IconGrid, IconSun, IconLayers3D, IconSectionX, IconSectionY, IconSmoothSurface, IconSyncRotate, IconCalendar, IconClock, IconSettings, IconHD } from '../icons/ToolbarIcons';
 import ViewSettingsModal from '../ViewSettingsModal';
+import ReceptorModal from '../ReceptorModal';
 import { useFlip } from '../../lib/useFlip';
 import { useSlices, useTerrainCut, useWindFields, useWindVolumeCells } from '../../lib/useSlice';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
@@ -217,7 +218,7 @@ function computeStats(model) {
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
-function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, objectStyle, projection, gizmoNorthMode, ambientOcclusion, hdMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
+function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, objectStyle, projection, gizmoNorthMode, ambientOcclusion, hdMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onReceptorClick, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
   const { tr } = useI18n();
   const model = loaded?.model;
   const showModel = model && !blockedNoVerticalExtent;
@@ -267,6 +268,7 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dat
               sectionAngle={sectionAngle}
               onPivotChange={onPivotChange}
               onAngleChange={onAngleChange}
+              onReceptorClick={onReceptorClick}
               cameraSyncRef={cameraSyncRef}
               cameraSyncEnabled={cameraSyncEnabled}
             />
@@ -309,6 +311,7 @@ export default function ModelView() {
   const sunA = useModelSun(loadedA?.model, state);
   const sunB = useModelSun(loadedB?.model, state);
   const [viewBarCollapsed, setViewBarCollapsed] = useState(false);
+  const [selectedReceptor, setSelectedReceptor] = useState(null);
 
   const terrainCutA = useTerrainCut(state.terrainA, state);
   const terrainCutB = useTerrainCut(state.terrainB, state);
@@ -589,6 +592,12 @@ export default function ModelView() {
         </HelpTooltip>
       </div>
 
+      <ReceptorModal
+        receptor={selectedReceptor}
+        structure={state.filesetA?.structure || state.filesetB?.structure}
+        onClose={() => setSelectedReceptor(null)}
+      />
+
       <ViewSettingsModal />
 
       <div className="model-viewer-row" ref={flipRef}>
@@ -617,6 +626,7 @@ export default function ModelView() {
             sectionAngle={state.sectionAngle}
             onPivotChange={(i, j) => set({ sectionX: i, sectionY: j })}
             onAngleChange={(deg) => set({ sectionAngle: deg })}
+            onReceptorClick={setSelectedReceptor}
             emptyHint={tr('model_empty_hint')}
           />
         ))}

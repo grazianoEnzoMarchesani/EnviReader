@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { I18nProvider, useI18n } from './i18n/I18nContext';
 import TopBar from './components/TopBar';
@@ -19,10 +19,34 @@ const VIEWS = {
 };
 
 function AppLayout() {
-  const { state } = useAppState();
+  const { state, set } = useAppState();
   const { tr } = useI18n();
   const { Sidebar, Main } = VIEWS[state.appView] || VIEWS.analysis;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ignora se stiamo digitando in un input o textarea
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      if (e.code === 'Space') {
+        e.preventDefault();
+        set((s) => ({ playing: !s.playing }));
+      } else if (e.code === 'Digit1' || e.code === 'Numpad1') {
+        if (state.appView === 'analysis') set({ viewType: 'plan' });
+        else if (state.appView === 'model') window.dispatchEvent(new CustomEvent('snap-camera-3d', { detail: 'top' }));
+      } else if (e.code === 'Digit2' || e.code === 'Numpad2') {
+        if (state.appView === 'analysis') set({ viewType: 'sectionX' });
+        else if (state.appView === 'model') window.dispatchEvent(new CustomEvent('snap-camera-3d', { detail: 'right' }));
+      } else if (e.code === 'Digit3' || e.code === 'Numpad3') {
+        if (state.appView === 'analysis') set({ viewType: 'sectionY' });
+        else if (state.appView === 'model') window.dispatchEvent(new CustomEvent('snap-camera-3d', { detail: 'front' }));
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [set, state.appView]);
 
   return (
     <div className="app-root">

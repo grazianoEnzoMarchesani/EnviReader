@@ -597,3 +597,37 @@ export function terrainCutProfile(cut, dims, slice, viewType, sectionX, sectionY
   }
   return out;
 }
+
+export async function loadReceptorData(structure, receptorName) {
+  if (!structure) return null;
+  const file = findFileBy(structure, (name) => {
+    const n = name.toLowerCase();
+    return n.includes('1dt') && n.includes(receptorName.toLowerCase());
+  });
+  if (!file) return null;
+
+  try {
+    const text = await file.text();
+    const lines = text.split('\n');
+    if (lines.length < 2) return null;
+
+    const headers = lines[0].split(',').map((h) => h.trim());
+    const data = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      const values = line.split(',');
+      const row = {};
+      headers.forEach((h, idx) => {
+        const val = values[idx] ? values[idx].trim() : '';
+        const num = Number(val);
+        row[h] = isNaN(num) || val === '' ? val : num;
+      });
+      data.push(row);
+    }
+    return { headers, data, filename: file.name };
+  } catch (err) {
+    console.error("Failed to parse receptor file", err);
+    return null;
+  }
+}
