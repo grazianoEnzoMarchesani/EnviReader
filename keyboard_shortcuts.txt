@@ -1,0 +1,36 @@
+EnviReader Keyboard Shortcuts
+
+Time & Slicing Navigation
+---------------------------------------------------
+Spacebar            : Play / Pause the time slider
+ArrowRight          : Move time one step forward
+ArrowLeft           : Move time one step backward
+ArrowUp / W         : Move the current slice up (increases Z level in Plan view, or moves X/Y section forward)
+ArrowDown / S       : Move the current slice down (decreases Z level in Plan view, or moves X/Y section backward)
+
+Quick Views (2D & 3D)
+---------------------------------------------------
+1 (or Numpad 1)     : Switch to Plan View (Top down)
+2 (or Numpad 2)     : Switch to Section X View (Right)
+3 (or Numpad 3)     : Switch to Section Y View (Front)
+
+Visual Layers Toggles
+---------------------------------------------------
+B                   : Toggle Buildings layer visibility
+V                   : Toggle Vegetation layer visibility
+T                   : Toggle Terrain layer visibility
+R                   : Toggle Receptors visibility
+O                   : Toggle Data Voxels Overlay in 3D (switches between bare model and analytical data)
+
+Wind Overlays
+---------------------------------------------------
+F                   : Toggle Wind Field (2D vectors on the active slices)
+Shift + F           : Toggle Wind Volume (3D volumetric streamlines/vectors)
+
+General Interface
+---------------------------------------------------
+A                   : Switch to Data Analysis View (2D)
+M                   : Switch to 3D Model View
+C                   : Cycle Compare Modes (Available only when a second fileset B is open: Single -> B -> A|B / Diff)
+\ (Backslash)       : Expand / Collapse the left sidebar
+Shift + D           : Toggle Dark / Light theme
