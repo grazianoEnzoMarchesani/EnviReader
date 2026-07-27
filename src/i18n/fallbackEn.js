@@ -364,6 +364,13 @@ export const FALLBACK_I18N = {
     "help_compare_abdiff_title": "A vs B vs Diff",
     "help_compare_abdiff_body": "Adds a third panel with the point-by-point difference between A and B, on top of the side-by-side comparison — the fastest way to spot exactly where and how much the two scenarios diverge.",
 
+    "help_view_plan_title": "Plan view",
+    "help_view_plan_body": "Shows the data mapped on a horizontal plane at the selected level (Z). Use this to see the spatial distribution of values across the site at a specific height.",
+    "help_view_sectionx_title": "Longitudinal section",
+    "help_view_sectionx_body": "Shows the data mapped on a vertical plane cut along the X axis. Use this to see how values change with height and to inspect vertical profiles.",
+    "help_view_sectiony_title": "Transverse section",
+    "help_view_sectiony_body": "Shows the data mapped on a vertical plane cut along the Y axis. The perpendicular counterpart of the longitudinal section.",
+
     "help_render_style_pixel_title": "Pixel",
     "help_render_style_pixel_body": "Shows one flat color per grid cell, at the exact resolution of the simulation. The default, most literal reading of the data.",
     "help_render_style_contour_title": "Contour",

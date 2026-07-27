@@ -374,7 +374,14 @@ export default function AnalysisView() {
     { key: 'ab', label: tr('compare_ab'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined, help: { title: tr('help_compare_ab_title'), body: tr('help_compare_ab_body') } },
     { key: 'abdiff', label: tr('compare_abdiff'), disabled: !state.filesetBOpen, title: !state.filesetBOpen ? tr('hint_open_b') : undefined, help: { title: tr('help_compare_abdiff_title'), body: tr('help_compare_abdiff_body') } },
   ];
-  const viewTypeOptions = visibleViewTypes.map((v) => ({ key: v.key, label: tr(v.labelKey) }));
+  const viewTypeOptions = visibleViewTypes.map((v) => ({
+    key: v.key,
+    label: tr(v.labelKey),
+    help: {
+      title: tr(`help_view_${v.key.toLowerCase()}_title`),
+      body: tr(`help_view_${v.key.toLowerCase()}_body`)
+    }
+  }));
   const renderStyleOptions = [
     { key: 'pixel', label: tr('render_style_pixel'), help: { title: tr('help_render_style_pixel_title'), body: tr('help_render_style_pixel_body') } },
     { key: 'contour', label: tr('render_style_contour'), help: { title: tr('help_render_style_contour_title'), body: tr('help_render_style_contour_body') } },
