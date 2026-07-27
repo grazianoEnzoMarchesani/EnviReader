@@ -69,7 +69,7 @@ export default function TimeSeriesChart({ series, labels, time, onSelectTime }) 
     return Math.min(n - 1, Math.max(0, Math.round(frac * (n - 1))));
   };
 
-  const timeX = xAt(Math.min(time, n - 1));
+  const timeX = time != null ? xAt(Math.min(time, n - 1)) : 0;
   const timeFlip = timeX > M.left + innerW * 0.6;
 
   return (
@@ -99,14 +99,16 @@ export default function TimeSeriesChart({ series, labels, time, onSelectTime }) 
           )}
 
           {/* istante corrente delle mappe */}
-          <g className="ts-now">
-            <line x1={timeX} x2={timeX} y1={M.top} y2={M.top + innerH} />
-            <circle cx={timeX} cy={M.top} r="3" />
-            <circle cx={timeX} cy={M.top + innerH} r="3" />
-            <text x={timeX + (timeFlip ? -7 : 7)} y={M.top - 8} textAnchor={timeFlip ? 'end' : 'start'}>
-              {labels[time] ?? ''}
-            </text>
-          </g>
+          {time != null && (
+            <g className="ts-now">
+              <line x1={timeX} x2={timeX} y1={M.top} y2={M.top + innerH} />
+              <circle cx={timeX} cy={M.top} r="3" />
+              <circle cx={timeX} cy={M.top + innerH} r="3" />
+              <text x={timeX + (timeFlip ? -7 : 7)} y={M.top - 8} textAnchor={timeFlip ? 'end' : 'start'}>
+                {labels[time] ?? ''}
+              </text>
+            </g>
+          )}
 
           {drawn.map((s) => (
             <g key={s.name}>

@@ -8,12 +8,14 @@ export default function ReceptorModal({ receptor, structure, onClose }) {
   const { tr } = useI18n();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [selectedZ, setSelectedZ] = useState(null);
 
   useModalKeyboard(!!receptor, onClose, onClose);
 
   useEffect(() => {
     if (!receptor || !structure) {
       setData(null);
+      setSelectedZ(null);
       return;
     }
     setLoading(true);
@@ -21,6 +23,7 @@ export default function ReceptorModal({ receptor, structure, onClose }) {
     loadReceptorData(structure, receptor.name).then((res) => {
       if (!cancelled) {
         setData(res);
+        setSelectedZ(null);
         setLoading(false);
       }
     });
@@ -30,7 +33,7 @@ export default function ReceptorModal({ receptor, structure, onClose }) {
   if (!receptor) return null;
 
   let content;
-  let selectedHeightLabel = '';
+  let heightSelectNode = null;
   
   if (loading) {
     content = <p className="modal-text">Loading...</p>;
@@ -46,14 +49,43 @@ export default function ReceptorModal({ receptor, structure, onClose }) {
     let chartData = data.data;
 
     if (heightKey) {
-      const targetHeight = heightKey.includes('cm') ? 0 : 1.5;
       const availableHeights = [...new Set(data.data.map(r => r[heightKey]))].filter(v => typeof v === 'number');
+      availableHeights.sort((a, b) => a - b);
       if (availableHeights.length > 0) {
-        const closestHeight = availableHeights.reduce((prev, curr) => 
-          Math.abs(curr - targetHeight) < Math.abs(prev - targetHeight) ? curr : prev
+        let currentZ = selectedZ;
+        if (currentZ === null || !availableHeights.includes(currentZ)) {
+          const targetHeight = heightKey.includes('cm') ? 0 : 1.5;
+          currentZ = availableHeights.reduce((prev, curr) => 
+            Math.abs(curr - targetHeight) < Math.abs(prev - targetHeight) ? curr : prev
+          );
+        }
+        
+        chartData = data.data.filter(r => r[heightKey] === currentZ);
+        const unit = heightKey.includes('cm') ? 'cm' : 'm';
+        
+        heightSelectNode = (
+          <div style={{ marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <label style={{ color: 'var(--text-color)', fontSize: '14px', fontWeight: '500' }}>Altezza (z):</label>
+            <select 
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--card-bg)',
+                color: 'var(--text-color)',
+                fontSize: '14px',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+              value={currentZ} 
+              onChange={(e) => setSelectedZ(Number(e.target.value))}
+            >
+              {availableHeights.map(h => (
+                <option key={h} value={h}>{h} {unit}</option>
+              ))}
+            </select>
+          </div>
         );
-        chartData = data.data.filter(r => r[heightKey] === closestHeight);
-        selectedHeightLabel = ` (z = ${closestHeight}${heightKey.includes('cm') ? 'cm' : 'm'})`;
       }
     }
 
@@ -89,7 +121,7 @@ export default function ReceptorModal({ receptor, structure, onClose }) {
               <TimeSeriesChart 
                 series={[{ name: header, color: 'var(--series-b)', values: chartData.map(row => row[header]) }]} 
                 labels={labels} 
-                time={0} 
+                time={null} 
               />
             </div>
           </div>
@@ -101,7 +133,8 @@ export default function ReceptorModal({ receptor, structure, onClose }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-card credits-card" onClick={(e) => e.stopPropagation()} style={{ width: '80%', maxWidth: '800px' }}>
-        <div className="modal-title">Receptor: {receptor.name}{selectedHeightLabel || ''}</div>
+        <div className="modal-title" style={{ marginBottom: '15px' }}>Receptor: {receptor.name}</div>
+        {heightSelectNode}
         {content}
         <div style={{ marginTop: '20px' }}>
           <button className="primary-btn" onClick={onClose}>

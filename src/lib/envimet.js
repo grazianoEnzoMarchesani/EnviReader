@@ -607,7 +607,8 @@ export async function loadReceptorData(structure, receptorName) {
   if (!file) return null;
 
   try {
-    const text = await file.text();
+    const buffer = await file.arrayBuffer();
+    const text = decodeEDXText(buffer);
     const lines = text.split('\n');
     if (lines.length < 2) return null;
 
