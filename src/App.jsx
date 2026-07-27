@@ -4,6 +4,7 @@ import { I18nProvider, useI18n } from './i18n/I18nContext';
 import TopBar from './components/TopBar';
 import CreditsModal from './components/CreditsModal';
 import CustomRangeModal from './components/CustomRangeModal';
+import ShortcutsModal from './components/ShortcutsModal';
 import AnalysisSidebar from './components/sidebar/AnalysisSidebar';
 import AnalysisView from './components/views/AnalysisView';
 import ModelView from './components/views/ModelView';
@@ -22,7 +23,6 @@ function AppLayout() {
   const { state, set, toggle, toggleTheme, setCompareMode, setCompareMode3D } = useAppState();
   const { tr } = useI18n();
   const { Sidebar, Main } = VIEWS[state.appView] || VIEWS.analysis;
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -84,7 +84,7 @@ function AppLayout() {
       else if (e.code === 'KeyC') {
         if (state.filesetBOpen) {
           if (state.appView === 'analysis') {
-            const modes = ['single', 'b', 'diff'];
+            const modes = ['single', 'b', 'ab', 'abdiff'];
             setCompareMode(modes[(modes.indexOf(state.compareMode) + 1) % modes.length]);
           } else if (state.appView === 'model') {
             const modes = ['single', 'b', 'ab'];
@@ -94,7 +94,14 @@ function AppLayout() {
       }
       // Sidebar (backslash o accentata)
       else if (e.code === 'Backslash' || e.code === 'IntlBackslash') {
-        setSidebarCollapsed((c) => !c);
+        set((s) => {
+          const bothClosed = s.sidebarCollapsed && s.viewBarCollapsed;
+          return { sidebarCollapsed: !bothClosed, viewBarCollapsed: !bothClosed };
+        });
+      }
+      // Shortcuts Help (Shift + ?)
+      else if (e.key === '?' && e.shiftKey) {
+        toggle('showShortcuts');
       }
     };
 
@@ -105,7 +112,7 @@ function AppLayout() {
   return (
     <div className="app-root">
       <TopBar />
-      <div className={`body-row ${!Sidebar || sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <div className={`body-row ${!Sidebar || state.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         {Sidebar && (
           <>
             <aside className="sidebar">
@@ -117,8 +124,8 @@ function AppLayout() {
             <HelpTooltip content={{ title: tr('help_sidebar_toggle_title'), body: tr('help_sidebar_toggle_body') }}>
               <button
                 className="sidebar-toggle"
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                aria-label={sidebarCollapsed ? "Espandi sidebar" : "Riduci sidebar"}
+                onClick={() => toggle('sidebarCollapsed')}
+                aria-label={state.sidebarCollapsed ? "Espandi sidebar" : "Riduci sidebar"}
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="15 18 9 12 15 6"></polyline>
@@ -133,6 +140,7 @@ function AppLayout() {
         </main>
       </div>
       <CreditsModal />
+      <ShortcutsModal />
       <CustomRangeModal />
     </div>
   );

@@ -401,6 +401,27 @@ export const FALLBACK_I18N = {
     "help_gizmo_rotate_ccw_title": "Rotate 90° left",
     "help_gizmo_rotate_ccw_body": "Rotates the 3D view 90° counter-clockwise around the current target, useful for quickly checking the model from its four cardinal sides.",
     "help_gizmo_rotate_cw_title": "Rotate 90° right",
-    "help_gizmo_rotate_cw_body": "Rotates the 3D view 90° clockwise around the current target, the mirrored counterpart of the left-rotate button."
+    "help_gizmo_rotate_cw_body": "Rotates the 3D view 90° clockwise around the current target, the mirrored counterpart of the left-rotate button.",
+    "title_keyboard_shortcuts": "Keyboard Shortcuts",
+    "shortcuts_time_nav": "Time & Navigation",
+    "shortcut_play_pause": "Play / Pause",
+    "shortcut_time_step": "Time step fwd/bwd",
+    "shortcut_move_z": "Move Z-level / slice",
+    "shortcut_or": "or",
+    "shortcuts_quick_views": "Quick Views",
+    "shortcut_plan_view": "Plan View (Top)",
+    "shortcut_section_x": "Section X View (Right)",
+    "shortcut_section_y": "Section Y View (Front)",
+    "shortcuts_visual_layers": "Visual Layers",
+    "layer_data_voxels": "Data Voxels (3D)",
+    "shortcuts_data_env": "Data & Environment",
+    "shortcut_wind_field_2d": "Wind Field (2D)",
+    "shortcut_wind_volume_3d": "Wind Volume (3D)",
+    "shortcut_compare_mode": "Compare Mode",
+    "shortcuts_general_ui": "General UI",
+    "shortcut_model_analysis": "Model / Analysis Views",
+    "shortcut_toggle_sidebar": "Toggle Sidebar",
+    "shortcut_theme": "Dark / Light Theme",
+    "shortcut_help": "Shortcuts Help"
   }
 };

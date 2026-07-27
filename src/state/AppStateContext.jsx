@@ -9,6 +9,8 @@ const initialState = {
   theme: loadTheme(), // scelta salvata, altrimenti il tema di sistema
   appView: 'analysis',
   activeTab: 'data',
+  sidebarCollapsed: false,
+  viewBarCollapsed: false,
   compareMode: 'single',
   compareMode3D: 'single', // confronto nel viewer 3D: 'single' | 'b' | 'ab' (niente diff, non ha senso per un modello 3D)
   viewType: 'plan',

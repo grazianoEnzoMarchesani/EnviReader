@@ -91,8 +91,8 @@ function monthLabel(key, lang) {
 
 export default function BoundaryView() {
   const { state, set } = useAppState();
+  const viewBarCollapsed = state.viewBarCollapsed;
   const { tr, lang } = useI18n();
-  const [viewBarCollapsed, setViewBarCollapsed] = useState(false);
 
   // fileset mostrato: quello selezionato, con fallback su quello disponibile
   const shown = state[`fileset${state.boundaryFileset}`] ? state.boundaryFileset : state.filesetA ? 'A' : state.filesetB ? 'B' : null;
@@ -251,7 +251,7 @@ export default function BoundaryView() {
             <button
               type="button"
               className="view-bar-toggle"
-              onClick={() => setViewBarCollapsed((v) => !v)}
+              onClick={() => toggle('viewBarCollapsed')}
               aria-label={tr(viewBarCollapsed ? 'btn_expand_toolbar' : 'btn_collapse_toolbar')}
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

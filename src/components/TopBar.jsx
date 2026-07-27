@@ -3,6 +3,7 @@ import { useAppState } from '../state/AppStateContext';
 import { useI18n } from '../i18n/I18nContext';
 import SaveChartModal from './SaveChartModal';
 import NavBar from './NavBar';
+import { IconKeyboard } from './icons/ToolbarIcons';
 
 export default function TopBar() {
   const { state, toggle, toggleTheme, openFilesetA, toggleFilesetB } = useAppState();
@@ -66,6 +67,15 @@ export default function TopBar() {
             ))}
           </div>
           <button className="btn btn-ghost-top" onClick={() => setShowSaveModal(true)}>{tr('btn_save_charts')}</button>
+          <button 
+            className="btn btn-ghost-top" 
+            onClick={() => toggle('showShortcuts')} 
+            aria-label="Keyboard Shortcuts" 
+            title="Keyboard Shortcuts (Shift + ?)"
+            style={{ padding: '0 0.5rem' }}
+          >
+            <IconKeyboard />
+          </button>
           <button className="theme-switch" onClick={toggleTheme} aria-label="theme">
             <span className="theme-switch-label">{isDark ? tr('theme_dark') : tr('theme_light')}</span>
             <span className={`toggle-track${isDark ? ' on' : ''}`}>

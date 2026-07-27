@@ -181,6 +181,15 @@ export function IconSun(props) {
   );
 }
 
+export function IconKeyboard(props) {
+  return (
+    <svg {...base} width="18" height="18" {...props}>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M8 15h8" />
+    </svg>
+  );
+}
+
 // Icona compatta per il pulsante ciclico "Wind display" della toolbar 3D
 // (off → 2D → 3D): due sole linee di soffio, corte, per lasciare spazio al
 // badge "2D"/"3D" sovrapposto in basso a destra.

@@ -394,7 +394,7 @@ export default function AnalysisView() {
     if (!showSections && state.viewType !== 'plan') set({ viewType: 'plan' });
   }, [showSections, state.viewType]);
 
-  const [viewBarCollapsed, setViewBarCollapsed] = useState(false);
+  const viewBarCollapsed = state.viewBarCollapsed;
   const { modesLayout, topRef, panelRef, modesRef } = useModesLayout(
     '.segmented',
     [state.compareMode, state.viewType, state.filesetBOpen, state.showObjectsOverlay],
@@ -480,7 +480,7 @@ export default function AnalysisView() {
         <button
           type="button"
           className="view-bar-toggle"
-          onClick={() => setViewBarCollapsed((v) => !v)}
+          onClick={() => toggle('viewBarCollapsed')}
           aria-label={tr(viewBarCollapsed ? 'btn_expand_toolbar' : 'btn_collapse_toolbar')}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

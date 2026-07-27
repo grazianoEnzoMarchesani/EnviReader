@@ -309,8 +309,7 @@ export default function ModelView() {
   const objectsVolumeA = useObjectsVolume(state.filesetA);
   const objectsVolumeB = useObjectsVolume(state.filesetB);
   const sunA = useModelSun(loadedA?.model, state);
-  const sunB = useModelSun(loadedB?.model, state);
-  const [viewBarCollapsed, setViewBarCollapsed] = useState(false);
+  const viewBarCollapsed = state.viewBarCollapsed;
   const [selectedReceptor, setSelectedReceptor] = useState(null);
 
   const terrainCutA = useTerrainCut(state.terrainA, state);
@@ -582,7 +581,7 @@ export default function ModelView() {
         <button
           type="button"
           className="view-bar-toggle"
-          onClick={() => setViewBarCollapsed((v) => !v)}
+          onClick={() => toggle('viewBarCollapsed')}
           aria-label={tr(viewBarCollapsed ? 'btn_expand_toolbar' : 'btn_collapse_toolbar')}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
