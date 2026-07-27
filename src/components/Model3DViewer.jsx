@@ -509,6 +509,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
     // Vicino al perno il trascinamento resta indefinito (angolo instabile):
     // lì il gesto è sempre un click che sposta l'incrocio, mai una rotazione.
     const lineHitTest = (clientX, clientY) => {
+      if (!stage.dataOverlayLayer?.visible && !stage.windOverlayLayer?.visible) return null;
       const { model: m, sectionX: sx, sectionY: sy, sectionAngle: sa } = interactionRef.current;
       if (!m) return null;
       const { I, J } = m.geometry;
@@ -621,15 +622,17 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
         stage.controls.enabled = true;
         renderer.domElement.style.cursor = '';
       } else if (dragMode === 'maybe-click') {
-        const point = groundHit(e);
-        const { model: m } = interactionRef.current;
-        if (point && m) {
-          const { I, J } = m.geometry;
-          const { col, row } = worldToGrid(m, point);
-          interactionRef.current.onPivotChange?.(
-            Math.min(I - 1, Math.max(0, Math.round(col))),
-            Math.min(J - 1, Math.max(0, Math.round(row))),
-          );
+        if (stage.dataOverlayLayer?.visible || stage.windOverlayLayer?.visible) {
+          const point = groundHit(e);
+          const { model: m } = interactionRef.current;
+          if (point && m) {
+            const { I, J } = m.geometry;
+            const { col, row } = worldToGrid(m, point);
+            interactionRef.current.onPivotChange?.(
+              Math.min(I - 1, Math.max(0, Math.round(col))),
+              Math.min(J - 1, Math.max(0, Math.round(row))),
+            );
+          }
         }
       }
       dragMode = null;
