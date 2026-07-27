@@ -29,7 +29,7 @@ export default function ShortcutsModal() {
             </div>
             <div className="shortcut-row">
               <span className="shortcut-desc">{tr('shortcut_move_z')}</span>
-              <span className="shortcut-keys"><kbd className="shortcut-key">↑</kbd> <kbd className="shortcut-key">↓</kbd> {tr('shortcut_or')} <kbd className="shortcut-key">W</kbd> <kbd className="shortcut-key">S</kbd></span>
+              <span className="shortcut-keys"><kbd className="shortcut-key">↑</kbd> <kbd className="shortcut-key">↓</kbd></span>
             </div>
           </div>
 
@@ -76,6 +76,10 @@ export default function ShortcutsModal() {
           <div className="shortcuts-section">
             <h3 className="credits-subtitle">{tr('shortcuts_data_env')}</h3>
             <div className="shortcut-row">
+              <span className="shortcut-desc">{tr('shortcut_sun_path')}</span>
+              <kbd className="shortcut-key">S</kbd>
+            </div>
+            <div className="shortcut-row">
               <span className="shortcut-desc">{tr('shortcut_wind_field_2d')}</span>
               <kbd className="shortcut-key">F</kbd>
             </div>
@@ -93,7 +97,11 @@ export default function ShortcutsModal() {
             <h3 className="credits-subtitle">{tr('shortcuts_general_ui')}</h3>
             <div className="shortcut-row">
               <span className="shortcut-desc">{tr('shortcut_model_analysis')}</span>
-              <span className="shortcut-keys"><kbd className="shortcut-key">M</kbd> <kbd className="shortcut-key">A</kbd></span>
+              <kbd className="shortcut-key">A</kbd>
+            </div>
+            <div className="shortcut-row">
+              <span className="shortcut-desc">{tr('nav_boundary')}</span>
+              <kbd className="shortcut-key">E</kbd>
             </div>
             <div className="shortcut-row">
               <span className="shortcut-desc">{tr('shortcut_toggle_sidebar')}</span>

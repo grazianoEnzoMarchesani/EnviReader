@@ -309,6 +309,7 @@ export default function ModelView() {
   const objectsVolumeA = useObjectsVolume(state.filesetA);
   const objectsVolumeB = useObjectsVolume(state.filesetB);
   const sunA = useModelSun(loadedA?.model, state);
+  const sunB = useModelSun(loadedB?.model, state);
   const viewBarCollapsed = state.viewBarCollapsed;
   const [selectedReceptor, setSelectedReceptor] = useState(null);
 

@@ -415,12 +415,13 @@ export const FALLBACK_I18N = {
     "shortcuts_visual_layers": "Visual Layers",
     "layer_data_voxels": "Data Voxels (3D)",
     "shortcuts_data_env": "Data & Environment",
+    "shortcut_sun_path": "Sun path (3D)",
     "shortcut_wind_field_2d": "Wind Field (2D)",
     "shortcut_wind_volume_3d": "Wind Volume (3D)",
     "shortcut_compare_mode": "Compare Mode",
     "shortcuts_general_ui": "General UI",
     "shortcut_model_analysis": "Model / Analysis Views",
-    "shortcut_toggle_sidebar": "Toggle Sidebar",
+    "shortcut_toggle_sidebar": "Toggle Toolbars",
     "shortcut_theme": "Dark / Light Theme",
     "shortcut_help": "Shortcuts Help"
   }

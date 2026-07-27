@@ -55,9 +55,9 @@ function AppLayout() {
         }));
       }
       // Navigazione spaziale (Frecce Su / Giù oppure W / S)
-      else if (e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'KeyW' || e.code === 'KeyS') {
+      else if (e.code === 'ArrowUp' || e.code === 'ArrowDown') {
         e.preventDefault();
-        const dir = (e.code === 'ArrowUp' || e.code === 'KeyW') ? 1 : -1;
+        const dir = (e.code === 'ArrowUp') ? 1 : -1;
         set((s) => {
           const dims = s.edxMeta?.dimensions;
           if (!dims) return {};
@@ -73,11 +73,15 @@ function AppLayout() {
       else if (e.code === 'KeyT') toggle('showTerrain');
       else if (e.code === 'KeyR') toggle('showReceptors');
       else if (e.code === 'KeyO') toggle('showDataVoxels');
+      // Sole (S)
+      else if (e.code === 'KeyS') toggle('sunPathEnabled');
       // Vento (F, Shift+F)
       else if (e.code === 'KeyF') toggle(e.shiftKey ? 'showWindVolume' : 'showWindField');
-      // Cambio vista (A, M)
-      else if (e.code === 'KeyA') set({ appView: 'analysis' });
-      else if (e.code === 'KeyM') set({ appView: 'model' });
+      // Cambio vista (A per ciclare 2D/3D, E per boundary)
+      else if (e.code === 'KeyA') {
+        set((s) => ({ appView: s.appView === 'analysis' ? 'model' : 'analysis' }));
+      }
+      else if (e.code === 'KeyE') set({ appView: 'boundary' });
       // Tema chiaro/scuro (Shift + D)
       else if (e.code === 'KeyD' && e.shiftKey) toggleTheme();
       // Comparazione (C)
