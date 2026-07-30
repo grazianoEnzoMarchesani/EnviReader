@@ -63,7 +63,7 @@ const initialState = {
   // UTCI) in sezione: isola la sola quota pedonale che segue il terreno e
   // azzera lo "schiacciamento" verticale dell'export, in 2D e nel viewer 3D.
   fixBiometSections: false,
-  levelOut: true, // "livella salendo": smorza il rilievo con la quota, vedi terrainCut
+  levelOutMode: 'cascade', // 'off' | 'levelOut' | 'cascade', vedi terrainCut
   levelOutHeight: 1, // quota di transizione (livelli): oltre, il piano è orizzontale
   windOpacity: 50,
   windSize: 50,
@@ -386,7 +386,11 @@ export function AppStateProvider({ children }) {
         if (s.sectionX != null) patch.sectionX = dims ? clampTo(s.sectionX, dims.x - 1) : s.sectionX;
         if (s.sectionY != null) patch.sectionY = dims ? clampTo(s.sectionY, dims.y - 1) : s.sectionY;
         if (s.levelOutHeight != null) patch.levelOutHeight = Math.max(1, dims ? clampTo(s.levelOutHeight, dims.z - 1) : s.levelOutHeight);
-        for (const k of ['sectionAngle', 'followTerrain', 'fixBiometSections', 'levelOut', 'showWindField', 'showObjectsOverlay', 'windStyle', 'windOpacity', 'windSize', 'windDensity', 'scaleType', 'palette', 'paletteReversed', 'diffPalette', 'diffPaletteReversed', 'ambientOcclusion']) {
+        // Compatibilità con preset vecchi: salvavano il booleano `levelOut` invece
+        // dell'enum `levelOutMode` (introdotto con la modalità "a cascata").
+        const levelOutMode = s.levelOutMode ?? (s.levelOut != null ? (s.levelOut ? 'levelOut' : 'off') : null);
+        if (levelOutMode != null) patch.levelOutMode = levelOutMode;
+        for (const k of ['sectionAngle', 'followTerrain', 'fixBiometSections', 'showWindField', 'showObjectsOverlay', 'windStyle', 'windOpacity', 'windSize', 'windDensity', 'scaleType', 'palette', 'paletteReversed', 'diffPalette', 'diffPaletteReversed', 'ambientOcclusion']) {
           if (s[k] != null) patch[k] = s[k];
         }
         // showWindField e showWindVolume sono mutuamente esclusivi (vedi toggle);

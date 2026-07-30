@@ -32,6 +32,7 @@ export const VIEW_TYPES = [
 export const NAV_VIEWS = [
   { key: 'analysis', labelKey: 'nav_analysis' },
   { key: 'model', labelKey: 'nav_model' },
+  { key: 'webgis', labelKey: 'nav_webgis' },
   { key: 'boundary', labelKey: 'nav_boundary' },
 ];
 

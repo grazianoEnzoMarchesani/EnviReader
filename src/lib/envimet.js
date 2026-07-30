@@ -327,7 +327,7 @@ export function extractSlice(dataView, dims, varIndex, config) {
       const x = i % dimX;
       const y = (i / dimX) | 0;
       let k = level;
-      if (terrain) k = Math.min(Math.floor(terrain.data[i] * terrain.gain + terrain.base), dimZ - 1);
+      if (terrain) k = Math.min(Math.floor(applyTerrainCut(terrain, terrain.data[i])), dimZ - 1);
       out[i] = read(varOffset + ((k * dimY + y) * dimX + x) * BYTES);
     }
     return out;
@@ -454,7 +454,7 @@ export async function loadPointSeries(series, variableName, { x, y, level, terra
       const cx = Math.max(0, Math.min(x, dims.x - 1));
       const cy = Math.max(0, Math.min(y, dims.y - 1));
       let k = Math.max(0, Math.min(level, dims.z - 1));
-      if (terrain) k = Math.min(Math.floor(terrain.data[cy * dims.x + cx] * terrain.gain + terrain.base), dims.z - 1);
+      if (terrain) k = Math.min(Math.floor(applyTerrainCut(terrain, terrain.data[cy * dims.x + cx])), dims.z - 1);
       const offset = (((varIndex * dims.z + k) * dims.y + cy) * dims.x + cx) * 4;
       const buffer = await pair.EDT.slice(offset, offset + 4).arrayBuffer();
       if (buffer.byteLength < 4) return NaN;
@@ -570,15 +570,44 @@ export async function loadTerrain(structure) {
   }
 }
 
-// Quota di taglio per "segui il terreno": nelle estrazioni k = floor(gain·terreno + base),
-// una sola moltiplicazione+somma per cella. Da solo è l'offset puro (gain 1, base level);
-// con "livella salendo" il rilievo si smorza linearmente salendo (t = level/transizione)
-// verso il piano orizzontale a terrenoMax + level. La quota risultante non scende mai
-// sotto terreno + level, quindi il taglio non entra mai nel terreno.
-export function terrainCut(terrain, level, levelOut, transition) {
+// Quota di taglio per "segui il terreno". Modalità:
+// - 'off': offset puro (gain 1, base level, nessun floor) — ogni colonna sale di
+//   pari passo con "level", mantenendo il rilievo reale (drappeggio classico);
+// - 'levelOut' ("livella salendo"): il rilievo si smorza linearmente e UNIFORMEMENTE
+//   su tutte le celle (t = level/transizione) verso il piano orizzontale a
+//   terrenoMax + level — tutte le colonne iniziano a muoversi insieme fin da level=0;
+// - 'cascade' ("livellamento a cascata"): ogni colonna resta ferma alla sua quota
+//   reale finché "level" non la raggiunge, poi la insegue per `transition` livelli
+//   (vedi applyTerrainCut) fino a coincidere esattamente con "level" — un piano
+//   orizzontale ancorato al valore che l'utente vede e controlla direttamente,
+//   MAI al terreno massimo del modello (che può essere molto più alto di quanto
+//   visibile nella vista corrente e far scattare l'intera scena a una quota
+//   assurda con una transizione stretta). Le colonne più basse vengono raggiunte
+//   e appiattite per prime, quelle più alte restano ferme più a lungo — come un
+//   livello d'acqua che sale e sommerge prima le zone basse.
+// In ogni modalità la quota risultante non scende mai sotto il terreno reale.
+export function terrainCut(terrain, level, mode, transition) {
   if (!terrain) return null;
-  const t = levelOut ? Math.min(level / Math.max(1, transition), 1) : 0;
-  return { data: terrain.data, gain: 1 - t, base: t * terrain.max + level };
+  if (mode === 'cascade') return { data: terrain.data, mode: 'cascade', level, transition: Math.max(1, transition) };
+  if (mode !== 'levelOut') return { data: terrain.data, gain: 1, base: level, floor: null };
+  const t = Math.min(level / Math.max(1, transition), 1);
+  return { data: terrain.data, gain: 1 - t, base: t * terrain.max + level, floor: null };
+}
+
+// Applica il taglio "segui il terreno" a un valore di terreno campionato. Punto
+// unico della formula: usato dal profilo 2D qui sotto, da extractSlice/
+// loadPointSeries più sopra e dai 4 siti equivalenti in inxScene.js (pianta/
+// sezioni/vento 3D) — cambiare una modalità qui la cambia ovunque.
+// 'cascade': ferma a `value` finché "level" non la raggiunge, poi la insegue
+// linearmente su una finestra di `transition` livelli.
+// altrimenti: k = value·gain + base, vincolato dal basso a `floor` se presente.
+export function applyTerrainCut(cut, value) {
+  if (cut.mode === 'cascade') {
+    const frac = Math.min(Math.max((cut.level - value) / cut.transition, 0), 1);
+    return value + frac * (cut.level - value);
+  }
+  const k = value * cut.gain + cut.base;
+  return cut.floor != null && k < cut.floor ? cut.floor : k;
 }
 
 // Profilo del taglio lungo una sezione: per ogni colonna dello slice, l'indice z
@@ -593,7 +622,7 @@ export function terrainCutProfile(cut, dims, slice, viewType, sectionX, sectionY
     const x = slice.line ? Math.round(slice.line.x0 + slice.line.dx * i) : viewType === 'sectionX' ? sectionX : i;
     const y = slice.line ? Math.round(slice.line.y0 + slice.line.dy * i) : viewType === 'sectionX' ? i : sectionY;
     const cell = clampI(y, dims.y - 1) * dims.x + clampI(x, dims.x - 1);
-    out[i] = Math.min(Math.floor(cut.data[cell] * cut.gain + cut.base), dims.z - 1);
+    out[i] = Math.min(Math.floor(applyTerrainCut(cut, cut.data[cell])), dims.z - 1);
   }
   return out;
 }

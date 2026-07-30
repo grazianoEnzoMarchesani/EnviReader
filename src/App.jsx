@@ -8,6 +8,7 @@ import ShortcutsModal from './components/ShortcutsModal';
 import AnalysisSidebar from './components/sidebar/AnalysisSidebar';
 import AnalysisView from './components/views/AnalysisView';
 import ModelView from './components/views/ModelView';
+import WebGisView from './components/views/WebGisView';
 import BoundaryView from './components/views/BoundaryView';
 import HelpTooltip from './components/controls/HelpTooltip';
 
@@ -16,6 +17,7 @@ import HelpTooltip from './components/controls/HelpTooltip';
 const VIEWS = {
   analysis: { Sidebar: AnalysisSidebar, Main: AnalysisView },
   model: { Sidebar: AnalysisSidebar, Main: ModelView },
+  webgis: { Sidebar: AnalysisSidebar, Main: WebGisView },
   boundary: { Main: BoundaryView },
 };
 
@@ -61,10 +63,9 @@ function AppLayout() {
         set((s) => {
           const dims = s.edxMeta?.dimensions;
           if (!dims) return {};
-          if (s.viewType === 'plan') return { level: clamp(s.level + dir, 0, dims.z - 1) };
-          if (s.viewType === 'sectionX') return { sectionX: clamp(s.sectionX + dir, 0, dims.x - 1) };
-          if (s.viewType === 'sectionY') return { sectionY: clamp(s.sectionY + dir, 0, dims.y - 1) };
-          return {};
+          // In base al feedback dell'utente, le frecce Su/Giù devono sempre spostare il piano orizzontale (level)
+          // sia in 2D (a prescindere dalla vista principale) sia in 3D.
+          return { level: clamp(s.level + dir, 0, dims.z - 1) };
         });
       }
       // Layer visivi (B, V, T, R, O)
@@ -77,10 +78,11 @@ function AppLayout() {
       else if (e.code === 'KeyS') toggle('sunPathEnabled');
       // Vento (F, Shift+F)
       else if (e.code === 'KeyF') toggle(e.shiftKey ? 'showWindVolume' : 'showWindField');
-      // Cambio vista (A per ciclare 2D/3D, E per boundary)
+      // Cambio vista (A per ciclare 2D/3D, G per WebGIS, E per boundary)
       else if (e.code === 'KeyA') {
         set((s) => ({ appView: s.appView === 'analysis' ? 'model' : 'analysis' }));
       }
+      else if (e.code === 'KeyG') set({ appView: 'webgis' });
       else if (e.code === 'KeyE') set({ appView: 'boundary' });
       // Tema chiaro/scuro (Shift + D)
       else if (e.code === 'KeyD' && e.shiftKey) toggleTheme();

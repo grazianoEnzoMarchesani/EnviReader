@@ -252,10 +252,10 @@ export function useInxRotation(fileset) {
 // fileset: memoizzata così i suoi coefficienti si calcolano una volta sola e
 // gli hook a valle ricaricano solo quando cambia davvero qualcosa
 export function useTerrainCut(terrain, state) {
-  const { followTerrain, level, levelOut, levelOutHeight } = state;
+  const { followTerrain, level, levelOutMode, levelOutHeight } = state;
   return useMemo(
-    () => (followTerrain ? terrainCut(terrain, level, levelOut, levelOutHeight) : null),
-    [terrain, followTerrain, level, levelOut, levelOutHeight],
+    () => (followTerrain ? terrainCut(terrain, level, levelOutMode, levelOutHeight) : null),
+    [terrain, followTerrain, level, levelOutMode, levelOutHeight],
   );
 }
 

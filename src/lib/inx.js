@@ -39,6 +39,26 @@ function parseLeaves(body) {
 
 const num = (v) => (v == null || v.trim?.() === '' ? null : Number(v));
 
+// Georeferenziazione proiettata dell'angolo sud-ovest del dominio, quando
+// l'INX ce l'ha: `realworldLowerLeft_X/Y` sono precisi al centimetro, mentre
+// `location_Longitude/Latitude` è lo stesso punto arrotondato dall'esportatore
+// (QGIS scrive 2 decimali → centinaia di metri di errore). La zona arriva da
+// <UTMZone>, o in subordine dal codice EPSG (326xx = UTM nord, 327xx = sud);
+// Grasshopper lascia questi campi a 0/vuoti, e lì si torna al lon/lat.
+function parseUtmGeoref(l) {
+  const x = num(l.realworldLowerLeft_X);
+  const y = num(l.realworldLowerLeft_Y);
+  if (!Number.isFinite(x) || !Number.isFinite(y) || (x === 0 && y === 0)) return null;
+
+  const epsg = /(\d{4,5})/.exec(l.projectionSystem ?? '')?.[1];
+  const epsgNum = epsg ? Number(epsg) : null;
+  const fromEpsg = epsgNum >= 32601 && epsgNum <= 32760 ? epsgNum % 100 : null;
+  const zone = num(l.UTMZone) || fromEpsg;
+  if (!Number.isFinite(zone) || zone < 1 || zone > 60) return null;
+
+  return { x, y, zone, north: !(epsgNum >= 32701 && epsgNum <= 32760) };
+}
+
 // Matrice densa I×J: una riga di testo per j, valori separati da virgola.
 // numeric=false restituisce stringhe (ID materiale), altrimenti Float32Array.
 function parseMatrix(body, attrs, numeric = true) {
@@ -114,6 +134,7 @@ export function parseINX(text) {
         rotation: num(l.modelRotation) || 0,
         longitude: num(l.location_Longitude),
         latitude: num(l.location_Latitude),
+        utm: parseUtmGeoref(l),
       };
     } else if (tag === 'buildings2D') {
       for (const sub of splitBlocks(`<ENVI-MET_Datafile>${body}</ENVI-MET_Datafile>`)) {

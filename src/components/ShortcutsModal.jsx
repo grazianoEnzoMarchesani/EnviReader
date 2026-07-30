@@ -100,6 +100,10 @@ export default function ShortcutsModal() {
               <kbd className="shortcut-key">A</kbd>
             </div>
             <div className="shortcut-row">
+              <span className="shortcut-desc">{tr('nav_webgis')}</span>
+              <kbd className="shortcut-key">G</kbd>
+            </div>
+            <div className="shortcut-row">
               <span className="shortcut-desc">{tr('nav_boundary')}</span>
               <kbd className="shortcut-key">E</kbd>
             </div>

@@ -2,8 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppState } from '../../state/AppStateContext';
 import { useI18n } from '../../i18n/I18nContext';
 import { MODEL_LAYERS, SCALE_TYPES_3D } from '../../data/constants';
-import { findInxFile, readINX } from '../../lib/inx';
-import { loadObjectsVolume, isBiometDataset, hasVerticalExtent } from '../../lib/envimet';
+import { isBiometDataset, hasVerticalExtent } from '../../lib/envimet';
 import { sunPosition, sunPathSamples, sunDiagramCurves, estimateTimezoneOffset } from '../../lib/sunPosition';
 import { getSunSample } from '../../lib/sunLink';
 import Model3DViewer from '../Model3DViewer';
@@ -18,6 +17,7 @@ import ViewSettingsModal from '../ViewSettingsModal';
 import ReceptorModal from '../ReceptorModal';
 import { useFlip } from '../../lib/useFlip';
 import { useSlices, useTerrainCut, useWindFields, useWindVolumeCells } from '../../lib/useSlice';
+import { useInxModel, useObjectsVolume, useDataOverlay, computeStats } from '../../lib/useModelData';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { activePalette } from '../../data/palettes';
 import { formatValue, orientColors, contourLegendGradient } from '../../lib/colormap';
@@ -64,40 +64,6 @@ function SunAnglesBadge({ azimuth, altitude }) {
   );
 }
 
-// Carica e parsa l'INX (inputData/*.INX) del fileset, se presente
-function useInxModel(fileset) {
-  const [loaded, setLoaded] = useState(null); // { model, fileName }
-  useEffect(() => {
-    setLoaded(null);
-    const structure = fileset?.structure;
-    if (!structure) return;
-    const file = findInxFile(structure);
-    if (!file) return;
-    let cancelled = false;
-    readINX(file)
-      .then((model) => { if (!cancelled) setLoaded({ model, fileName: file.name }); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [fileset]);
-  return loaded;
-}
-
-// Volume "Objects" (EDT/EDX) del fileset per la vegetazione 3D, se ci sono risultati
-function useObjectsVolume(fileset) {
-  const [volume, setVolume] = useState(null);
-  useEffect(() => {
-    setVolume(null);
-    const structure = fileset?.structure;
-    if (!structure) return;
-    let cancelled = false;
-    loadObjectsVolume(structure)
-      .then((v) => { if (!cancelled) setVolume(v); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [fileset]);
-  return volume;
-}
-
 // Percorso solare per un singolo modello: azimuth/altitudine correnti, arco
 // del giorno e rete annuale, tutti derivati dalla località letta nell'INX
 function useModelSun(model, state) {
@@ -134,35 +100,6 @@ function useModelSun(model, state) {
   }, [sunActive, location?.latitude, location?.longitude, sunSample.date, sunSample.hour]);
 
   return { sunSample, hasLocation, sunActive, sunPathPoints, sunDiagram, sunInfo };
-}
-
-// Confeziona l'overlay voxel di un fileset per il viewer 3D: stesso dato e
-// stessa palette della vista 2D, con un range unico condiviso tra i piani
-// attivi (pianta/sezioni) così i colori restano confrontabili quando più piani
-// sono visibili insieme. null se non c'è nulla da mostrare (overlay spento,
-// nessun piano attivo, o dataset non ancora caricato).
-function useDataOverlay(slices, terrainCut, views, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ, range, contour) {
-  return useMemo(() => {
-    if (!dimZ || (!views.plan && !views.sectionX && !views.sectionY)) return null;
-    if (!(views.plan && slices.plan) && !(views.sectionX && slices.sectionX) && !(views.sectionY && slices.sectionY)) return null;
-    return {
-      views: {
-        plan: views.plan ? slices.plan : null,
-        sectionX: views.sectionX ? slices.sectionX : null,
-        sectionY: views.sectionY ? slices.sectionY : null,
-      },
-      range,
-      colors,
-      reversed,
-      pivot: { sectionX, sectionY },
-      terrainCut,
-      level,
-      dimZ,
-      smooth,
-      spacingZ,
-      contour,
-    };
-  }, [slices.plan, slices.sectionX, slices.sectionY, terrainCut, views.plan, views.sectionX, views.sectionY, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ, range, contour]);
 }
 
 // Confeziona l'overlay 3D del vento sulle fette dati di un fileset: stessa
@@ -202,19 +139,6 @@ function useWindOnSlicesOverlay(windFields, refValue, views, style, opacity, siz
 // aggiornare senza ricostruire la mesh (vedi il suo effetto dedicato).
 function useWindVolumeOverlay(cells, opacity) {
   return useMemo(() => (cells ? { cells, opacity } : null), [cells, opacity]);
-}
-
-function computeStats(model) {
-  if (!model) return null;
-  const { I, J, Z, dx, dy } = model.geometry;
-  let max = 0;
-  const zTop = model.buildings2D.zTop?.data;
-  if (zTop) for (let i = 0; i < zTop.length; i++) if (zTop[i] > max) max = zTop[i];
-  return {
-    grid: `${I} × ${J} × ${Z}`,
-    res: dx === dy ? `${dx} m` : `${dx} × ${dy} m`,
-    height: `${Math.round(max)} m`,
-  };
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
