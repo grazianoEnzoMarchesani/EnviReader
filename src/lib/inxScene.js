@@ -8,11 +8,12 @@
 // modello, verificato confrontando la scena con la vista in pianta 2D dei
 // risultati (overlay "Objects"), che resta il riferimento corretto.
 // Le matrici INX sono scritte con la prima riga a nord: riga → j = J-1-riga.
-// I database materiali ENVI-met sono cifrati, quindi i colori derivano
-// dall'ID del materiale tramite una palette deterministica di fallback.
+// I colori di muri/tetti/terreno usano palette deterministiche (via hash
+// dell'ID materiale).
 
 import * as THREE from 'three';
 import { buildZLevels, zLevelsFromSpacing } from './inx';
+import { applyTerrainCut } from './envimet';
 import { VEGETATION_COLORS as VEGETATION_HEX, VEG_STYLE1_RADIUS_FRACTIONS, buildLUT, CONTOUR_BANDS, axisCenters, continuousIndex, bilinearSample } from './colormap';
 import { traceStreamlines2D } from './windField';
 import { COMBINED_MARKER_ASPECT, COMBINED_MARKER_LEN_FACTOR, lineToSegmentCells, pushArrowhead } from './windVolumeMath';
@@ -71,7 +72,7 @@ function hashPick(id, palette) {
 
 function soilColor(id, activeStyle = 'default') {
   if (activeStyle === 'style2' || activeStyle === 'style3') return 0xffffff;
-  if (!id || id === '000000') return SOIL_DEFAULT;
+  if (!id) return SOIL_DEFAULT;
   return SOIL_COLORS[id.slice(-2).toUpperCase()] ?? SOIL_DEFAULT;
 }
 
@@ -775,6 +776,11 @@ function buildFromObjectsVolume(model, objectsVolume, { toX, toZ }, spacingZ, ac
   const walls = [];
   const roofs = [];
   const soilCells = [];
+  // Colonne (i,j) già coperte a livello 0 da un edificio o da terreno
+  // rialzato: il volume Objects non marca affatto il suolo piatto (altezza 0
+  // = nessun codice oggetto), quindi senza questo tracking quelle celle
+  // resterebbero senza voxel e senza colore (vedi riempimento sotto).
+  const groundCovered = new Uint8Array(I * J);
   let buildingsMaxHeight = 0;
   let terrainMaxHeight = 0;
   for (let k = 0; k < dims.z; k++) {
@@ -794,12 +800,25 @@ function buildFromObjectsVolume(model, objectsVolume, { toX, toZ }, spacingZ, ac
           if (aboveRv !== OBJECTS_RV_BUILDING) {
             roofs.push({ x: toX(i), z: toZ(j), y: level.base + level.height + 0.06, sx: dx, sz: dy, sy: 0.12, color: roof });
           }
+          if (k === 0) groundCovered[j * I + i] = 1;
         } else if (rv === OBJECTS_RV_TERRAIN) {
           const id = model.soils?.data[j * I + i] ?? '';
           soilCells.push({ x: toX(i), z: toZ(j), y: voxelY, sx: dx, sz: dy, sy: level.height, color: soilColor(id, activeStyle) });
           terrainMaxHeight = Math.max(terrainMaxHeight, level.base + level.height);
+          if (k === 0) groundCovered[j * I + i] = 1;
         }
       }
+    }
+  }
+  // Suolo piatto (altezza 0): riempie le colonne rimaste scoperte con una
+  // lastra sottile al livello base, così il terreno non resta a buco nero
+  // dove il volume Objects non ha marcato nulla.
+  const groundLevel = zLevels[0];
+  for (let j = 0; j < J; j++) {
+    for (let i = 0; i < I; i++) {
+      if (groundCovered[j * I + i]) continue;
+      const id = model.soils?.data[j * I + i] ?? '';
+      soilCells.push({ x: toX(i), z: toZ(j), y: groundLevel.base + groundLevel.height / 2, sx: dx, sz: dy, sy: groundLevel.height, color: soilColor(id, activeStyle) });
     }
   }
   let buildings = null;
@@ -860,7 +879,7 @@ function addPlanCells(cells, slice, dimZ, range, lut, level, terrainCut, I, J, d
       const color = lutColor(lut, data[idx], range.min, range.max);
       if (color == null) continue;
       let k = level;
-      if (terrainCut) k = Math.min(dimZ - 1, Math.max(0, Math.floor(terrainCut.data[idx] * terrainCut.gain + terrainCut.base)));
+      if (terrainCut) k = Math.min(dimZ - 1, Math.max(0, Math.floor(applyTerrainCut(terrainCut, terrainCut.data[idx]))));
       const lvl = zLevels[Math.min(k, zLevels.length - 1)];
       const j = J - 1 - row;
       cells.push({ x: toX(col), z: toZ(j), y: lvl.base + lvl.height / 2, sx: dx, sz: dy, sy: lvl.height, color });
@@ -925,7 +944,7 @@ function buildPlanSurface(slice, range, lut, level, terrainCut, I, J, dx, dy, zL
   for (let row = 0; row < J; row++) {
     for (let col = 0; col < I; col++) {
       const idx = row * w + col;
-      const kf = terrainCut ? Math.min(kMax, Math.max(0, terrainCut.data[idx] * terrainCut.gain + terrainCut.base)) : level;
+      const kf = terrainCut ? Math.min(kMax, Math.max(0, applyTerrainCut(terrainCut, terrainCut.data[idx]))) : level;
       cellY[idx] = continuousHeight(zLevels, boundaries, kf);
     }
   }
@@ -1285,7 +1304,7 @@ function buildContourPlanSurface(slice, range, lut, level, terrainCut, I, J, dx,
   for (let row = 0; row < J; row++) {
     for (let col = 0; col < I; col++) {
       const cidx = row * w + col;
-      const kf = terrainCut ? Math.min(kMax, Math.max(0, terrainCut.data[cidx] * terrainCut.gain + terrainCut.base)) : level;
+      const kf = terrainCut ? Math.min(kMax, Math.max(0, applyTerrainCut(terrainCut, terrainCut.data[cidx]))) : level;
       cellY[row * I + col] = continuousHeight(zLevels, boundaries, kf);
     }
   }
@@ -1648,7 +1667,7 @@ function windCellHeight(zLevels, kf) {
 }
 
 function planWindHeight(idx, level, terrainCut, zLevels) {
-  const kf = terrainCut ? terrainCut.data[idx] * terrainCut.gain + terrainCut.base : level;
+  const kf = terrainCut ? applyTerrainCut(terrainCut, terrainCut.data[idx]) : level;
   return windCellHeight(zLevels, kf);
 }
 

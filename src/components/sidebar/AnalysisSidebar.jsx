@@ -64,8 +64,19 @@ function DataTab() {
       <Toggle label={tr('toggle_follow_terrain')} on={state.followTerrain} onToggle={() => toggle('followTerrain')} />
       {state.followTerrain && (
         <>
-          <Toggle label={tr('toggle_level_out')} on={state.levelOut} onToggle={() => toggle('levelOut')} />
-          {state.levelOut && (
+          <div className="section">
+            <div className="group-label">{tr('group_level_out_mode')}</div>
+            <OptionButtons
+              options={[
+                { key: 'off', label: tr('level_out_mode_off') },
+                { key: 'levelOut', label: tr('toggle_level_out') },
+                { key: 'cascade', label: tr('level_out_mode_cascade') },
+              ]}
+              value={state.levelOutMode}
+              onSelect={(v) => set({ levelOutMode: v })}
+            />
+          </div>
+          {state.levelOutMode !== 'off' && (
             <Slider
               label={tr('slider_level_out_height')}
               value={state.levelOutHeight}

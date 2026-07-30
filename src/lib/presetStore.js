@@ -12,6 +12,9 @@ import { SCALE_TYPES } from '../data/constants';
 const STORAGE_KEY = 'envireader.customPresets.v1';
 const SCALE_VALUES = SCALE_TYPES.map((s) => s.value);
 
+// `levelOut` (booleano) resta qui solo per leggere preset salvati prima della
+// modalità "a cascata": non viene più scritto, vedi `levelOutMode` sotto e in
+// AppStateContext.applyPreset.
 const BOOL_FIELDS = ['followTerrain', 'levelOut', 'showWindField', 'paletteReversed', 'diffPaletteReversed'];
 const INT_FIELDS = ['timeIndex', 'level', 'sectionX', 'sectionY', 'levelOutHeight', 'windOpacity', 'windSize', 'windDensity'];
 const STR_FIELDS = ['dataGroup', 'dataset', 'palette', 'diffPalette'];
@@ -31,6 +34,7 @@ function sanitizeSettings(raw) {
   if (Number.isFinite(angle)) s.sectionAngle = angle;
   if (typeof raw.hour === 'string' && /^\d{1,2}:\d{2}$/.test(raw.hour)) s.hour = raw.hour;
   if (raw.windStyle === 'arrows' || raw.windStyle === 'streamlines' || raw.windStyle === 'combined') s.windStyle = raw.windStyle;
+  if (raw.levelOutMode === 'off' || raw.levelOutMode === 'levelOut' || raw.levelOutMode === 'cascade') s.levelOutMode = raw.levelOutMode;
   if (SCALE_VALUES.includes(raw.scaleType)) s.scaleType = raw.scaleType;
   return Object.keys(s).length ? s : null;
 }
@@ -101,7 +105,7 @@ export function settingsFromState(state) {
     sectionY: state.sectionY,
     sectionAngle: state.sectionAngle,
     followTerrain: state.followTerrain,
-    levelOut: state.levelOut,
+    levelOutMode: state.levelOutMode,
     levelOutHeight: state.levelOutHeight,
     showWindField: state.showWindField,
     windStyle: state.windStyle,

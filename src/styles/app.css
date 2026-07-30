@@ -1277,6 +1277,45 @@ button { font-family: inherit; }
 }
 .model-canvas { position: absolute; inset: 0; }
 .model-canvas canvas { width: 100%; height: 100%; display: block; }
+
+/* Vista WebGIS: mappa maplibre a tutta area, stesso riquadro di .model-viewer */
+.webgis-map { position: absolute; inset: 0; width: 100%; height: 100%; }
+.webgis-calibration-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+}
+.webgis-calibration-field { display: flex; align-items: center; gap: 6px; }
+.webgis-calibration-field label { color: var(--text-secondary); white-space: nowrap; }
+.webgis-calibration-field input[type="number"] {
+  width: 64px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+}
+.webgis-calibration-checkbox { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); white-space: nowrap; }
+.webgis-calibration-presets { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); white-space: nowrap; }
+.webgis-calibration-presets button {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+}
+.webgis-calibration-presets button:hover { background: var(--accent-soft); color: var(--accent-text); }
 /* contenitore del gizmo di orientamento (ViewCube): ospita l'area di hit del
    cubo/bussola più i pulsanti fissi (casetta = reimposta vista, frecce curve
    = ruota di 90°) agli angoli, come nei tipici gizmo dei software CAD */
