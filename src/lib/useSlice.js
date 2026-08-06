@@ -290,15 +290,20 @@ export function usePointSeries(fileset, groupPath, variableName, sectionX, secti
   return values;
 }
 
-// Andamento nel tempo per più posizioni salvate (bookmark) contemporaneamente.
-// Ritorna { [bookmarkId]: values | null }. Un solo hook (non un usePointSeries
-// per bookmark dentro un .map, che violerebbe le regole degli hook con
+// Andamento nel tempo per più posizioni salvate (cursori) contemporaneamente.
+// Ritorna { [cursorId]: values | null }. Un solo hook (non un usePointSeries
+// per cursore dentro un .map, che violerebbe le regole degli hook con
 // cardinalità variabile) che carica tutte le posizioni in parallelo.
-export function useBookmarkSeries(fileset, groupPath, variableName, bookmarks, terrain) {
+// Ogni cursore porta con sé la propria modalità "segui il terreno"
+// (followTerrain/levelOutMode/levelOutHeight, vedi cursorStore.js): il
+// taglio terreno va quindi ricalcolato per cursore a partire dal terreno
+// grezzo del fileset, non riusato dall'impostazione corrente (che può
+// differire da quella con cui il cursore è stato salvato).
+export function useCursorSeries(fileset, groupPath, variableName, cursors, rawTerrain) {
   const [seriesById, setSeriesById] = useState({});
 
   useEffect(() => {
-    if (!fileset || groupPath == null || !variableName || !bookmarks.length) {
+    if (!fileset || groupPath == null || !variableName || !cursors.length) {
       setSeriesById({});
       return;
     }
@@ -311,19 +316,20 @@ export function useBookmarkSeries(fileset, groupPath, variableName, bookmarks, t
           return;
         }
         const entries = await Promise.all(
-          bookmarks.map(async (b) => {
+          cursors.map(async (b) => {
+            const terrain = b.followTerrain ? terrainCut(rawTerrain, b.level, b.levelOutMode, b.levelOutHeight) : null;
             const config = { x: Math.max(0, b.sectionX), y: Math.max(0, b.sectionY), level: Math.max(0, b.level), terrain };
             return [b.id, await loadPointSeries(series, variableName, config)];
           }),
         );
         if (alive) setSeriesById(Object.fromEntries(entries));
       } catch (err) {
-        console.error('Errore nel caricamento delle serie temporali dei bookmark:', err);
+        console.error('Errore nel caricamento delle serie temporali dei cursori:', err);
         if (alive) setSeriesById({});
       }
     })();
     return () => { alive = false; };
-  }, [fileset, groupPath, variableName, bookmarks, terrain]);
+  }, [fileset, groupPath, variableName, cursors, rawTerrain]);
 
   return seriesById;
 }

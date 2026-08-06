@@ -3,7 +3,7 @@ import { DATA_GROUPS, DATASETS } from '../data/constants';
 import { pickDirectory, listDataGroups, getFilesInFolder, getFileCoupleSeries, readEDX, seriesLabel, loadTerrain, readSimName } from '../lib/envimet';
 import { loadCustomPalettes, persistCustomPalettes } from '../lib/paletteStore';
 import { loadCustomPresets, persistCustomPresets, nearestTimeIndex } from '../lib/presetStore';
-import { loadPositionBookmarks, persistPositionBookmarks } from '../lib/bookmarkStore';
+import { loadPositionCursors, persistPositionCursors } from '../lib/cursorStore';
 import { loadTheme, persistTheme } from '../lib/prefsStore';
 
 const initialState = {
@@ -90,7 +90,7 @@ const initialState = {
   diffPaletteReversed: false,
   customPalettes: loadCustomPalettes(), // palette dell'utente, persistite in localStorage
   customPresets: loadCustomPresets(), // preset dell'utente, persistiti in localStorage
-  positionBookmarks: loadPositionBookmarks(), // posizioni del mirino salvate dall'utente, persistite in localStorage
+  positionCursors: loadPositionCursors(), // posizioni del mirino salvate dall'utente, persistite in localStorage
   paletteDraft: null, // editor aperto: { target: 'main'|'diff', editingId, name, colors }
   diffOrderAB: true,
   scaleType: 'syncedViews',
@@ -208,8 +208,8 @@ export function AppStateProvider({ children }) {
   }, [state.customPresets]);
 
   useEffect(() => {
-    persistPositionBookmarks(state.positionBookmarks);
-  }, [state.positionBookmarks]);
+    persistPositionCursors(state.positionCursors);
+  }, [state.positionCursors]);
 
   // TimePlayer: avanza automaticamente state.time finché "playing" resta
   // true, in loop (torna a 0 dopo l'ultimo indice) — come un lettore

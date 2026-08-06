@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useI18n } from '../i18n/I18nContext';
 import { useModalKeyboard } from '../lib/useModalKeyboard';
+import { useModalTransition } from '../lib/useModalTransition';
 import { loadReceptorData } from '../lib/envimet';
 import TimeSeriesChart from './TimeSeriesChart';
 
@@ -11,6 +12,7 @@ export default function ReceptorModal({ receptor, structure, onClose }) {
   const [selectedZ, setSelectedZ] = useState(null);
 
   useModalKeyboard(!!receptor, onClose, onClose);
+  const { data: receptorDisplay, closing } = useModalTransition(receptor);
 
   useEffect(() => {
     if (!receptor || !structure) {
@@ -30,15 +32,15 @@ export default function ReceptorModal({ receptor, structure, onClose }) {
     return () => { cancelled = true; };
   }, [receptor, structure]);
 
-  if (!receptor) return null;
+  if (!receptorDisplay) return null;
 
   let content;
   let heightSelectNode = null;
-  
+
   if (loading) {
     content = <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</div>;
   } else if (!data) {
-    content = <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>No data found for receptor: {receptor.name}</div>;
+    content = <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>No data found for receptor: {receptorDisplay.name}</div>;
   } else {
     // find height column
     const heightKey = data.headers.find(h => {
@@ -143,13 +145,13 @@ export default function ReceptorModal({ receptor, structure, onClose }) {
   }
 
   return (
-    <div className="modal-backdrop" onClick={onClose} style={{ backdropFilter: 'blur(4px)' }}>
+    <div className={`modal-backdrop${closing ? ' is-closing' : ''}`} onClick={onClose} style={{ backdropFilter: 'blur(4px)' }}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ width: '90%', maxWidth: '900px', padding: 0, display: 'flex', flexDirection: 'column', maxHeight: '90vh', overflow: 'hidden', boxShadow: '0 12px 32px rgba(0,0,0,0.2)' }}>
         {/* Header fixed */}
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface)', zIndex: 2 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>
-              Receptor: <span style={{ color: 'var(--accent)' }}>{receptor.name}</span>
+              Receptor: <span style={{ color: 'var(--accent)' }}>{receptorDisplay.name}</span>
             </span>
           </div>
           <button 

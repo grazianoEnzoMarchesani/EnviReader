@@ -24,6 +24,12 @@ function linePath(values, xAt, yAt) {
   return path;
 }
 
+// Swatch di legenda/tooltip coerente col tratteggio della linea (serie B)
+function dashedKeyBg(s) {
+  if (!s.dashed) return s.color;
+  return `repeating-linear-gradient(90deg, ${s.color} 0, ${s.color} 5px, transparent 5px, transparent 8px)`;
+}
+
 export default function TimeSeriesChart({ series, labels, time, onSelectTime }) {
   const boxRef = useRef(null);
   const [width, setWidth] = useState(0);
@@ -112,7 +118,11 @@ export default function TimeSeriesChart({ series, labels, time, onSelectTime }) 
 
           {drawn.map((s) => (
             <g key={s.name}>
-              <path className="ts-line" d={linePath(s.values, xAt, yAt)} style={{ stroke: s.color }} />
+              <path
+                className="ts-line"
+                d={linePath(s.values, xAt, yAt)}
+                style={{ stroke: s.color, strokeDasharray: s.dashed ? '7 4' : 'none' }}
+              />
               {n <= MAX_MARKERS &&
                 s.values.map((v, i) =>
                   Number.isNaN(v) ? null : (
@@ -131,7 +141,7 @@ export default function TimeSeriesChart({ series, labels, time, onSelectTime }) 
             const v = s.values[hover];
             return (
               <div key={s.name} className="ts-tooltip-row">
-                <span className="ts-key" style={{ background: s.color }} />
+                <span className="ts-key" style={{ background: dashedKeyBg(s) }} />
                 <span className="ts-tooltip-value">{v == null || Number.isNaN(v) ? '–' : formatValue(v, span)}</span>
                 <span className="ts-tooltip-name">{s.name}</span>
               </div>
@@ -144,7 +154,7 @@ export default function TimeSeriesChart({ series, labels, time, onSelectTime }) 
         <div className="ts-legend">
           {drawn.map((s) => (
             <span key={s.name} className="ts-legend-item">
-              <span className="ts-key" style={{ background: s.color }} />
+              <span className="ts-key" style={{ background: dashedKeyBg(s) }} />
               {s.name}
             </span>
           ))}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useI18n } from '../../i18n/I18nContext';
-import { MAX_STOPS, MIN_STOPS, resampleColors, encodePaletteCode } from '../../lib/paletteStore';
+import { MAX_STOPS, MIN_STOPS, resampleColors, encodePaletteCode, sanitizeName } from '../../lib/paletteStore';
 
 // Editor "duplica e ritocca": tappe equidistanti, color picker nativo del
 // browser, +/− ricampiona il gradiente attuale preservandone l'aspetto.
@@ -52,7 +52,7 @@ export default function GradientEditor({ draft, onChange, onSave, onCancel }) {
         type="text"
         value={name}
         placeholder={tr('editor_name_placeholder')}
-        onChange={(e) => onChange({ name: e.target.value })}
+        onChange={(e) => onChange({ name: sanitizeName(e.target.value) })}
       />
       <button className="ghost-btn primary" onClick={onSave}>{tr('btn_save_palette')}</button>
       <div className="gradient-btn-row">

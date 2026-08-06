@@ -5,7 +5,7 @@ import { exportCharts } from '../lib/exportUtils';
 import Segmented from './controls/Segmented';
 import { useModalKeyboard } from '../lib/useModalKeyboard';
 
-export default function SaveChartModal({ onClose }) {
+export default function SaveChartModal({ onClose, closing }) {
   const { state, set } = useAppState();
   const { tr } = useI18n();
 
@@ -70,7 +70,7 @@ export default function SaveChartModal({ onClose }) {
   ];
 
   return (
-    <div className="modal-backdrop" onClick={!exporting ? onClose : undefined}>
+    <div className={`modal-backdrop${closing ? ' is-closing' : ''}`} onClick={!exporting ? onClose : undefined}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ minWidth: '350px' }}>
         <div className="modal-title">{tr('modal_save_chart_title')}</div>
         <p className="modal-text" style={{ marginBottom: '16px' }}>

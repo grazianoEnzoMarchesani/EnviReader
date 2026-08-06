@@ -6,6 +6,7 @@ import Select from './controls/Select';
 import Toggle from './controls/Toggle';
 import { DEFAULT_SECTION_LINE_COLOR } from '../data/constants';
 import { useModalKeyboard } from '../lib/useModalKeyboard';
+import { useModalTransition } from '../lib/useModalTransition';
 
 export default function ViewSettingsModal() {
   const { state, set, toggle } = useAppState();
@@ -13,8 +14,9 @@ export default function ViewSettingsModal() {
 
   const close = () => set({ viewSettingsOpen: false });
   useModalKeyboard(state.viewSettingsOpen, close, close);
+  const { data: open, closing } = useModalTransition(state.viewSettingsOpen);
 
-  if (!state.viewSettingsOpen) return null;
+  if (!open) return null;
   // Nel viewer 3D non esistono linea di sezione né overlay oggetti in 2D: il
   // modale mostra lì solo lo slider dimensione widget, valido per entrambe le viste.
   const is3D = state.appView === 'model';
@@ -27,7 +29,7 @@ export default function ViewSettingsModal() {
   ];
 
   return (
-    <div className="modal-backdrop" onClick={close}>
+    <div className={`modal-backdrop${closing ? ' is-closing' : ''}`} onClick={close}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">{tr('btn_view_settings')}</div>
 

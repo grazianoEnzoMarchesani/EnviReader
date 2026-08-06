@@ -2,8 +2,65 @@ import { useState, useEffect } from 'react';
 import { useAppState } from '../state/AppStateContext';
 import { useI18n } from '../i18n/I18nContext';
 import { useModalKeyboard } from '../lib/useModalKeyboard';
+import { useModalTransition } from '../lib/useModalTransition';
 
 const roundForDisplay = (n) => Math.round(n * 100) / 100;
+
+// Slider a due maniglie per velocizzare l'inserimento: i suoi estremi restano
+// fissi ai limiti con cui il modale si è aperto (il range "naturale" di
+// quella vista), anche se poi l'utente digita valori diversi nei campi di
+// testo — che restano comunque liberi di accettare qualsiasi numero.
+function DualRangeSlider({ boundMin, boundMax, minVal, maxVal, onChange }) {
+  const span = boundMax - boundMin;
+  const step = span > 0 ? span / 500 : 1;
+  const clamp = (n) => Math.min(boundMax, Math.max(boundMin, n));
+  const curMin = clamp(isNaN(minVal) ? boundMin : minVal);
+  const curMax = clamp(isNaN(maxVal) ? boundMax : maxVal);
+
+  const handleMin = (e) => {
+    const v = Math.min(parseFloat(e.target.value), curMax);
+    onChange(roundForDisplay(v), null);
+  };
+  const handleMax = (e) => {
+    const v = Math.max(parseFloat(e.target.value), curMin);
+    onChange(null, roundForDisplay(v));
+  };
+
+  const minPct = span > 0 ? ((curMin - boundMin) / span) * 100 : 0;
+  const maxPct = span > 0 ? ((curMax - boundMin) / span) * 100 : 100;
+  // euristica per portare in primo piano la maniglia più vicina al bordo
+  // opposto, così resta afferrabile anche quando le due si sovrappongono
+  const minOnTop = (curMin - boundMin) > (boundMax - curMax);
+
+  return (
+    <div className="dual-range">
+      <div className="dual-range-track" />
+      <div className="dual-range-fill" style={{ left: `${minPct}%`, right: `${100 - maxPct}%` }} />
+      <input
+        type="range"
+        className="dual-range-input"
+        style={{ zIndex: minOnTop ? 4 : 3 }}
+        min={boundMin}
+        max={boundMax}
+        step={step}
+        value={curMin}
+        onChange={handleMin}
+        aria-label="Min"
+      />
+      <input
+        type="range"
+        className="dual-range-input"
+        style={{ zIndex: minOnTop ? 3 : 4 }}
+        min={boundMin}
+        max={boundMax}
+        step={step}
+        value={curMax}
+        onChange={handleMax}
+        aria-label="Max"
+      />
+    </div>
+  );
+}
 
 export default function CustomRangeModal() {
   const { state, set } = useAppState();
@@ -12,11 +69,17 @@ export default function CustomRangeModal() {
 
   const [minVal, setMinVal] = useState('');
   const [maxVal, setMaxVal] = useState('');
+  const [bounds, setBounds] = useState(null);
 
   useEffect(() => {
     if (modalData) {
       setMinVal(modalData.min != null ? String(roundForDisplay(modalData.min)) : '');
       setMaxVal(modalData.max != null ? String(roundForDisplay(modalData.max)) : '');
+      setBounds(
+        modalData.min != null && modalData.max != null && modalData.min < modalData.max
+          ? { min: modalData.min, max: modalData.max }
+          : null,
+      );
     }
   }, [modalData]);
 
@@ -44,16 +107,30 @@ export default function CustomRangeModal() {
   };
 
   useModalKeyboard(!!modalData, handleSave, handleClose);
+  const { data: modalDisplay, closing } = useModalTransition(modalData);
 
-  if (!modalData) return null;
+  if (!modalDisplay) return null;
 
   return (
-    <div className="modal-backdrop" onClick={handleClose}>
+    <div className={`modal-backdrop${closing ? ' is-closing' : ''}`} onClick={handleClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-title">{modalData.title}</div>
+        <div className="modal-title">{modalDisplay.title}</div>
         <p className="modal-text" style={{ marginBottom: '16px' }}>
           {tr('modal_custom_range_desc')}
         </p>
+
+        {bounds && (
+          <DualRangeSlider
+            boundMin={bounds.min}
+            boundMax={bounds.max}
+            minVal={parseFloat(minVal)}
+            maxVal={parseFloat(maxVal)}
+            onChange={(newMin, newMax) => {
+              if (newMin != null) setMinVal(String(newMin));
+              if (newMax != null) setMaxVal(String(newMax));
+            }}
+          />
+        )}
 
         <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
           <div style={{ flex: 1 }}>

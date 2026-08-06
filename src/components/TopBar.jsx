@@ -4,11 +4,13 @@ import { useI18n } from '../i18n/I18nContext';
 import SaveChartModal from './SaveChartModal';
 import NavBar from './NavBar';
 import { IconKeyboard } from './icons/ToolbarIcons';
+import { useModalTransition } from '../lib/useModalTransition';
 
 export default function TopBar() {
   const { state, toggle, toggleTheme, openFilesetA, toggleFilesetB } = useAppState();
   const { tr, lang, setLang, languages } = useI18n();
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const { data: saveModalOpen, closing: saveModalClosing } = useModalTransition(showSaveModal);
   const isDark = state.theme === 'dark';
   const loading = state.loadingFileset;
 
@@ -84,7 +86,7 @@ export default function TopBar() {
           </button>
         </div>
       </header>
-      {showSaveModal && <SaveChartModal onClose={() => setShowSaveModal(false)} />}
+      {saveModalOpen && <SaveChartModal onClose={() => setShowSaveModal(false)} closing={saveModalClosing} />}
     </>
   );
 }

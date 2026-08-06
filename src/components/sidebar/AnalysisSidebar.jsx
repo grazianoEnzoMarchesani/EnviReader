@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import { SIDEBAR_TABS } from '../../data/constants';
 import { paletteGroups, findPalette } from '../../data/palettes';
-import { makeId, uniqueName, decodePaletteCode, parsePaletteFile, paletteFilePayload } from '../../lib/paletteStore';
+import { makeId, uniqueName, sanitizeName, decodePaletteCode, parsePaletteFile, paletteFilePayload } from '../../lib/paletteStore';
 import { settingsFromState, parsePresetFile, presetFilePayload } from '../../lib/presetStore';
-import { bookmarkColor } from '../../lib/bookmarkStore';
+import { effectiveCursorColor, cursorColorHex, cursorFilePayload, parseCursorFile } from '../../lib/cursorStore';
 import { DEFAULT_PRESETS } from '../../data/defaultPresets';
 import { useAppState } from '../../state/AppStateContext';
 import { useI18n } from '../../i18n/I18nContext';
@@ -404,7 +404,7 @@ function PresetsTab() {
                   type="text"
                   value={renameText}
                   autoFocus
-                  onChange={(e) => setRenameText(e.target.value)}
+                  onChange={(e) => setRenameText(sanitizeName(e.target.value))}
                   onKeyDown={(e) => e.key === 'Enter' && renamePreset(p.id)}
                 />
                 <button className="ghost-btn primary" onClick={() => renamePreset(p.id)}>{tr('btn_ok')}</button>
@@ -430,7 +430,7 @@ function PresetsTab() {
             type="text"
             value={name}
             placeholder={tr('preset_name_placeholder')}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => setName(sanitizeName(e.target.value))}
             onKeyDown={(e) => e.key === 'Enter' && saveCurrent()}
           />
           <button className="ghost-btn primary" onClick={saveCurrent}>{tr('btn_save_preset')}</button>
@@ -446,48 +446,79 @@ function PresetsTab() {
   );
 }
 
-// Bookmark di posizione: salvano solo il mirino di sezione (sectionX/Y,
+// Cursori di posizione: salvano solo il mirino di sezione (sectionX/Y,
 // sectionAngle, level), non l'intera vista come i preset — vedi
-// bookmarkStore.js. Stessa struttura UI di PresetsTab (salva/rinomina/
-// elimina inline), senza preset di fabbrica né import/export su file.
-function BookmarksTab() {
+// cursorStore.js. Stessa struttura UI di PresetsTab (salva/rinomina/
+// elimina inline, import/export su file JSON), senza preset di fabbrica.
+function CursorsTab() {
   const { state, set } = useAppState();
   const { tr } = useI18n();
+  const fileRef = useRef(null);
   const [name, setName] = useState('');
   const [renamingId, setRenamingId] = useState(null);
   const [renameText, setRenameText] = useState('');
+  const [importError, setImportError] = useState(false);
 
   const saveCurrent = () => {
     set((s) => ({
-      positionBookmarks: [
-        ...s.positionBookmarks,
+      positionCursors: [
+        ...s.positionCursors,
         {
           id: makeId(),
-          name: uniqueName(name.trim() || tr('custom_bookmark_default_name'), s.positionBookmarks.map((b) => b.name)),
+          name: uniqueName(name.trim() || tr('custom_cursor_default_name'), s.positionCursors.map((b) => b.name)),
           sectionX: s.sectionX,
           sectionY: s.sectionY,
           sectionAngle: s.sectionAngle,
           level: s.level,
+          followTerrain: s.followTerrain,
+          levelOutMode: s.levelOutMode,
+          levelOutHeight: s.levelOutHeight,
         },
       ],
     }));
     setName('');
   };
 
-  const deleteBookmark = (id) => set((s) => ({ positionBookmarks: s.positionBookmarks.filter((b) => b.id !== id) }));
+  const deleteCursor = (id) => set((s) => ({ positionCursors: s.positionCursors.filter((b) => b.id !== id) }));
 
-  const renameBookmark = (id) => {
+  const updateCursorColor = (id, color) =>
+    set((s) => ({ positionCursors: s.positionCursors.map((b) => (b.id === id ? { ...b, color } : b)) }));
+
+  const renameCursor = (id) => {
     set((s) => ({
-      positionBookmarks: s.positionBookmarks.map((b) =>
+      positionCursors: s.positionCursors.map((b) =>
         b.id === id
-          ? { ...b, name: uniqueName(renameText.trim() || b.name, s.positionBookmarks.filter((x) => x.id !== id).map((x) => x.name)) }
+          ? { ...b, name: uniqueName(renameText.trim() || b.name, s.positionCursors.filter((x) => x.id !== id).map((x) => x.name)) }
           : b,
       ),
     }));
     setRenamingId(null);
   };
 
-  const recallBookmark = (b) => {
+  const importFile = async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    const items = parseCursorFile(await f.text());
+    setImportError(!items);
+    if (!items) return;
+    set((s) => {
+      const cursors = [...s.positionCursors];
+      for (const b of items) cursors.push({ ...b, id: makeId(), name: uniqueName(b.name, cursors.map((x) => x.name)) });
+      return { positionCursors: cursors };
+    });
+  };
+
+  const exportFile = () => {
+    const blob = new Blob([cursorFilePayload(state.positionCursors)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'envireader-cursors.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const recallCursor = (b) => {
     const dims = state.edxMeta?.dimensions;
     const clampTo = (v, max) => Math.max(0, Math.min(v, max));
     set({
@@ -495,15 +526,18 @@ function BookmarksTab() {
       sectionY: dims ? clampTo(b.sectionY, dims.y - 1) : b.sectionY,
       sectionAngle: b.sectionAngle,
       level: dims ? clampTo(b.level, dims.z - 1) : b.level,
+      followTerrain: b.followTerrain,
+      levelOutMode: b.levelOutMode,
+      levelOutHeight: dims ? Math.max(1, clampTo(b.levelOutHeight, dims.z - 1)) : b.levelOutHeight,
     });
   };
 
   return (
     <div className="section">
-      <div className="group-label">{tr('group_bookmarks')}</div>
-      {state.positionBookmarks.length === 0 && <div className="gradient-hint">{tr('bookmarks_empty_hint')}</div>}
+      <div className="group-label">{tr('group_cursors')}</div>
+      {state.positionCursors.length === 0 && <div className="gradient-hint">{tr('cursors_empty_hint')}</div>}
       <div className="preset-list">
-        {state.positionBookmarks.map((b, i) =>
+        {state.positionCursors.map((b, i) =>
           renamingId === b.id ? (
             <div key={b.id} className="code-import-row">
               <input
@@ -511,24 +545,29 @@ function BookmarksTab() {
                 type="text"
                 value={renameText}
                 autoFocus
-                onChange={(e) => setRenameText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && renameBookmark(b.id)}
+                onChange={(e) => setRenameText(sanitizeName(e.target.value))}
+                onKeyDown={(e) => e.key === 'Enter' && renameCursor(b.id)}
               />
-              <button className="ghost-btn primary" onClick={() => renameBookmark(b.id)}>{tr('btn_ok')}</button>
+              <button className="ghost-btn primary" onClick={() => renameCursor(b.id)}>{tr('btn_ok')}</button>
             </div>
           ) : (
             <div key={b.id} className="preset-row custom">
-              <button className="preset-btn" onClick={() => recallBookmark(b)}>
-                <span className="bookmark-dot" style={{ background: bookmarkColor(i) }} />
-                {b.name}
-              </button>
+              <label className="cursor-dot" style={{ background: effectiveCursorColor(b, i) }} title={tr('title_cursor_color')}>
+                <input
+                  type="color"
+                  value={b.color || cursorColorHex(i)}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => updateCursorColor(b.id, e.target.value)}
+                />
+              </label>
+              <button className="preset-btn" onClick={() => recallCursor(b)}>{b.name}</button>
               <span className="palette-row-actions">
                 <button
                   className="palette-row-btn"
                   title={tr('title_edit_palette')}
                   onClick={() => { setRenamingId(b.id); setRenameText(b.name); }}
                 >✎</button>
-                <button className="palette-row-btn" title={tr('title_delete_palette')} onClick={() => deleteBookmark(b.id)}>×</button>
+                <button className="palette-row-btn" title={tr('title_delete_palette')} onClick={() => deleteCursor(b.id)}>×</button>
               </span>
             </div>
           ),
@@ -539,17 +578,23 @@ function BookmarksTab() {
           className="gradient-name"
           type="text"
           value={name}
-          placeholder={tr('bookmark_name_placeholder')}
-          onChange={(e) => setName(e.target.value)}
+          placeholder={tr('cursor_name_placeholder')}
+          onChange={(e) => setName(sanitizeName(e.target.value))}
           onKeyDown={(e) => e.key === 'Enter' && saveCurrent()}
         />
-        <button className="ghost-btn primary" onClick={saveCurrent}>{tr('btn_save_bookmark')}</button>
+        <button className="ghost-btn primary" onClick={saveCurrent}>{tr('btn_save_cursor')}</button>
+      </div>
+      <div className="section">
+        <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={importFile} />
+        <button className="ghost-btn" onClick={() => fileRef.current?.click()}>{tr('btn_import_cursors')}</button>
+        <button className="ghost-btn" disabled={!state.positionCursors.length} onClick={exportFile}>{tr('btn_export_cursors')}</button>
+        {importError && <div className="gradient-hint error">{tr('import_invalid')}</div>}
       </div>
     </div>
   );
 }
 
-const TAB_PANELS = { data: DataTab, wind: WindTab, palette: PaletteTab, presets: PresetsTab, bookmarks: BookmarksTab };
+const TAB_PANELS = { data: DataTab, wind: WindTab, palette: PaletteTab, presets: PresetsTab, cursors: CursorsTab };
 
 export default function AnalysisSidebar() {
   const { state, set } = useAppState();

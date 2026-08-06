@@ -1,6 +1,7 @@
 import { useAppState } from '../state/AppStateContext';
 import { useI18n } from '../i18n/I18nContext';
 import { useModalKeyboard } from '../lib/useModalKeyboard';
+import { useModalTransition } from '../lib/useModalTransition';
 
 export default function ShortcutsModal() {
   const { state, toggle } = useAppState();
@@ -8,11 +9,12 @@ export default function ShortcutsModal() {
 
   const close = () => toggle('showShortcuts');
   useModalKeyboard(state.showShortcuts, close, close);
+  const { data: open, closing } = useModalTransition(state.showShortcuts);
 
-  if (!state.showShortcuts) return null;
+  if (!open) return null;
 
   return (
-    <div className="modal-backdrop" onClick={close}>
+    <div className={`modal-backdrop${closing ? ' is-closing' : ''}`} onClick={close}>
       <div className="modal-card credits-card shortcuts-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-title">{tr('title_keyboard_shortcuts')}</div>
         
