@@ -297,6 +297,7 @@ export default function Model3DViewer({ model, objectsVolume, spacingZ, dimZ, da
       layers: null, resetView: () => {}, setProjection: () => {},
     };
     stageRef.current = stage;
+    if (import.meta.env.DEV) { window.__stage3d = stage; window.__THREE = THREE; }
 
     // Il RenderPass (il "beauty pass" base) non deve disegnare le pareti
     // overlay dati (temperatura/vento/volume): vengono ridipinte a parte più

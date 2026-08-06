@@ -3,6 +3,7 @@ import { SIDEBAR_TABS } from '../../data/constants';
 import { paletteGroups, findPalette } from '../../data/palettes';
 import { makeId, uniqueName, decodePaletteCode, parsePaletteFile, paletteFilePayload } from '../../lib/paletteStore';
 import { settingsFromState, parsePresetFile, presetFilePayload } from '../../lib/presetStore';
+import { bookmarkColor } from '../../lib/bookmarkStore';
 import { DEFAULT_PRESETS } from '../../data/defaultPresets';
 import { useAppState } from '../../state/AppStateContext';
 import { useI18n } from '../../i18n/I18nContext';
@@ -445,7 +446,110 @@ function PresetsTab() {
   );
 }
 
-const TAB_PANELS = { data: DataTab, wind: WindTab, palette: PaletteTab, presets: PresetsTab };
+// Bookmark di posizione: salvano solo il mirino di sezione (sectionX/Y,
+// sectionAngle, level), non l'intera vista come i preset — vedi
+// bookmarkStore.js. Stessa struttura UI di PresetsTab (salva/rinomina/
+// elimina inline), senza preset di fabbrica né import/export su file.
+function BookmarksTab() {
+  const { state, set } = useAppState();
+  const { tr } = useI18n();
+  const [name, setName] = useState('');
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameText, setRenameText] = useState('');
+
+  const saveCurrent = () => {
+    set((s) => ({
+      positionBookmarks: [
+        ...s.positionBookmarks,
+        {
+          id: makeId(),
+          name: uniqueName(name.trim() || tr('custom_bookmark_default_name'), s.positionBookmarks.map((b) => b.name)),
+          sectionX: s.sectionX,
+          sectionY: s.sectionY,
+          sectionAngle: s.sectionAngle,
+          level: s.level,
+        },
+      ],
+    }));
+    setName('');
+  };
+
+  const deleteBookmark = (id) => set((s) => ({ positionBookmarks: s.positionBookmarks.filter((b) => b.id !== id) }));
+
+  const renameBookmark = (id) => {
+    set((s) => ({
+      positionBookmarks: s.positionBookmarks.map((b) =>
+        b.id === id
+          ? { ...b, name: uniqueName(renameText.trim() || b.name, s.positionBookmarks.filter((x) => x.id !== id).map((x) => x.name)) }
+          : b,
+      ),
+    }));
+    setRenamingId(null);
+  };
+
+  const recallBookmark = (b) => {
+    const dims = state.edxMeta?.dimensions;
+    const clampTo = (v, max) => Math.max(0, Math.min(v, max));
+    set({
+      sectionX: dims ? clampTo(b.sectionX, dims.x - 1) : b.sectionX,
+      sectionY: dims ? clampTo(b.sectionY, dims.y - 1) : b.sectionY,
+      sectionAngle: b.sectionAngle,
+      level: dims ? clampTo(b.level, dims.z - 1) : b.level,
+    });
+  };
+
+  return (
+    <div className="section">
+      <div className="group-label">{tr('group_bookmarks')}</div>
+      {state.positionBookmarks.length === 0 && <div className="gradient-hint">{tr('bookmarks_empty_hint')}</div>}
+      <div className="preset-list">
+        {state.positionBookmarks.map((b, i) =>
+          renamingId === b.id ? (
+            <div key={b.id} className="code-import-row">
+              <input
+                className="gradient-name"
+                type="text"
+                value={renameText}
+                autoFocus
+                onChange={(e) => setRenameText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && renameBookmark(b.id)}
+              />
+              <button className="ghost-btn primary" onClick={() => renameBookmark(b.id)}>{tr('btn_ok')}</button>
+            </div>
+          ) : (
+            <div key={b.id} className="preset-row custom">
+              <button className="preset-btn" onClick={() => recallBookmark(b)}>
+                <span className="bookmark-dot" style={{ background: bookmarkColor(i) }} />
+                {b.name}
+              </button>
+              <span className="palette-row-actions">
+                <button
+                  className="palette-row-btn"
+                  title={tr('title_edit_palette')}
+                  onClick={() => { setRenamingId(b.id); setRenameText(b.name); }}
+                >✎</button>
+                <button className="palette-row-btn" title={tr('title_delete_palette')} onClick={() => deleteBookmark(b.id)}>×</button>
+              </span>
+            </div>
+          ),
+        )}
+      </div>
+      <div className="code-import-row">
+        <input
+          className="gradient-name"
+          type="text"
+          value={name}
+          placeholder={tr('bookmark_name_placeholder')}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && saveCurrent()}
+        />
+        <button className="ghost-btn primary" onClick={saveCurrent}>{tr('btn_save_bookmark')}</button>
+      </div>
+    </div>
+  );
+}
+
+const TAB_PANELS = { data: DataTab, wind: WindTab, palette: PaletteTab, presets: PresetsTab, bookmarks: BookmarksTab };
 
 export default function AnalysisSidebar() {
   const { state, set } = useAppState();

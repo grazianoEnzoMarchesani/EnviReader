@@ -428,7 +428,13 @@
     "shortcut_model_analysis": "Analisi dati 2D/3D",
     "shortcut_toggle_sidebar": "Mostra / nascondi barre strumenti",
     "shortcut_theme": "Tema Chiaro / Scuro",
-    "shortcut_help": "Aiuto scorciatoie"
+    "shortcut_help": "Aiuto scorciatoie",
+    "tab_bookmarks": "Bookmark",
+    "group_bookmarks": "Posizioni salvate",
+    "custom_bookmark_default_name": "Posizione",
+    "bookmark_name_placeholder": "Nome posizione",
+    "bookmarks_empty_hint": "Nessuna posizione salvata: sposta il mirino e salvalo con un nome per confrontarlo in Time series.",
+    "btn_save_bookmark": "Salva posizione"
   },
   "en": {
     "app_tagline": "Desktop environmental analysis",
@@ -859,7 +865,13 @@
     "shortcut_model_analysis": "2D/3D Data Analysis",
     "shortcut_toggle_sidebar": "Toggle Toolbars",
     "shortcut_theme": "Dark / Light Theme",
-    "shortcut_help": "Shortcuts Help"
+    "shortcut_help": "Shortcuts Help",
+    "tab_bookmarks": "Bookmarks",
+    "group_bookmarks": "Saved positions",
+    "custom_bookmark_default_name": "Position",
+    "bookmark_name_placeholder": "Position name",
+    "bookmarks_empty_hint": "No saved positions yet: move the crosshair and save it with a name to compare it in Time series.",
+    "btn_save_bookmark": "Save position"
   },
   "es": {
     "app_tagline": "Análisis ambiental de escritorio",
@@ -1290,7 +1302,13 @@
     "shortcut_model_analysis": "Análisis de datos 2D/3D",
     "shortcut_toggle_sidebar": "Mostrar / ocultar barras de herramientas",
     "shortcut_theme": "Tema Claro / Oscuro",
-    "shortcut_help": "Ayuda de atajos"
+    "shortcut_help": "Ayuda de atajos",
+    "tab_bookmarks": "Marcadores",
+    "group_bookmarks": "Posiciones guardadas",
+    "custom_bookmark_default_name": "Posición",
+    "bookmark_name_placeholder": "Nombre de la posición",
+    "bookmarks_empty_hint": "Aún no hay posiciones guardadas: mueve la mira y guárdala con un nombre para compararla en Time series.",
+    "btn_save_bookmark": "Guardar posición"
   },
   "fr": {
     "app_tagline": "Analyse environnementale de bureau",
@@ -1721,7 +1739,13 @@
     "shortcut_model_analysis": "Analyse des données 2D/3D",
     "shortcut_toggle_sidebar": "Afficher / masquer les barres d'outils",
     "shortcut_theme": "Thème Clair / Sombre",
-    "shortcut_help": "Aide sur les raccourcis"
+    "shortcut_help": "Aide sur les raccourcis",
+    "tab_bookmarks": "Repères",
+    "group_bookmarks": "Positions enregistrées",
+    "custom_bookmark_default_name": "Position",
+    "bookmark_name_placeholder": "Nom de la position",
+    "bookmarks_empty_hint": "Aucune position enregistrée : déplacez le viseur et enregistrez-le avec un nom pour le comparer dans Time series.",
+    "btn_save_bookmark": "Enregistrer la position"
   },
   "de": {
     "app_tagline": "Desktop-Umweltanalyse",
@@ -2152,6 +2176,12 @@
     "shortcut_model_analysis": "2D/3D-Datenanalyse",
     "shortcut_toggle_sidebar": "Symbolleisten ein- / ausblenden",
     "shortcut_theme": "Helles / Dunkles Design",
-    "shortcut_help": "Hilfe zu Tastaturkürzeln"
+    "shortcut_help": "Hilfe zu Tastaturkürzeln",
+    "tab_bookmarks": "Lesezeichen",
+    "group_bookmarks": "Gespeicherte Positionen",
+    "custom_bookmark_default_name": "Position",
+    "bookmark_name_placeholder": "Positionsname",
+    "bookmarks_empty_hint": "Noch keine gespeicherten Positionen: Fadenkreuz verschieben und mit einem Namen speichern, um es in Time series zu vergleichen.",
+    "btn_save_bookmark": "Position speichern"
   }
 }
