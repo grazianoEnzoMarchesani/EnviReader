@@ -2,6 +2,8 @@
 // estrazione di slice dai binari EDT. Nessuna dipendenza esterna.
 // I valori -999 dei file EDT sono il "no data" di ENVI-met e diventano NaN.
 
+import { sanitizeName } from './paletteStore';
+
 const FILE_PAIR_REGEX = /^(.+?)_((?:BIO_)?[A-Z]+)_(\d{4}-\d{2}-\d{2})(?:_(\d{2}\.\d{2}\.\d{2}))?\.(EDT|EDX)$/i;
 const NO_DATA = -999;
 
@@ -197,9 +199,14 @@ async function parseEDX(file) {
     spacing,
     extent: { x: sum(spacing.x), y: sum(spacing.y), z: sum(spacing.z) },
     nrVariables: num('nr_variables'),
+    // nomi variabile letti dal testo grezzo del tag XML via regex (vedi
+    // tagText sopra): niente parser vero, quindi eventuali tag HTML infilati
+    // nel file .EDX arriverebbero qui come stringa letterale. sanitizeName li
+    // ripulisce prima che il nome finisca nel menu Dataset, nei titoli mappa
+    // e in eventuali export.
     variableNames: tagText(xmlText, 'name_variables')
       .split(',')
-      .map((s) => s.trim())
+      .map((s) => sanitizeName(s, 120).trim())
       .filter(Boolean),
   };
 }

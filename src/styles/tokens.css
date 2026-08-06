@@ -24,13 +24,13 @@
   --series-a: #c9503c;
   --series-b: #0e83ab;
   --series-c: #008300;
-  /* Bookmark di posizione in Time Series: terzina validata (banda L, croma,
+  /* Cursori di posizione in Time Series: terzina validata (banda L, croma,
      CVD, contrasto), scelta a distanza da --series-a/b per non confondersi
-     con le serie A/B della posizione corrente; ciclica oltre 3 bookmark
+     con le serie A/B della posizione corrente; ciclica oltre 3 cursori
      (l'identità resta comunque affidata al nome, sempre visibile in legenda) */
-  --bookmark-1: #7c4fd1;
-  --bookmark-2: #b83a8e;
-  --bookmark-3: #1a8f4c;
+  --cursor-1: #7c4fd1;
+  --cursor-2: #b83a8e;
+  --cursor-3: #1a8f4c;
   --shadow: 0 1px 2px rgba(20, 25, 30, 0.04), 0 4px 16px rgba(20, 25, 30, 0.05);
 
   --font: "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -59,8 +59,8 @@
   --series-a: #d15a41;
   --series-b: #1f97be;
   --series-c: #22a022;
-  --bookmark-1: #9575e8;
-  --bookmark-2: #cf5a9c;
-  --bookmark-3: #3aa864;
+  --cursor-1: #9575e8;
+  --cursor-2: #cf5a9c;
+  --cursor-3: #3aa864;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 20px rgba(0, 0, 0, 0.35);
 }

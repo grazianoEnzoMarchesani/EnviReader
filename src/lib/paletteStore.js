@@ -12,7 +12,7 @@ function sanitize(item) {
   if (!item || !Array.isArray(item.colors)) return null;
   const colors = item.colors.filter(isHex).map((c) => c.toLowerCase());
   if (colors.length < MIN_STOPS || colors.length > MAX_STOPS) return null;
-  return { id: typeof item.id === 'string' ? item.id : makeId(), name: String(item.name || '').trim() || 'Palette', colors };
+  return { id: typeof item.id === 'string' ? item.id : makeId(), name: sanitizeName(item.name).trim() || 'Palette', colors };
 }
 
 export function loadCustomPalettes() {
@@ -36,6 +36,30 @@ export function makeId() {
   return `u${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
 }
 
+// Caratteri di controllo ASCII (0x00-0x1F e 0x7F, quindi anche tab/newline):
+// costruito con fromCharCode invece di un'escape letterale nel sorgente, per
+// non tenere byte di controllo grezzi dentro il file .js.
+const CONTROL_CHARS_RE = new RegExp(
+  `[${Array.from({ length: 32 }, (_, i) => String.fromCharCode(i)).join('')}${String.fromCharCode(127)}]`,
+  'g',
+);
+
+// Sanifica un nome inserito dall'utente (preset/palette/cursore): rimuove tag
+// HTML/XML e caratteri di controllo, poi taglia la lunghezza. React sfugge
+// già il testo in fase di rendering, ma questi nomi vengono anche esportati
+// su file JSON e re-importati altrove, quindi conviene ripulirli fin
+// dall'input invece di fidarsi che restino sempre semplice testo a valle.
+// Niente trim qui: va usato anche negli onChange mentre l'utente digita, e un
+// trim ad ogni carattere cancellerebbe lo spazio finale di un nome composto
+// come "Punto A" non appena si continua a scrivere. Il trim finale spetta a
+// chi chiama, al momento del salvataggio.
+export function sanitizeName(input, maxLen = 60) {
+  return String(input ?? '')
+    .replace(/<[^>]*>/g, '')
+    .replace(CONTROL_CHARS_RE, '')
+    .slice(0, maxLen);
+}
+
 // In caso di nomi già presenti l'import aggiunge " (2)", " (3)", …
 export function uniqueName(name, taken) {
   if (!taken.includes(name)) return name;
@@ -55,7 +79,7 @@ export function decodePaletteCode(text) {
   if (!m) return null;
   const colors = m[1].toLowerCase().split('-').map((h) => `#${h}`);
   if (colors.length > MAX_STOPS) return null;
-  return { name: m[2].trim(), colors };
+  return { name: sanitizeName(m[2]).trim(), colors };
 }
 
 // ---------- export/import su file ----------

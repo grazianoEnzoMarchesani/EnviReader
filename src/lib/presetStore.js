@@ -6,7 +6,7 @@
 // che resta come timeIndex di ripiego.
 // Un preset è { id, name, settings } (i predefiniti hanno varKey/timeKey al posto di name).
 
-import { makeId } from './paletteStore';
+import { makeId, sanitizeName } from './paletteStore';
 import { SCALE_TYPES } from '../data/constants';
 
 const STORAGE_KEY = 'envireader.customPresets.v1';
@@ -44,7 +44,7 @@ function sanitizePreset(item) {
   if (!settings) return null;
   return {
     id: typeof item.id === 'string' ? item.id : makeId(),
-    name: String(item.name || '').trim() || 'Preset',
+    name: sanitizeName(item.name).trim() || 'Preset',
     settings,
   };
 }
@@ -147,7 +147,7 @@ function sanitizeImportedPalette(item) {
   if (!item || typeof item.id !== 'string' || !Array.isArray(item.colors)) return null;
   const colors = item.colors.filter(isHex).map((c) => c.toLowerCase());
   if (colors.length < 2 || colors.length > 8) return null;
-  return { id: item.id, name: String(item.name || '').trim() || 'Palette', colors };
+  return { id: item.id, name: sanitizeName(item.name).trim() || 'Palette', colors };
 }
 
 // Vecchio formato ({ nome: { "Data group", "Data", time, colorPalette… } }):

@@ -331,6 +331,44 @@ button { font-family: inherit; }
   box-shadow: 0 0 0 2px var(--accent-soft);
 }
 .slider-row { display: flex; align-items: center; gap: 8px; }
+
+.dual-range { position: relative; height: 20px; margin: 4px 0 24px; }
+.dual-range-track { position: absolute; top: 8px; left: 0; right: 0; height: 4px; border-radius: 2px; background: var(--border); }
+.dual-range-fill { position: absolute; top: 8px; height: 4px; border-radius: 2px; background: var(--accent); }
+.dual-range-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  background: transparent;
+  pointer-events: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.dual-range-input::-webkit-slider-runnable-track { appearance: none; -webkit-appearance: none; background: transparent; }
+.dual-range-input::-moz-range-track { background: transparent; border: none; }
+.dual-range-input::-webkit-slider-thumb {
+  pointer-events: all;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+.dual-range-input::-moz-range-thumb {
+  pointer-events: all;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
 /* 24px = minimo WCAG 2.2 per la dimensione dei target (SC 2.5.8) */
 .step-btn {
   width: 24px;
@@ -558,7 +596,7 @@ button { font-family: inherit; }
 .code-import-row .ghost-btn { flex: 0 0 auto; width: auto; }
 
 /* ---------- presets ---------- */
-.preset-list { display: flex; flex-direction: column; gap: 6px; }
+.preset-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .preset-btn {
   text-align: left;
   padding: 9px 12px;
@@ -602,10 +640,10 @@ button { font-family: inherit; }
 }
 
 /* Custom presets row */
-.preset-row.custom { 
-  display: flex; 
-  align-items: center; 
-  gap: 6px; 
+.preset-row.custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .preset-row.custom .preset-btn {
   flex: 1;
@@ -615,15 +653,27 @@ button { font-family: inherit; }
   white-space: nowrap;
 }
 
-/* ---------- bookmark di posizione ---------- */
-.bookmark-dot {
+/* ---------- cursori di posizione ---------- */
+.cursor-dot {
+  position: relative;
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  margin-right: 7px;
   vertical-align: middle;
   flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--border-subtle, var(--border));
+}
+.cursor-dot input[type='color'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
 /* ---------- status strip / chips / view bar ---------- */
@@ -836,6 +886,9 @@ button { font-family: inherit; }
 .chart-header { margin-bottom: 12px; }
 .chart-title { font-size: 13.5px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
 .chart-stats { font-size: 11.5px; color: var(--text-faint); font-family: var(--mono); }
+.chart-title-group { display: flex; flex-direction: column; min-width: 0; }
+.chart-legend-payoff { display: flex; gap: 10px; font-size: 10.5px; font-family: var(--mono); }
+.chart-legend-payoff span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
 .chart-body {
   height: 280px;
   border-radius: 8px;
@@ -1518,6 +1571,28 @@ button { font-family: inherit; }
 .fc-legend { justify-content: flex-start; padding-left: 52px; }
 
 /* ---------- modal ---------- */
+/* Ingresso: leggero "pop" con overshoot (curva expo-out) per dare un feedback
+   morbido invece di uno scatto secco. Uscita: più rapida, senza overshoot,
+   per non far percepire l'interfaccia come lenta a rispondere. Le due
+   animazioni sono comandate da useModalTransition, che tiene il modale
+   montato il tempo necessario a far girare .is-closing prima di smontarlo. */
+@keyframes modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modal-backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes modal-card-in {
+  0% { opacity: 0; transform: scale(0.94) translateY(10px); }
+  60% { opacity: 1; transform: scale(1.012) translateY(-1px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes modal-card-out {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to { opacity: 0; transform: scale(0.96) translateY(6px); }
+}
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1526,6 +1601,11 @@ button { font-family: inherit; }
   align-items: center;
   justify-content: center;
   z-index: 100;
+  animation: modal-backdrop-in 0.22s ease-out both;
+}
+.modal-backdrop.is-closing {
+  animation: modal-backdrop-out 0.18s ease-in both;
+  pointer-events: none;
 }
 .modal-card {
   width: 480px;
@@ -1535,6 +1615,18 @@ button { font-family: inherit; }
   padding: 28px;
   box-shadow: var(--shadow);
   border: 1px solid var(--border);
+  animation: modal-card-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.modal-backdrop.is-closing .modal-card {
+  animation: modal-card-out 0.18s cubic-bezier(0.4, 0, 1, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop,
+  .modal-backdrop.is-closing,
+  .modal-card,
+  .modal-backdrop.is-closing .modal-card {
+    animation: none;
+  }
 }
 .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 14px; color: var(--text); }
 .modal-text { font-size: 13px; line-height: 1.6; color: var(--text-secondary); margin-bottom: 12px; }
