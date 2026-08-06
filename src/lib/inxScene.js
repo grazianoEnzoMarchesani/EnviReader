@@ -139,7 +139,7 @@ export function buildModelScene(model, objectsVolume = null, spacingZ = null, di
   decorativeLight.position.set(-W * 0.6, Math.max(W, H) * 0.8, -H * 0.4);
   group.add(decorativeLight);
 
-  const sunLayer = buildSunLayer({ W, H });
+  const sunLayer = buildSunLayer({ W, H, maxHeight });
   sunLayer.group.name = 'sun';
   group.add(sunLayer.group);
   layers.sun = sunLayer.group;
@@ -167,17 +167,26 @@ const CARDINALS = [
 // mostrato/nascosto in blocco quando la simulazione solare è attiva (vedi
 // Model3DViewer). La rete e la bussola si (ri)costruiscono in setSunDiagram; le
 // parti che seguono l'ora (luce, marcatore, raggio, arco del giorno) in updateSunLayer.
-function buildSunLayer({ W, H }) {
+function buildSunLayer({ W, H, maxHeight = 0 }) {
   const span = Math.max(W, H);
   const radius = span * 0.92;
+  // Il frustum ortografico dell'ombra deve contenere la scena vista da
+  // qualunque direzione del sole: la sua "larghezza" dipende sia
+  // dall'impronta orizzontale (span) sia dall'altezza degli edifici
+  // (maxHeight), perché con sole basso sull'orizzonte la geometria alta si
+  // proietta molto nella direzione "up" della shadow camera. Ignorare
+  // maxHeight tagliava fuori gli edifici dalla shadow map (ombre invisibili
+  // pur con luce diretta/diffusa ancora attiva).
+  const halfHeight = maxHeight / 2;
+  const targetY = halfHeight;
 
   const group = new THREE.Group();
   group.visible = false;
-  group.userData = { radius, span, lastPoints: null, lastDiagram: null, lastRotation: null };
+  group.userData = { radius, span, targetY, lastPoints: null, lastDiagram: null, lastRotation: null };
 
   const light = new THREE.DirectionalLight(0xfff3e0, 0);
   light.castShadow = true;
-  const shadowExtent = span * 0.65;
+  const shadowExtent = Math.max(span * 0.65, span * 0.5 + halfHeight);
   const shadowMapSize = 4096;
   light.shadow.camera.left = -shadowExtent;
   light.shadow.camera.right = shadowExtent;
@@ -186,13 +195,18 @@ function buildSunLayer({ W, H }) {
   light.shadow.camera.near = 1;
   light.shadow.camera.far = radius + shadowExtent * 2;
   light.shadow.mapSize.set(shadowMapSize, shadowMapSize);
-  // bias/normalBias in valore assoluto non hanno senso su modelli di scale
-  // diverse (una città di 500m e un cortile di 20m userebbero lo stesso
-  // offset): si derivano dalla dimensione reale di un texel della shadow map,
-  // così l'aliasing sui bordi voxel resta corretto qualunque sia l'estensione
-  // del modello (span/shadowExtent).
+  // normalBias è in unità mondo (metri) in three.js, quindi ha senso
+  // derivarlo dalla dimensione reale di un texel della shadow map: cresce con
+  // l'estensione del modello, così l'aliasing sui bordi voxel resta corretto
+  // qualunque sia lo shadowExtent. shadow.bias invece è un offset nello
+  // spazio di profondità NORMALIZZATO (NDC), indipendente dalla scala del
+  // mondo: scalarlo con texelSize (come si faceva qui) lo rendeva enorme sui
+  // modelli grandi (es. -0.03 su un dominio di 400m, contro l'ordine di
+  // 0.0001 tipico) — abbastanza da spostare il confronto di profondità oltre
+  // qualunque occlusore reale e far sparire le ombre portate del tutto,
+  // lasciando solo l'ombreggiatura diretta (N·L) e l'ambient occlusion.
   const texelSize = (shadowExtent * 2) / shadowMapSize;
-  light.shadow.bias = -texelSize * 0.25;
+  light.shadow.bias = -0.0003;
   light.shadow.normalBias = texelSize * 1.5;
   light.target = new THREE.Object3D();
   group.add(light.target);
@@ -458,11 +472,14 @@ export function setSunDiagram(sunLayer, rotationDeg, diagram) {
 // solo quando cambiano i campioni (pathPoints), non ad ogni tick dello slider.
 export function updateSunLayer(sunLayer, rotationDeg, azimuth, altitude, pathPoints) {
   const { group, light, pathLine, ray, marker } = sunLayer;
-  const radius = group.userData.radius;
+  const { radius, targetY = 0 } = group.userData;
   const sunPos = sunDirection(azimuth, altitude, rotationDeg).multiplyScalar(radius);
 
-  light.position.copy(sunPos);
-  light.target.position.set(0, 0, 0);
+  // La luce punta al centro verticale del modello (targetY), non al suolo,
+  // così il frustum dell'ombra resta centrato sulla scena anche per edifici
+  // alti; marcatore/raggio/bussola invece restano ancorati al livello 0.
+  light.position.set(sunPos.x, sunPos.y + targetY, sunPos.z);
+  light.target.position.set(0, targetY, 0);
   light.target.updateMatrixWorld();
 
   const above = altitude > 0;

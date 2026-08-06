@@ -289,3 +289,41 @@ export function usePointSeries(fileset, groupPath, variableName, sectionX, secti
 
   return values;
 }
+
+// Andamento nel tempo per più posizioni salvate (bookmark) contemporaneamente.
+// Ritorna { [bookmarkId]: values | null }. Un solo hook (non un usePointSeries
+// per bookmark dentro un .map, che violerebbe le regole degli hook con
+// cardinalità variabile) che carica tutte le posizioni in parallelo.
+export function useBookmarkSeries(fileset, groupPath, variableName, bookmarks, terrain) {
+  const [seriesById, setSeriesById] = useState({});
+
+  useEffect(() => {
+    if (!fileset || groupPath == null || !variableName || !bookmarks.length) {
+      setSeriesById({});
+      return;
+    }
+    let alive = true;
+    (async () => {
+      try {
+        const series = getFileCoupleSeries(getFilesInFolder(fileset.structure, groupPath));
+        if (!series.length) {
+          if (alive) setSeriesById({});
+          return;
+        }
+        const entries = await Promise.all(
+          bookmarks.map(async (b) => {
+            const config = { x: Math.max(0, b.sectionX), y: Math.max(0, b.sectionY), level: Math.max(0, b.level), terrain };
+            return [b.id, await loadPointSeries(series, variableName, config)];
+          }),
+        );
+        if (alive) setSeriesById(Object.fromEntries(entries));
+      } catch (err) {
+        console.error('Errore nel caricamento delle serie temporali dei bookmark:', err);
+        if (alive) setSeriesById({});
+      }
+    })();
+    return () => { alive = false; };
+  }, [fileset, groupPath, variableName, bookmarks, terrain]);
+
+  return seriesById;
+}

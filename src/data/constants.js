@@ -21,6 +21,7 @@ export const SIDEBAR_TABS = [
   { key: 'wind', labelKey: 'tab_wind' },
   { key: 'palette', labelKey: 'tab_palette' },
   { key: 'presets', labelKey: 'tab_presets' },
+  { key: 'bookmarks', labelKey: 'tab_bookmarks' },
 ];
 
 export const VIEW_TYPES = [
