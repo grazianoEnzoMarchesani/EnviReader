@@ -1405,30 +1405,37 @@ button { font-family: inherit; }
 .model-sun-widgets {
   position: absolute;
   top: 8px;
-  left: 48px;
+  left: calc(16px + 32px * var(--widget-scale, 1));
   display: flex;
   flex-direction: column;
   gap: 8px;
   z-index: 1;
   pointer-events: none;
+  transition: left 0.15s ease-out;
 }
 .model-sun-badge {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 10px;
-  border-radius: 8px;
+  gap: calc(6px * var(--widget-scale, 1));
+  height: calc(32px * var(--widget-scale, 1));
+  padding: 0 calc(10px * var(--widget-scale, 1));
+  border-radius: calc(8px * var(--widget-scale, 1));
   background: color-mix(in srgb, var(--surface) 75%, transparent);
   border: 1px solid var(--border-strong);
-  font-size: 11px;
+  font-size: calc(11px * var(--widget-scale, 1));
   font-weight: 700;
   font-family: var(--mono);
   color: var(--text);
   white-space: nowrap;
   animation: widget-pop 0.2s ease-out;
+  transition: height 0.15s ease-out, font-size 0.15s ease-out;
 }
-.model-sun-badge svg { width: 14px; height: 14px; color: var(--text-secondary); flex-shrink: 0; }
+.model-sun-badge svg {
+  width: calc(14px * var(--widget-scale, 1));
+  height: calc(14px * var(--widget-scale, 1));
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
 
 
 /* ---------- boundary view ---------- */
