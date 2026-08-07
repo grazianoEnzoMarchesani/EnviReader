@@ -312,7 +312,7 @@ export default function AnalysisView() {
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('A', vType, range),
       body: sliceA ? (
-        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={mainPalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} renderStyle={state.renderStyle} hdMode={state.hdMode} />
+        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={mainPalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} renderStyle={state.renderStyle} hdMode={state.hdMode} legendTicks={state.legendTicks} legendTextScale={state.legendTextScale} />
       ) : null,
     },
     {
@@ -331,7 +331,7 @@ export default function AnalysisView() {
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('B', vType, range),
       body: sliceB ? (
-        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={mainPalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} renderStyle={state.renderStyle} hdMode={state.hdMode} />
+        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={mainPalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} renderStyle={state.renderStyle} hdMode={state.hdMode} legendTicks={state.legendTicks} legendTextScale={state.legendTextScale} />
       ) : null,
     },
     {
@@ -349,7 +349,7 @@ export default function AnalysisView() {
       reversed: diffReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('Diff', vType, range),
       body: sliceDiff ? (
-        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={diffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} renderStyle={state.renderStyle} hdMode={state.hdMode} />
+        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={diffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} renderStyle={state.renderStyle} hdMode={state.hdMode} legendTicks={state.legendTicks} legendTextScale={state.legendTextScale} />
       ) : null,
     },
   ];

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildLUT, sliceToImageData, sliceToContourImageData, orientColors, contourLegendGradient, formatValue, objectsToImageData } from '../lib/colormap';
 import { traceStreamlines2D } from '../lib/windField';
+import LegendBar from './LegendBar';
 
 // Anteprima in miniatura di uno slice, usata nei riquadri di cambio vista.
 // Mantiene le proporzioni fisiche: altezza fissa e larghezza proporzionale,
@@ -403,7 +404,7 @@ function crossGeometry(control, slice, W, H) {
 
 // Mappa raster: il canvas ha la risoluzione della griglia ENVI-met e viene
 // ingrandito via CSS (image-rendering: pixelated), come le celle di Leonardo.
-export default function MapChart({ slice, objectsSlice, objectsOpts, colors, reversed, min, max, onCellClick, marks, sectionControl, sectionLineStyle, compass, showCalendar, showClock, timeLabel, wind, onLegendClick, widgetScale, renderStyle, hdMode }) {
+export default function MapChart({ slice, objectsSlice, objectsOpts, colors, reversed, min, max, onCellClick, marks, sectionControl, sectionLineStyle, compass, showCalendar, showClock, timeLabel, wind, onLegendClick, widgetScale, renderStyle, hdMode, legendTicks, legendTextScale }) {
   const canvasRef = useRef(null);
   const objectsCanvasRef = useRef(null);
   const frameRef = useRef(null);
@@ -788,14 +789,14 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
           </div>
         )}
       </div>
-      <button type="button" className="map-legend" onClick={onLegendClick}>
-        <span className="map-legend-label">{formatValue(min, span)}</span>
-        <span
-          className="map-legend-bar"
-          style={{ background: renderStyle === 'contour' ? contourLegendGradient(colors, reversed) : `linear-gradient(90deg, ${orientColors(colors, reversed).join(',')})` }}
-        />
-        <span className="map-legend-label">{formatValue(max, span)}</span>
-      </button>
+      <LegendBar
+        min={min}
+        max={max}
+        gradient={renderStyle === 'contour' ? contourLegendGradient(colors, reversed) : `linear-gradient(90deg, ${orientColors(colors, reversed).join(',')})`}
+        showTicks={legendTicks}
+        textScale={legendTextScale}
+        onClick={onLegendClick}
+      />
       {windLegend && (windLegend.style === 'streamlines' || windLegend.style === 'combined') && (
         <div className="map-wind-legend">
           <span className="map-legend-label">0</span>

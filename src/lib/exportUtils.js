@@ -232,6 +232,23 @@ async function generateHybridSvg(card) {
   const legendBar = card.querySelector('.map-legend-bar');
   if (legendBar) svgContent += extractWidgetNativeSvg(legendBar, true);
 
+  // Etichette degli intervalli intermedi (opzione "Legenda dettagliata"): il
+  // trattino verticale è un ::before CSS, non un nodo DOM, quindi va ridisegnato
+  // come <line> qui invece di poterlo clonare come gli altri widget.
+  const legendBarWrap = card.querySelector('.map-legend-bar-wrap');
+  const legendTickEls = card.querySelectorAll('.map-legend-tick');
+  if (legendBarWrap && legendTickEls.length) {
+    const wrapRect = legendBarWrap.getBoundingClientRect();
+    const y0 = wrapRect.bottom - cardRect.top;
+    legendTickEls.forEach((el) => {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2 - cardRect.left;
+      const tickColor = window.getComputedStyle(el).color;
+      svgContent += `<line x1="${cx}" y1="${y0}" x2="${cx}" y2="${y0 + 3}" stroke="${tickColor}" stroke-width="1" />`;
+      svgContent += extractTextSvg(el);
+    });
+  }
+
   // 5. Texts
   svgContent += extractTextSvg(card.querySelector('.chart-title'));
   svgContent += extractTextSvg(card.querySelector('.chart-stats'));

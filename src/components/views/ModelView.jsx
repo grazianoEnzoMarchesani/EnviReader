@@ -20,7 +20,8 @@ import { useSlices, useTerrainCut, useWindFields, useWindVolumeCells } from '../
 import { useInxModel, useObjectsVolume, useDataOverlay, computeStats } from '../../lib/useModelData';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { activePalette } from '../../data/palettes';
-import { formatValue, orientColors, contourLegendGradient } from '../../lib/colormap';
+import { orientColors, contourLegendGradient } from '../../lib/colormap';
+import LegendBar from '../LegendBar';
 import { niceCeil } from '../../lib/windField';
 import { overlayRange, VIEW_KEYS } from '../../lib/sliceRange';
 import { filesetLabel, timeLabel } from '../../lib/labels';
@@ -142,7 +143,7 @@ function useWindVolumeOverlay(cells, opacity) {
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
-function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, objectStyle, projection, gizmoNorthMode, ambientOcclusion, hdMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onReceptorClick, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent }) {
+function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, objectStyle, projection, gizmoNorthMode, ambientOcclusion, hdMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onReceptorClick, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent, legendTicks, legendTextScale }) {
   const { tr } = useI18n();
   const model = loaded?.model;
   const showModel = model && !blockedNoVerticalExtent;
@@ -212,14 +213,14 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dat
         )}
       </div>
       {showModel && dataOverlay && (
-        <button type="button" className="map-legend" onClick={() => onLegendClick?.(dataOverlay.range)}>
-          <span className="map-legend-label">{formatValue(dataOverlay.range.min, dataOverlay.range.max - dataOverlay.range.min)}</span>
-          <span
-            className="map-legend-bar"
-            style={{ background: dataOverlay.contour ? contourLegendGradient(dataOverlay.colors, dataOverlay.reversed) : `linear-gradient(90deg, ${orientColors(dataOverlay.colors, dataOverlay.reversed).join(',')})` }}
-          />
-          <span className="map-legend-label">{formatValue(dataOverlay.range.max, dataOverlay.range.max - dataOverlay.range.min)}</span>
-        </button>
+        <LegendBar
+          min={dataOverlay.range.min}
+          max={dataOverlay.range.max}
+          gradient={dataOverlay.contour ? contourLegendGradient(dataOverlay.colors, dataOverlay.reversed) : `linear-gradient(90deg, ${orientColors(dataOverlay.colors, dataOverlay.reversed).join(',')})`}
+          showTicks={legendTicks}
+          textScale={legendTextScale}
+          onClick={() => onLegendClick?.(dataOverlay.range)}
+        />
       )}
     </div>
   );
@@ -545,6 +546,8 @@ export default function ModelView() {
             cameraSyncRef={cameraSyncRef}
             cameraSyncEnabled={state.syncCamera3D && panelKeys.length === 2}
             blockedNoVerticalExtent={blockedNoVerticalExtent}
+            legendTicks={state.legendTicks}
+            legendTextScale={state.legendTextScale}
             sectionX={state.sectionX}
             sectionY={state.sectionY}
             sectionAngle={state.sectionAngle}

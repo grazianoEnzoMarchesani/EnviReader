@@ -310,6 +310,20 @@ export function contourLegendGradient(colors, reversed) {
   return `linear-gradient(90deg, ${stops.join(', ')})`;
 }
 
+// Valori numerici dei confini di fascia del filled contour (CONTOUR_BANDS+1
+// punti da min a max), riusati per etichettare la legenda "dettagliata": in
+// modalità contour coincidono con le isolinee disegnate sulla mappa, in
+// pixel/vector restano comunque posizioni utili di lettura sul gradiente
+// continuo (stessa spaziatura, nessuna quantizzazione del colore).
+export function legendTickValues(min, max) {
+  const range = max - min;
+  const ticks = [];
+  for (let i = 0; i <= CONTOUR_BANDS; i++) {
+    ticks.push(min + (i / CONTOUR_BANDS) * range);
+  }
+  return ticks;
+}
+
 export function formatValue(value, span = 0) {
   if (!Number.isFinite(value)) return '–';
   const decimals = Math.abs(span || value) >= 100 ? 1 : 2;
