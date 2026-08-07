@@ -6,7 +6,8 @@ import { isBiometDataset, hasVerticalExtent } from '../../lib/envimet';
 import { useInxModel, useObjectsVolume, useDataOverlay } from '../../lib/useModelData';
 import { useSlices, useTerrainCut } from '../../lib/useSlice';
 import { activePalette } from '../../data/palettes';
-import { formatValue, orientColors, contourLegendGradient } from '../../lib/colormap';
+import { orientColors, contourLegendGradient } from '../../lib/colormap';
+import LegendBar from '../LegendBar';
 import { overlayRange } from '../../lib/sliceRange';
 import IconToggle from '../controls/IconToggle';
 import Segmented from '../controls/Segmented';
@@ -260,14 +261,13 @@ export default function WebGisView() {
             )}
           </div>
           {showViewer && dataOverlay && (
-            <div className="map-legend">
-              <span className="map-legend-label">{formatValue(dataOverlay.range.min, dataOverlay.range.max - dataOverlay.range.min)}</span>
-              <span
-                className="map-legend-bar"
-                style={{ background: dataOverlay.contour ? contourLegendGradient(dataOverlay.colors, dataOverlay.reversed) : `linear-gradient(90deg, ${orientColors(dataOverlay.colors, dataOverlay.reversed).join(',')})` }}
-              />
-              <span className="map-legend-label">{formatValue(dataOverlay.range.max, dataOverlay.range.max - dataOverlay.range.min)}</span>
-            </div>
+            <LegendBar
+              min={dataOverlay.range.min}
+              max={dataOverlay.range.max}
+              gradient={dataOverlay.contour ? contourLegendGradient(dataOverlay.colors, dataOverlay.reversed) : `linear-gradient(90deg, ${orientColors(dataOverlay.colors, dataOverlay.reversed).join(',')})`}
+              showTicks={state.legendTicks}
+              textScale={state.legendTextScale}
+            />
           )}
         </div>
       </div>

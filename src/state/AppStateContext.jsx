@@ -32,6 +32,16 @@ const initialState = {
   // lì il costo è per-frame su tutta la scena (non un ricampionamento
   // puntuale come in 2D) e può mettere in crisi GPU più modeste.
   hdMode3D: false,
+  // Legenda con etichette numeriche agli intervalli intermedi (non solo min/
+  // max), sugli stessi CONTOUR_BANDS usati dal filled contour — visibile sia
+  // in 'contour' (bordi di fascia) sia in 'pixel'/'vector' (stesse posizioni
+  // sul gradiente continuo). Opzione avanzata, non attiva sulle miniature.
+  legendTicks: false,
+  // Ingrandimento (%) del testo delle etichette della legenda (min/max e tick
+  // intermedi): lo spazio orizzontale occupato dalla legenda resta invariato,
+  // cambia solo la dimensione del testo (via transform: scale, non font-size,
+  // per non alterare il layout) — vedi LegendBar.jsx.
+  legendTextScale: 100,
   filesetAOpen: false,
   filesetBOpen: false,
   loadingFileset: null, // 'A' | 'B' mentre la cartella scelta viene letta e analizzata

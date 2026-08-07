@@ -1176,8 +1176,60 @@ button { font-family: inherit; }
   z-index: 2;
 }
 .map-legend { display: flex; align-items: center; gap: 8px; }
-.map-legend-bar { flex: 1; min-width: 100px; height: 8px; border-radius: 4px; }
-.map-legend-label { font-size: 10.5px; font-family: var(--mono); color: var(--text-secondary); }
+/* Con i tick intermedi, min e max diventano il primo e l'ultimo tick della
+   stessa fila (stessa cadenza, stesso stile) invece di due etichette a parte
+   fuori dalla barra: la barra occupa da sola tutta la riga. */
+.map-legend.has-ticks { margin-bottom: 14px; }
+.map-legend-bar-wrap { position: relative; flex: 1; min-width: 100px; }
+.map-legend-bar { display: block; width: 100%; height: 8px; border-radius: 4px; }
+/* font-size impostato inline in LegendBar.jsx in base allo slider "dimensione
+   testo legenda": qui (min/max fuori dalla barra) il box deve crescere con il
+   testo, non solo la resa visiva, così flexbox restringe map-legend-bar-wrap
+   (flex: 1) per fare posto e l'intera riga resta larga come la card, senza
+   mai sforare. transition rende il ridimensionamento fluido trascinando lo
+   slider. */
+.map-legend-label { display: inline-block; font-size: 10.5px; font-family: var(--mono); color: var(--text-secondary); transition: font-size 0.1s ease-out; }
+/* Etichette degli intervalli intermedi (opzione "Legenda dettagliata"): un
+   trattino verticale a contatto con la barra e il valore sotto, allineati
+   in percentuale sulla larghezza della barra così restano coerenti anche
+   quando la legenda si ridimensiona (card più stretta, export, ecc.). */
+.map-legend-ticks {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  margin-top: 3px;
+  pointer-events: none;
+}
+.map-legend-tick {
+  position: absolute;
+  top: 0;
+  font-size: 8.5px;
+  font-family: var(--mono);
+  color: var(--text-faint);
+  white-space: nowrap;
+  transition: transform 0.1s ease-out;
+}
+/* Estremi (min/max) della fila di tick: stesso stile, colore un filo più
+   marcato per restare leggibili come i due valori di riferimento della scala.
+   A differenza degli intermedi non sono centrati sul proprio punto (metà del
+   testo finirebbe fuori dalla card): il trattino resta esattamente a 0%/100%,
+   la cifra si estende verso l'interno della barra, così restano vicini agli
+   intermedi invece che appesi fuori. (transform del testo: inline, vedi sopra) */
+.map-legend-tick-edge { color: var(--text-secondary); }
+.map-legend-tick-edge::before { background: var(--text-secondary); }
+.map-legend-tick-edge:first-child::before { left: 0; transform: none; }
+.map-legend-tick-edge:last-child::before { left: 100%; transform: none; }
+.map-legend-tick::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  width: 1px;
+  height: 3px;
+  background: var(--text-faint);
+  transform: translateX(-50%);
+}
 /* Frecce del vento: overlay a risoluzione schermo sopra la mappa raster */
 .map-wind-canvas {
   position: absolute;

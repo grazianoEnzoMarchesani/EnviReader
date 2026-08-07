@@ -121,6 +121,18 @@ export default function ViewSettingsModal() {
           </>
         )}
 
+        <div className="modal-section-title">{tr('group_legend')}</div>
+        <div className="modal-field-group">
+          <Toggle
+            label={tr('toggle_legend_ticks')}
+            on={state.legendTicks}
+            onToggle={() => toggle('legendTicks')}
+          />
+        </div>
+        <div className="view-bar-group" style={{ marginBottom: '16px' }}>
+          <Slider label={tr('slider_legend_text_scale')} value={state.legendTextScale} min={100} max={200} step={10} unit="%" onChange={(v) => set({ legendTextScale: v })} />
+        </div>
+
         <div className="modal-section-title">{tr('group_widgets')}</div>
         <div className="view-bar-group">
           <Slider label={tr('slider_widget_scale')} value={state.widgetScale} min={100} max={300} step={10} unit="%" onChange={(v) => set({ widgetScale: v })} />
