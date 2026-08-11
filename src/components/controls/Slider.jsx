@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-export default function Slider({ label, value, min, max, step = 1, unit = '', onChange, accessory }) {
+export default function Slider({ label, value, min, max, step = 1, unit = '', onChange, accessory, hint }) {
   const clamp = (v) => Math.max(min, Math.min(max, v));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(String(value));
@@ -56,6 +56,7 @@ export default function Slider({ label, value, min, max, step = 1, unit = '', on
           />
         </div>
       </div>
+      {hint ? <div className="slider-hint-row">{hint}</div> : null}
       <div className="slider-row">
         <button className="step-btn" onClick={() => onChange(clamp(value - step))}>–</button>
         <input
@@ -66,6 +67,11 @@ export default function Slider({ label, value, min, max, step = 1, unit = '', on
           step={step}
           value={value}
           onChange={(e) => onChange(parseFloat(e.target.value))}
+          onMouseUp={(e) => e.currentTarget.blur()}
+          onTouchEnd={(e) => e.currentTarget.blur()}
+          onKeyUp={(e) => {
+            if (e.key.startsWith('Arrow')) e.currentTarget.blur();
+          }}
         />
         <button className="step-btn" onClick={() => onChange(clamp(value + step))}>+</button>
       </div>

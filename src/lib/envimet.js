@@ -274,16 +274,73 @@ function getDataView(file) {
   return promise;
 }
 
+// Quante celle, dal basso, sono occupate da edificio/terreno (1/2, vedi
+// isOccupied in extractSlice) in una colonna (x, y) del layer Objects — nucleo
+// condiviso da loadColumnShift (una singola colonna, per l'hint di quota) e da
+// biometValueAt qui sotto (pianta e serie temporale); le sezioni hanno la
+// propria freeZ locale perché scandagliano l'intera griglia e già hanno
+// objectsOffset precalcolato una volta sola, non conviene rifattorizzarle.
+function objectsShift(dataView, dims, objectsVarIndex, x, y) {
+  if (objectsVarIndex == null || objectsVarIndex === -1) return 0;
+  const { x: dimX, y: dimY, z: dimZ } = dims;
+  const BYTES = 4;
+  const objOffset = objectsVarIndex * dimX * dimY * dimZ * BYTES;
+  let z = 0;
+  while (z < dimZ - 1) {
+    const offset = objOffset + ((z * dimY + y) * dimX + x) * BYTES;
+    if (offset + BYTES > dataView.byteLength) break;
+    const rv = Math.round(dataView.getFloat32(offset, true));
+    if (rv !== 1 && rv !== 2) break;
+    z++;
+  }
+  return z;
+}
+
+// Valore della colonna biomet ricollocata (vedi nota su extractSlice) alla
+// posizione assoluta k: parte dallo shift già noto e scandisce il dato grezzo
+// da s=0, saltando i NaN interni esattamente come compactColumn, finché non
+// raggiunge z===k — condivisa da extractSlice (pianta) e loadPointSeries
+// (serie temporale) perché un offset diretto (k - shift) sbaglierebbe non
+// appena la colonna ha un vuoto interno (es. un tratto non modellato sotto
+// una sporgenza), un caso comune abbastanza da rendere le due estrazioni
+// incoerenti se calcolate in due modi diversi.
+function biometValueAt(dataView, dims, varIndex, x, y, shift, k) {
+  if (k < shift) return NaN;
+  const { x: dimX, y: dimY, z: dimZ } = dims;
+  const BYTES = 4;
+  const varOffset = varIndex * dimX * dimY * dimZ * BYTES;
+  const read = (offset) => {
+    if (offset + BYTES > dataView.byteLength) return NaN;
+    const value = dataView.getFloat32(offset, true);
+    return value === NO_DATA || Number.isNaN(value) ? NaN : value;
+  };
+  let z = shift;
+  for (let s = 0; s < dimZ && z <= k; s++) {
+    const v = read(varOffset + ((s * dimY + y) * dimX + x) * BYTES);
+    if (Number.isNaN(v)) continue;
+    if (z === k) return v;
+    z++;
+  }
+  return NaN;
+}
+
 // config: { level, terrain } | { sectionX, biometFix?, objectsVarIndex? } |
 // { sectionY, biometFix?, objectsVarIndex? } | { line, biometFix?, objectsVarIndex? }
 // biometFix corregge il bug storico di ENVI-met sui dataset biomet (PMV/PET/
-// SET/UTCI) in sezione: l'export non tiene conto di dove sono edifici/
-// terreno, "schiacciando" la sezione contro il fondo del dominio. Per
-// colonna: si conta quante celle sono occupate da edificio/terreno partendo
-// dal basso (layer Objects, stesso file, objectsVarIndex — non una formula
-// sul terreno, ma la verità già disponibile) e si trasla l'intera colonna
-// grezza in alto di quella quantità; quello che esce dal dominio in alto
-// viene tagliato, lo spazio liberato in basso resta vuoto (NaN).
+// SET/UTCI): l'export non tiene conto di dove sono edifici/terreno,
+// "schiacciando" la colonna contro il fondo del dominio. Per colonna: si
+// conta quante celle sono occupate da edificio/terreno partendo dal basso
+// (layer Objects, stesso file, objectsVarIndex — non una formula sul
+// terreno, ma la verità già disponibile per quella cella) e si trasla la
+// colonna grezza in alto di quella quantità (shift); quello che esce dal
+// dominio in alto viene tagliato, lo spazio liberato in basso resta vuoto
+// (NaN) — esattamente come sotto il terreno reale in un dataset non-biomet.
+// Una volta ricollocata, la colonna è un dato "normale" in coordinate
+// assolute: il ramo pianta la fa quindi passare per la stessa
+// applyTerrainCut() di Follow Terrain, usando `shift` al posto della quota
+// terreno (terrain.data[i]) — così off/levelOut/cascade funzionano come per
+// qualunque altra variabile, e con Follow Terrain spento un `level` sotto lo
+// shift restituisce NaN invece di "aggiungerlo" comunque (vedi extractSlice).
 export function extractSlice(dataView, dims, varIndex, config) {
   const { x: dimX, y: dimY, z: dimZ } = dims;
   const { level = null, sectionX = null, sectionY = null, terrain = null, line = null, biometFix = false, objectsVarIndex = null } = config;
@@ -327,15 +384,23 @@ export function extractSlice(dataView, dims, varIndex, config) {
     }
     return out;
   };
-
   if (level !== null) {
     const out = new Float32Array(dimX * dimY);
     for (let i = 0; i < out.length; i++) {
       const x = i % dimX;
       const y = (i / dimX) | 0;
-      let k = level;
-      if (terrain) k = Math.min(Math.floor(applyTerrainCut(terrain, terrain.data[i])), dimZ - 1);
-      out[i] = read(varOffset + ((k * dimY + y) * dimX + x) * BYTES);
+      if (biometFix) {
+        const shift = freeZ(x, y);
+        // Follow Terrain acceso: shift gioca il ruolo della quota terreno nella
+        // stessa formula off/levelOut/cascade; spento: `level` è un indice
+        // assoluto nella colonna ricollocata, NaN se cade sotto lo shift.
+        const k = terrain ? Math.min(Math.floor(applyTerrainCut(terrain, shift)), dimZ - 1) : Math.min(level, dimZ - 1);
+        out[i] = biometValueAt(dataView, dims, varIndex, x, y, shift, k);
+      } else {
+        let k = level;
+        if (terrain) k = Math.min(Math.floor(applyTerrainCut(terrain, terrain.data[i])), dimZ - 1);
+        out[i] = read(varOffset + ((k * dimY + y) * dimX + x) * BYTES);
+      }
     }
     return out;
   }
@@ -449,9 +514,11 @@ export async function loadSlice(edtFile, edxInfo, variableName, config) {
   };
 }
 
-// Valore della cella (x, y) al livello dato per ogni istante della serie:
-// legge solo i 4 byte che servono da ciascun EDT, senza caricare i file interi
-export async function loadPointSeries(series, variableName, { x, y, level, terrain }) {
+// Valore della cella (x, y) al livello dato per ogni istante della serie: sui
+// dataset normali legge solo i 4 byte che servono da ciascun EDT, senza
+// caricare i file interi; sui biomet con fix serve invece il buffer intero
+// (getDataView, cache condivisa con la pianta) per la scansione skip-NaN.
+export async function loadPointSeries(series, variableName, { x, y, level, terrain, biometFix = false }) {
   return Promise.all(
     series.map(async (pair) => {
       const edx = await readEDX(pair.EDX);
@@ -461,6 +528,17 @@ export async function loadPointSeries(series, variableName, { x, y, level, terra
       const cx = Math.max(0, Math.min(x, dims.x - 1));
       const cy = Math.max(0, Math.min(y, dims.y - 1));
       let k = Math.max(0, Math.min(level, dims.z - 1));
+      if (biometFix) {
+        // stessa correzione del ramo "plan" di extractSlice, con la stessa
+        // biometValueAt (buffer intero via getDataView, non 4 byte puntuali):
+        // un offset diretto k-shift sbaglierebbe sui vuoti interni della
+        // colonna, serve saltarli esattamente come fa la pianta.
+        const dataView = await getDataView(pair.EDT);
+        const objIdx = edx.variableNames.findIndex((n) => /objects/i.test(n));
+        const shift = objectsShift(dataView, dims, objIdx, cx, cy);
+        if (terrain) k = Math.min(Math.floor(applyTerrainCut(terrain, shift)), dims.z - 1);
+        return biometValueAt(dataView, dims, varIndex, cx, cy, shift, k);
+      }
       if (terrain) k = Math.min(Math.floor(applyTerrainCut(terrain, terrain.data[cy * dims.x + cx])), dims.z - 1);
       const offset = (((varIndex * dims.z + k) * dims.y + cy) * dims.x + cx) * 4;
       const buffer = await pair.EDT.slice(offset, offset + 4).arrayBuffer();
@@ -469,6 +547,50 @@ export async function loadPointSeries(series, variableName, { x, y, level, terra
       return value === NO_DATA || Number.isNaN(value) ? NaN : value;
     }),
   );
+}
+
+// Quota fisica (m) del taglio all'indice z=k, per tradurre un "Livello"
+// astratto in un numero confrontabile col progetto reale. ENVI-met colloca
+// i valori al centro di ogni cella verticale, non al bordo superiore: si
+// sommano quindi gli spessori delle celle sottostanti (edxInfo.spacing.z) e
+// si aggiunge solo metà dello spessore della cella k.
+export function heightAtLevel(spacingZ, k) {
+  if (!spacingZ) return null;
+  let h = 0;
+  for (let i = 0; i < k && i < spacingZ.length; i++) h += spacingZ[i];
+  if (k < spacingZ.length) h += spacingZ[k] / 2;
+  return h;
+}
+
+// Quota fisica (m) della superficie del terreno, dato l'indice z (anche
+// frazionario) letto da solaraccess/ground. A differenza di heightAtLevel
+// qui non si vuole il centro di una cella dati ma il confine reale del
+// terreno: si sommano per intero gli spessori delle celle occupate e si
+// aggiunge solo la frazione di cella effettivamente coperta dal terreno,
+// non mezza cella "a forfait".
+export function groundSurfaceHeight(spacingZ, groundIndex) {
+  if (!spacingZ || groundIndex == null) return null;
+  const k = Math.floor(groundIndex);
+  const frac = groundIndex - k;
+  let h = 0;
+  for (let i = 0; i < k && i < spacingZ.length; i++) h += spacingZ[i];
+  if (k < spacingZ.length) h += frac * spacingZ[k];
+  return h;
+}
+
+// Quante celle, dal basso, sono occupate da edificio/terreno in una singola
+// colonna (x, y) — stessa logica di isOccupied/freeZ in extractSlice, ma
+// per un solo punto: usata per mostrare la quota reale che il fix biomet
+// raggiunge nel punto del mirino, senza dover scandagliare l'intero layer
+// Objects come fanno le sezioni.
+export async function loadColumnShift(edtFile, edxInfo, x, y) {
+  const objIdx = edxInfo.variableNames.findIndex((n) => /objects/i.test(n));
+  if (objIdx === -1) return 0;
+  const dataView = await getDataView(edtFile);
+  const dims = edxInfo.dimensions;
+  const cx = Math.max(0, Math.min(x, dims.x - 1));
+  const cy = Math.max(0, Math.min(y, dims.y - 1));
+  return objectsShift(dataView, dims, objIdx, cx, cy);
 }
 
 // Volume completo (tutti gli x,y,z) della variabile "Objects" dei risultati,

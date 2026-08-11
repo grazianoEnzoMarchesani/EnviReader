@@ -6,7 +6,7 @@ import { isBiometDataset, hasVerticalExtent } from '../../lib/envimet';
 import { sunPosition, sunPathSamples, sunDiagramCurves, estimateTimezoneOffset } from '../../lib/sunPosition';
 import { getSunSample } from '../../lib/sunLink';
 import Model3DViewer from '../Model3DViewer';
-import { MapCalendar, MapClock } from '../MapChart';
+import { MapCalendar, MapClock, WindLegendRow, streamWidth } from '../MapChart';
 import PointSeriesCard from '../PointSeriesCard';
 import Segmented from '../controls/Segmented';
 import IconToggle from '../controls/IconToggle';
@@ -20,12 +20,17 @@ import { useSlices, useTerrainCut, useWindFields, useWindVolumeCells } from '../
 import { useInxModel, useObjectsVolume, useDataOverlay, computeStats } from '../../lib/useModelData';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { activePalette } from '../../data/palettes';
-import { orientColors, contourLegendGradient } from '../../lib/colormap';
+import { orientColors, contourLegendGradient, percentileValue } from '../../lib/colormap';
 import LegendBar from '../LegendBar';
 import { niceCeil } from '../../lib/windField';
 import { overlayRange, VIEW_KEYS } from '../../lib/sliceRange';
 import { filesetLabel, timeLabel } from '../../lib/labels';
 import { useModesLayout } from '../../lib/useModesLayout';
+
+// Lunghezza nominale (px) della freccia di riferimento nella legenda vento
+// dei pannelli 3D: non c'è una griglia in coordinate schermo da cui derivarla
+// come in MapChart (windLayout), quindi è un valore fisso indicativo.
+const WIND_LEGEND_3D_ARROW_LEN = 40;
 
 const LAYER_ICONS = {
   showBuildings: IconBuilding,
@@ -143,15 +148,25 @@ function useWindVolumeOverlay(cells, opacity) {
 }
 
 // Un pannello del viewer 3D (un fileset): titolo/statistiche + canvas o stato vuoto
-function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, flags, wireframe, objectStyle, projection, gizmoNorthMode, ambientOcclusion, hdMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onReceptorClick, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent, legendTicks, legendTextScale }) {
+function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dataOverlay, windOverlay, windVolumeOverlay, windLegend, zebraLegend, flags, wireframe, objectStyle, projection, gizmoNorthMode, ambientOcclusion, hdMode, sun, sunPathEnabled, showCalendarWidget, showClockWidget, widgetScale, timeLabel, sectionX, sectionY, sectionAngle, onPivotChange, onAngleChange, onReceptorClick, onLegendClick, emptyHint, cameraSyncRef, cameraSyncEnabled, blockedNoVerticalExtent, legendTicks, legendTextScale }) {
   const { tr } = useI18n();
   const model = loaded?.model;
   const showModel = model && !blockedNoVerticalExtent;
   const stats = computeStats(model);
   const { hasLocation, sunActive, sunInfo, sunPathPoints, sunDiagram } = sun;
+  const panelRef = useRef(null);
+  const [panelWidth, setPanelWidth] = useState(0);
+
+  useEffect(() => {
+    const el = panelRef.current;
+    if (!el) return undefined;
+    const observer = new ResizeObserver(([entry]) => setPanelWidth(entry.contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <div className="model-panel" data-flip-key={flipKey} style={{ '--widget-scale': (widgetScale ?? 100) / 100 }}>
+    <div className="model-panel" ref={panelRef} data-flip-key={flipKey} style={{ '--widget-scale': (widgetScale ?? 100) / 100 }}>
       <div className="chart-header">
         <div className="chart-title">{title}</div>
         {stats && (
@@ -222,6 +237,7 @@ function ModelPanel({ flipKey, title, loaded, objectsVolume, spacingZ, dimZ, dat
           onClick={() => onLegendClick?.(dataOverlay.range)}
         />
       )}
+      {showModel && (windLegend || zebraLegend?.opts?.enabled) && <WindLegendRow windLegend={windLegend} availableWidth={panelWidth - 12} zebra={zebraLegend} />}
     </div>
   );
 }
@@ -275,8 +291,43 @@ export default function ModelView() {
   const spacingZ = state.edxMeta?.spacing?.z;
   const overlayRangeA = overlayRange(state.scaleType3D, state.customRanges, 'A', slicesA, slicesB);
   const overlayRangeB = overlayRange(state.scaleType3D, state.customRanges, 'B', slicesB, slicesA);
-  const dataOverlayA = useDataOverlay(slicesA, terrainCutA, voxelViews, mainPalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ, overlayRangeA, state.renderStyle === 'contour');
-  const dataOverlayB = useDataOverlay(slicesB, terrainCutB, voxelViews, mainPalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ, overlayRangeB, state.renderStyle === 'contour');
+
+  // Valore reale dei due percentili scelti per l'overlay zebra, sullo slice di
+  // Fileset A: stesso meccanismo di AnalysisView.jsx (la sidebar DataTab non ha
+  // accesso allo slice caricato, quindi legge zebraHighValue/zebraLowValue da
+  // qui), ma qui la pianta è sempre presente quando c'è un modello 3D, quindi
+  // si usa quella come riferimento anche se la vista pianta non è la sezione
+  // attiva mostrata sulle pareti.
+  const zebraSliceA = slicesA.plan || slicesA.sectionX || slicesA.sectionY;
+  useEffect(() => {
+    if (state.zebraMode === 'off' || !zebraSliceA) {
+      set({ zebraHighValue: null, zebraLowValue: null });
+      return;
+    }
+    const high = percentileValue(zebraSliceA.data, state.zebraHighPercentile);
+    const low = percentileValue(zebraSliceA.data, state.zebraLowPercentile);
+    set({
+      zebraHighValue: Number.isFinite(high) ? high : null,
+      zebraLowValue: Number.isFinite(low) ? low : null,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zebraSliceA, state.zebraMode, state.zebraHighPercentile, state.zebraLowPercentile]);
+
+  // Lo zebra nel viewer 3D funziona sulla superficie liscia (dataVoxelSmooth)
+  // e sul filled contour (che è SEMPRE una superficie continua, indipendente
+  // da dataVoxelSmooth — vedi il ramo `contour` di buildDataOverlay in
+  // inxScene.js): resta disattivato solo sui voxel a gradino, dove un colore
+  // piatto per cella non ha un confine da smussare e si confonderebbe con lo
+  // stile stesso della resa.
+  const zebraOpts = useMemo(() => ({
+    enabled: state.zebraMode !== 'off' && (state.renderStyle === 'contour' || state.dataVoxelSmooth),
+    highValue: state.zebraHighValue,
+    lowValue: state.zebraLowValue,
+    inverted: state.zebraMode === 'inverted',
+  }), [state.zebraMode, state.dataVoxelSmooth, state.renderStyle, state.zebraHighValue, state.zebraLowValue]);
+
+  const dataOverlayA = useDataOverlay(slicesA, terrainCutA, voxelViews, mainPalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ, overlayRangeA, state.renderStyle === 'contour', zebraOpts);
+  const dataOverlayB = useDataOverlay(slicesB, terrainCutB, voxelViews, mainPalette.colors, mainReversed, state.sectionX, state.sectionY, state.level, dimZ, state.dataVoxelSmooth, spacingZ, overlayRangeB, state.renderStyle === 'contour', zebraOpts);
 
   // Vento sulle fette dati già disegnate (pianta/sezioni): quali piani sono
   // "selezionati" (dataVoxelPlan/SectionX/SectionY) resta indipendente dal
@@ -342,6 +393,45 @@ export default function ModelView() {
   const windMode = state.showWindVolume ? '3d' : state.showWindField ? '2d' : 'off';
   const cycleWindMode = () => toggle(windMode === 'off' ? 'showWindField' : 'showWindVolume');
 
+  // Legenda del vento sotto ogni pannello 3D: stesso widget della vista 2D
+  // (WindLegendRow, MapChart.jsx), qui senza un "windLayout" reale (niente
+  // griglia/frameSize in una scena 3D in prospettiva) — la lunghezza di
+  // riferimento è quindi nominale (WIND_LEGEND_3D_ARROW_LEN), solo il valore
+  // massimo (refValue) e lo stile contano davvero. In modalità volumetrica
+  // il refValue arriva dal worker (niceCeil(volume.maxMag), vedi
+  // windVolumeWorker.js) perché non è calcolato lato main thread come per le
+  // fette piano/sezione.
+  const windLegendA =
+    windMode === '2d' && windOverlayA
+      ? { style: windOverlayA.style, len: WIND_LEGEND_3D_ARROW_LEN, width: streamWidth(windOverlayA.size), value: windOverlayA.refValue }
+      : windMode === '3d' && windVolumeOverlayA?.cells?.refValue > 0
+        ? { style: state.windStyle, len: WIND_LEGEND_3D_ARROW_LEN, width: streamWidth(state.windSize), value: windVolumeOverlayA.cells.refValue }
+        : null;
+  const windLegendB =
+    windMode === '2d' && windOverlayB
+      ? { style: windOverlayB.style, len: WIND_LEGEND_3D_ARROW_LEN, width: streamWidth(windOverlayB.size), value: windOverlayB.refValue }
+      : windMode === '3d' && windVolumeOverlayB?.cells?.refValue > 0
+        ? { style: state.windStyle, len: WIND_LEGEND_3D_ARROW_LEN, width: streamWidth(state.windSize), value: windVolumeOverlayB.cells.refValue }
+        : null;
+
+  // Legenda zebra sotto ogni pannello 3D: stesso widget della vista 2D
+  // (ZebraChips dentro WindLegendRow, MapChart.jsx) — la superficie liscia
+  // disegna lo stesso tratteggio diagonale del canvas 2D (vedi lo shader
+  // dedicato in inxScene.js), quindi il quadratino della legenda resta
+  // identico a quello 2D, nessuna variante. Soglie/percentili sono quelli
+  // globali (zebraOpts sopra), lo `span` per l'arrotondamento dei valori
+  // viene dal range overlay di ciascun fileset, come per la legenda colore.
+  const zebraLegendA = useMemo(() => ({
+    opts: { enabled: zebraOpts.enabled, lowPercentile: state.zebraLowPercentile, highPercentile: state.zebraHighPercentile, inverted: zebraOpts.inverted },
+    thresholds: { low: state.zebraLowValue, high: state.zebraHighValue },
+    span: overlayRangeA.max - overlayRangeA.min,
+  }), [zebraOpts.enabled, zebraOpts.inverted, state.zebraLowPercentile, state.zebraHighPercentile, state.zebraLowValue, state.zebraHighValue, overlayRangeA]);
+  const zebraLegendB = useMemo(() => ({
+    opts: { enabled: zebraOpts.enabled, lowPercentile: state.zebraLowPercentile, highPercentile: state.zebraHighPercentile, inverted: zebraOpts.inverted },
+    thresholds: { low: state.zebraLowValue, high: state.zebraHighValue },
+    span: overlayRangeB.max - overlayRangeB.min,
+  }), [zebraOpts.enabled, zebraOpts.inverted, state.zebraLowPercentile, state.zebraHighPercentile, state.zebraLowValue, state.zebraHighValue, overlayRangeB]);
+
   const flags = useMemo(
     () => ({
       showBuildings: state.showBuildings,
@@ -378,8 +468,8 @@ export default function ModelView() {
   const panelKeys = state.compareMode3D === 'ab' ? ['A', 'B'] : state.compareMode3D === 'b' ? ['B'] : ['A'];
 
   const panelProps = {
-    A: { title: filesetLabel(state, tr, 'A'), loaded: loadedA, objectsVolume: objectsVolumeA, spacingZ, dimZ, dataOverlay: dataOverlayA, windOverlay: windOverlayA, windVolumeOverlay: windVolumeOverlayA, sun: sunA, onLegendClick: (range) => handleLegendClick('A', range) },
-    B: { title: filesetLabel(state, tr, 'B'), loaded: loadedB, objectsVolume: objectsVolumeB, spacingZ, dimZ, dataOverlay: dataOverlayB, windOverlay: windOverlayB, windVolumeOverlay: windVolumeOverlayB, sun: sunB, onLegendClick: (range) => handleLegendClick('B', range) },
+    A: { title: filesetLabel(state, tr, 'A'), loaded: loadedA, objectsVolume: objectsVolumeA, spacingZ, dimZ, dataOverlay: dataOverlayA, windOverlay: windOverlayA, windVolumeOverlay: windVolumeOverlayA, windLegend: windLegendA, zebraLegend: zebraLegendA, sun: sunA, onLegendClick: (range) => handleLegendClick('A', range) },
+    B: { title: filesetLabel(state, tr, 'B'), loaded: loadedB, objectsVolume: objectsVolumeB, spacingZ, dimZ, dataOverlay: dataOverlayB, windOverlay: windOverlayB, windVolumeOverlay: windVolumeOverlayB, windLegend: windLegendB, zebraLegend: zebraLegendB, sun: sunB, onLegendClick: (range) => handleLegendClick('B', range) },
   };
   const flipRef = useFlip();
 

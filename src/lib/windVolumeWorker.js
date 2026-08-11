@@ -98,7 +98,7 @@ function computeCells({ structure, groupPath, timeIndex, geometry, spacingZ, sty
       }
     }
 
-    return { arrowCells: packCells(arrowCells), segCells: packCells(segCells), headCells: packCells(headCells) };
+    return { arrowCells: packCells(arrowCells), segCells: packCells(segCells), headCells: packCells(headCells), refValue };
   });
 }
 
@@ -110,9 +110,9 @@ self.onmessage = async (e) => {
       self.postMessage({ requestId, empty: true });
       return;
     }
-    const { arrowCells, segCells, headCells } = result;
+    const { arrowCells, segCells, headCells, refValue } = result;
     self.postMessage(
-      { requestId, empty: false, arrowCells, segCells, headCells },
+      { requestId, empty: false, arrowCells, segCells, headCells, refValue },
       [arrowCells.buffer, segCells.buffer, headCells.buffer],
     );
   } catch (err) {

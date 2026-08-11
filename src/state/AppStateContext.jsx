@@ -91,6 +91,23 @@ const initialState = {
   objOverlayBuildings: true,
   objOverlayTerrain: true,
   objOverlayVegetation: true,
+  // Overlay "zebra": evidenzia con un pattern a strisce diagonali (come negli
+  // esposimetri fotografici) le celle della vista corrente il cui valore
+  // supera un percentile alto e/o è sotto un percentile basso, qualunque sia
+  // il dataset mostrato — vedi zebraToImageData in colormap.js.
+  // 'off' | 'on' | 'inverted': 'on' copre di zebra le celle fuori soglia,
+  // 'inverted' copre il complemento (lascia scoperto solo il range percentile
+  // scelto) — vedi zebraToImageData in colormap.js.
+  zebraMode: 'off',
+  zebraHighPercentile: 95,
+  zebraLowPercentile: 5,
+  // Valore effettivo (nell'unità del dataset corrente) corrispondente ai due
+  // percentili sopra, sincronizzato da AnalysisView mentre calcola l'overlay
+  // sullo slice di Fileset A — stesso pattern di windVolumeLoading: un
+  // componente "a valle" pubblica un dato calcolato perché la sidebar (a
+  // monte nell'albero) possa mostrarlo accanto allo slider.
+  zebraHighValue: null,
+  zebraLowValue: null,
   windStyle: 'arrows', // 'arrows' | 'streamlines' | 'combined'
   palette: 'Turbo',
   paletteOpen: false,

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { formatValue } from '../lib/colormap';
 import { niceTicks } from '../lib/chartAxis';
+import { IconTerrain } from './icons/ToolbarIcons';
+import { useI18n } from '../i18n/I18nContext';
 
 // Grafico a linee della serie temporale nel punto selezionato, in SVG puro.
 // La linea verticale piena marca l'istante mostrato nelle mappe; il crosshair
@@ -34,6 +36,13 @@ export default function TimeSeriesChart({ series, labels, time, onSelectTime }) 
   const boxRef = useRef(null);
   const [width, setWidth] = useState(0);
   const [hover, setHover] = useState(null);
+  const { tr } = useI18n();
+  // Serie diverse possono avere il proprio Follow Terrain "congelato" al
+  // momento del salvataggio (i cursori) invece di quello attuale degli slider
+  // (il mirino live): senza questo segnale visivo due linee alla stessa
+  // posizione XY possono avere quote diverse per ragioni non ovvie a distanza
+  // di tempo — vedi followTerrain sui cursori in cursorStore.js.
+  const TerrainBadge = () => <IconTerrain className="ts-terrain-badge" width="12" height="12" title={tr('title_series_follow_terrain')} />;
 
   useEffect(() => {
     const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
@@ -144,6 +153,7 @@ export default function TimeSeriesChart({ series, labels, time, onSelectTime }) 
                 <span className="ts-key" style={{ background: dashedKeyBg(s) }} />
                 <span className="ts-tooltip-value">{v == null || Number.isNaN(v) ? '–' : formatValue(v, span)}</span>
                 <span className="ts-tooltip-name">{s.name}</span>
+                {s.followTerrain && <TerrainBadge />}
               </div>
             );
           })}
@@ -156,6 +166,7 @@ export default function TimeSeriesChart({ series, labels, time, onSelectTime }) 
             <span key={s.name} className="ts-legend-item">
               <span className="ts-key" style={{ background: dashedKeyBg(s) }} />
               {s.name}
+              {s.followTerrain && <TerrainBadge />}
             </span>
           ))}
         </div>

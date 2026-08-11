@@ -8,12 +8,17 @@ import { DEFAULT_PRESETS } from '../../data/defaultPresets';
 import { useAppState } from '../../state/AppStateContext';
 import { useI18n } from '../../i18n/I18nContext';
 import Slider from '../controls/Slider';
+import RangeSlider from '../controls/RangeSlider';
 import TimePlayer from '../controls/TimePlayer';
 import Toggle from '../controls/Toggle';
 import Select from '../controls/Select';
-import OptionButtons from '../controls/OptionButtons';
+import SegmentedControl from '../controls/SegmentedControl';
 import PaletteSelector, { orderedColors } from '../controls/PaletteSelector';
 import GradientEditor from '../controls/GradientEditor';
+import { IconTerrain } from '../icons/ToolbarIcons';
+import { isBiometDataset } from '../../lib/envimet';
+import { useTerrainCut, useLevelElevation, formatElevationHint } from '../../lib/useSlice';
+import { formatValue } from '../../lib/colormap';
 
 function DataTab() {
   const { state, set, toggle, setDataGroup } = useAppState();
@@ -28,6 +33,26 @@ function DataTab() {
   const datasetOptions = state.edxMeta
     ? state.edxMeta.variableNames.map((n) => ({ value: n, label: n }))
     : [];
+
+  // Traduce il "Livello" grezzo nella quota reale che raggiunge nel punto del
+  // mirino — sempre, non solo con Follow Terrain attivo: altrimenti sparendo
+  // e ricomparendo al variare del toggle sembra che senza Follow Terrain il
+  // livello non abbia una quota (ce l'ha, è solo la conversione diretta
+  // indice→metri). Con Follow Terrain applica il taglio terreno, sui dataset
+  // biomet col fix applica lo shift di colonna — vedi la nota su extractSlice
+  // in envimet.js.
+  const biometFixActive = state.fixBiometSections && isBiometDataset(state.dataGroup, state.dataset);
+  const terrainCutA = useTerrainCut(state.terrainA, state);
+  const levelElevation = useLevelElevation(
+    state.filesetA,
+    state.dataGroup,
+    state.sectionX,
+    state.sectionY,
+    state.level,
+    state.followTerrain ? terrainCutA : null,
+    biometFixActive,
+  );
+  const elevationHint = loaded ? formatElevationHint(tr, formatValue, levelElevation, state.followTerrain, biometFixActive) : null;
 
   return (
     <>
@@ -51,7 +76,14 @@ function DataTab() {
         onChange={(v) => set({ time: v })}
         accessory={<TimePlayer value={state.time} max={Math.max(0, state.seriesLabels.length - 1)} onChange={(v) => set({ time: v })} />}
       />
-      <Slider label={tr('slider_level')} value={state.level} min={0} max={dims ? Math.max(0, dims.z - 1) : 20} onChange={(v) => set({ level: v })} />
+      <Slider
+        label={tr('slider_level')}
+        value={state.level}
+        min={0}
+        max={dims ? Math.max(0, dims.z - 1) : 20}
+        onChange={(v) => set({ level: v })}
+        hint={elevationHint ? <span className="level-elevation-inline">{elevationHint}</span> : null}
+      />
       <Slider label={tr('slider_sectionx')} value={state.sectionX} min={0} max={dims ? Math.max(0, dims.x - 1) : 100} onChange={(v) => set({ sectionX: v })} />
       <Slider label={tr('slider_sectiony')} value={state.sectionY} min={0} max={dims ? Math.max(0, dims.y - 1) : 100} onChange={(v) => set({ sectionY: v })} />
       <Slider
@@ -66,16 +98,22 @@ function DataTab() {
       {state.followTerrain && (
         <>
           <div className="section">
-            <div className="group-label">{tr('group_level_out_mode')}</div>
-            <OptionButtons
-              options={[
-                { key: 'off', label: tr('level_out_mode_off') },
-                { key: 'levelOut', label: tr('toggle_level_out') },
-                { key: 'cascade', label: tr('level_out_mode_cascade') },
-              ]}
-              value={state.levelOutMode}
-              onSelect={(v) => set({ levelOutMode: v })}
+            <Toggle
+              label={tr('group_level_out_mode')}
+              on={state.levelOutMode !== 'off'}
+              onToggle={() => set({ levelOutMode: state.levelOutMode === 'off' ? 'levelOut' : 'off' })}
             />
+            {state.levelOutMode !== 'off' && (
+              <SegmentedControl
+                className="segmented-control--nested"
+                options={[
+                  { key: 'levelOut', label: tr('level_out_variant_standard') },
+                  { key: 'cascade', label: tr('level_out_variant_cascade') },
+                ]}
+                value={state.levelOutMode}
+                onSelect={(v) => set({ levelOutMode: v })}
+              />
+            )}
           </div>
           {state.levelOutMode !== 'off' && (
             <Slider
@@ -88,6 +126,42 @@ function DataTab() {
           )}
         </>
       )}
+      <div className="section">
+        <Toggle
+          label={tr('group_zebra')}
+          on={state.zebraMode !== 'off'}
+          onToggle={() => set({ zebraMode: state.zebraMode === 'off' ? 'on' : 'off' })}
+        />
+        {state.appView === 'model' && state.zebraMode !== 'off' && state.renderStyle !== 'contour' && !state.dataVoxelSmooth && (
+          <span className="level-elevation-inline">{tr('hint_zebra_requires_smooth')}</span>
+        )}
+        {state.zebraMode !== 'off' && (
+          <SegmentedControl
+            className="segmented-control--nested"
+            options={[
+              { key: 'on', label: tr('zebra_mode_on') },
+              { key: 'inverted', label: tr('zebra_mode_inverted') },
+            ]}
+            value={state.zebraMode}
+            onSelect={(v) => set({ zebraMode: v })}
+          />
+        )}
+        {state.zebraMode !== 'off' && (
+          <RangeSlider
+            label={tr('slider_zebra_percentile_range')}
+            min={0}
+            max={100}
+            unit="%"
+            low={state.zebraLowPercentile}
+            high={state.zebraHighPercentile}
+            onChangeLow={(v) => set({ zebraLowPercentile: v })}
+            onChangeHigh={(v) => set({ zebraHighPercentile: v })}
+            inverted={state.zebraMode === 'inverted'}
+            hintLow={state.zebraLowValue != null ? <span className="level-elevation-inline">{tr('slider_zebra_low_percentile')} {tr('hint_zebra_value').replace('{value}', formatValue(state.zebraLowValue))}</span> : null}
+            hintHigh={state.zebraHighValue != null ? <span className="level-elevation-inline">{tr('slider_zebra_high_percentile')} {tr('hint_zebra_value').replace('{value}', formatValue(state.zebraHighValue))}</span> : null}
+          />
+        )}
+      </div>
     </>
   );
 }
@@ -106,7 +180,7 @@ function WindTab() {
     <>
       <div className="section">
         <div className="group-label">{tr('group_wind_style')}</div>
-        <OptionButtons options={styleOptions} value={state.windStyle} onSelect={(v) => set({ windStyle: v })} />
+        <SegmentedControl options={styleOptions} value={state.windStyle} onSelect={(v) => set({ windStyle: v })} />
       </div>
       <Slider label={tr('slider_wind_opacity')} value={state.windOpacity} min={0} max={100} unit="%" onChange={(v) => set({ windOpacity: v })} />
       <Slider label={tr('slider_wind_size')} value={state.windSize} min={0} max={100} unit="%" onChange={(v) => set({ windSize: v })} />
@@ -561,6 +635,11 @@ function CursorsTab() {
                 />
               </label>
               <button className="preset-btn" onClick={() => recallCursor(b)}>{b.name}</button>
+              {b.followTerrain && (
+                <span className="cursor-terrain-badge" title={tr('title_cursor_follow_terrain')}>
+                  <IconTerrain width="13" height="13" />
+                </span>
+              )}
               <span className="palette-row-actions">
                 <button
                   className="palette-row-btn"

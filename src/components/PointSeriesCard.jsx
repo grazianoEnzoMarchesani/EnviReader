@@ -1,8 +1,10 @@
 import { useAppState } from '../state/AppStateContext';
 import { useI18n } from '../i18n/I18nContext';
 import TimeSeriesChart from './TimeSeriesChart';
-import { usePointSeries, useCursorSeries, useTerrainCut } from '../lib/useSlice';
+import { usePointSeries, useCursorSeries, useTerrainCut, useLevelElevation, formatElevationHint } from '../lib/useSlice';
 import { effectiveCursorColor } from '../lib/cursorStore';
+import { isBiometDataset } from '../lib/envimet';
+import { formatValue } from '../lib/colormap';
 
 // Card "Time series" in fondo alle viste 2D e 3D: andamento nel tempo del
 // valore nel punto selezionato (incrocio delle sezioni, livello corrente),
@@ -17,18 +19,32 @@ export default function PointSeriesCard({ showA = true, showB }) {
 
   const terrainCutA = useTerrainCut(state.terrainA, state);
   const terrainCutB = useTerrainCut(state.terrainB, state);
+  // stesso fix della pianta/sezioni (vedi extractSlice in envimet.js): la
+  // colonna biomet viene ricollocata sopra edifici/terreno prima di applicare
+  // Follow Terrain, così la serie temporale segue davvero il toggle.
+  const biometFixActive = state.fixBiometSections && isBiometDataset(state.dataGroup, state.dataset);
   const pointArgs = [state.dataGroup, state.dataset, state.sectionX, state.sectionY, state.level];
-  const pointSeriesA = usePointSeries(state.filesetA, ...pointArgs, terrainCutA);
-  const pointSeriesB = usePointSeries(state.filesetB, ...pointArgs, terrainCutB);
+  const pointSeriesA = usePointSeries(state.filesetA, ...pointArgs, terrainCutA, biometFixActive);
+  const pointSeriesB = usePointSeries(state.filesetB, ...pointArgs, terrainCutB, biometFixActive);
   // Ogni cursore porta con sé la propria modalità "segui il terreno": il
   // taglio va ricalcolato per cursore (vedi useCursorSeries), quindi qui
   // si passa il terreno grezzo del fileset, non terrainCutA/B (che riflette
   // solo l'impostazione corrente, usata per la sola serie "in tempo reale").
   const cursors = state.positionCursors;
   const cursorArgs = [state.dataGroup, state.dataset, cursors];
-  const cursorSeriesA = useCursorSeries(state.filesetA, ...cursorArgs, state.terrainA);
-  const cursorSeriesB = useCursorSeries(state.filesetB, ...cursorArgs, state.terrainB);
+  const cursorSeriesA = useCursorSeries(state.filesetA, ...cursorArgs, state.terrainA, biometFixActive);
+  const cursorSeriesB = useCursorSeries(state.filesetB, ...cursorArgs, state.terrainB, biometFixActive);
   const datasetLabel = state.edxMeta ? state.dataset : tr(state.dataset);
+  const levelElevation = useLevelElevation(
+    state.filesetA,
+    state.dataGroup,
+    state.sectionX,
+    state.sectionY,
+    state.level,
+    state.followTerrain ? terrainCutA : null,
+    biometFixActive,
+  );
+  const elevationHint = formatElevationHint(tr, formatValue, levelElevation, state.followTerrain, biometFixActive);
 
   const hasActiveSeries =
     (showA && pointSeriesA) || (showB && pointSeriesB) || cursors.some((b) => (showA && cursorSeriesA[b.id]) || (showB && cursorSeriesB[b.id]));
@@ -72,6 +88,7 @@ export default function PointSeriesCard({ showA = true, showB }) {
         {hasActiveSeries && (
           <span className="chart-stats">
             {datasetLabel} · {tr('chip_sectionx_prefix')} {state.sectionX}, {tr('chip_sectiony_prefix')} {state.sectionY} · {tr('chip_level_prefix')} {state.level}
+            {elevationHint ? ` · ${elevationHint}` : ''}
           </span>
         )}
         <span className={`chevron${state.timeSeriesOpen ? ' open' : ''}`} />
@@ -87,15 +104,15 @@ export default function PointSeriesCard({ showA = true, showB }) {
               // alcuna linea disegnabile e il grafico collasserebbe.
               ...(liveCursor && cursorSeriesA[liveCursor.id]
                 ? []
-                : [{ name: `${crosshairLabel} · A`, color: 'var(--series-a)', values: showA ? pointSeriesA : null }]),
+                : [{ name: `${crosshairLabel} · A`, color: 'var(--series-a)', values: showA ? pointSeriesA : null, followTerrain: state.followTerrain }]),
               ...(liveCursor && cursorSeriesB[liveCursor.id]
                 ? []
-                : [{ name: `${crosshairLabel} · B`, color: 'var(--series-b)', dashed: true, values: showB ? pointSeriesB : null }]),
+                : [{ name: `${crosshairLabel} · B`, color: 'var(--series-b)', dashed: true, values: showB ? pointSeriesB : null, followTerrain: state.followTerrain }]),
               ...cursors.flatMap((b, i) => {
                 const color = effectiveCursorColor(b, i);
                 const entries = [];
-                if (showA) entries.push({ name: showB ? `${b.name} · A` : b.name, color, values: cursorSeriesA[b.id] });
-                if (showB) entries.push({ name: `${b.name} · B`, color, dashed: true, values: cursorSeriesB[b.id] });
+                if (showA) entries.push({ name: showB ? `${b.name} · A` : b.name, color, values: cursorSeriesA[b.id], followTerrain: b.followTerrain });
+                if (showB) entries.push({ name: `${b.name} · B`, color, dashed: true, values: cursorSeriesB[b.id], followTerrain: b.followTerrain });
                 return entries;
               }),
             ]}

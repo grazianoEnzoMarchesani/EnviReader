@@ -870,6 +870,263 @@ function overlayMaterial(opts) {
   return new THREE.MeshBasicMaterial({ ...opts, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
 }
 
+// Overlay "zebra" nella superficie liscia 3D: stessa soglia percentile e
+// stessa convenzione cromatica del pattern a strisce diagonali della vista 2D
+// (vedi zebraToImageData/zebraCoverage in colormap.js — alto = nero, basso =
+// blu, invertito = grigio neutro, le due soglie con inclinazioni opposte).
+// A differenza del canvas 2D, qui il tratteggio non può essere "dipinto" su
+// una texture piatta: la superficie è vista da angolazioni e distanze
+// variabili, quindi un passo fisso in coordinate mondo cambierebbe densità
+// apparente con lo zoom. Si calcola invece in SCREEN SPACE dentro il
+// fragment shader, su gl_FragCoord (pixel del framebuffer): stesso identico
+// effetto visivo — un passo costante in pixel, indipendente da zoom/
+// distanza/rotazione — dello schermo-esposimetro 2D. Ogni vertice porta solo
+// un codice 0..3 (0 = nessun zebra, 1 = alto, 2 = basso, 3 = invertito): la
+// stessa identica logica di selezione di zebraToImageData, spostata qui in
+// zebraCode(). Il colore dati (attributo `color`, invariato) resta la
+// base su cui il fragment shader miscela la tinta zebra in base alla
+// copertura del tratteggio.
+function zebraCodeCore(isHigh, isLow, inverted) {
+  const selected = isHigh || isLow;
+  if (selected === !!inverted) return 0;
+  if (inverted) return 3;
+  return isHigh ? 1 : 2;
+}
+
+function zebraCode(value, zebra) {
+  if (!zebra?.enabled || Number.isNaN(value)) return 0;
+  const hasHigh = Number.isFinite(zebra.highValue);
+  const hasLow = Number.isFinite(zebra.lowValue);
+  const isHigh = hasHigh && value >= zebra.highValue;
+  const isLow = !isHigh && hasLow && value <= zebra.lowValue;
+  return zebraCodeCore(isHigh, isLow, zebra.inverted);
+}
+
+// Variante di zebraCode per il filled contour: lì il valore disponibile per
+// vertice (vedi p.v in buildBandedSurface) è già normalizzato 0..1 sul range
+// attivo — stessa quantità con cui viene scelta la fascia di colore, già
+// interpolata bilinearmente/linearmente lungo la griglia fine e ai bordi
+// delle fasce (clipConvexByValue) — quindi le soglie vanno normalizzate una
+// sola volta con lo stesso range invece di ri-denormalizzare ogni vertice.
+function normalizeZebraThresholds(zebra, range) {
+  if (!zebra?.enabled) return null;
+  const range01 = range.max - range.min || 1;
+  const norm = (v) => (Number.isFinite(v) ? (v - range.min) / range01 : NaN);
+  return { high: norm(zebra.highValue), low: norm(zebra.lowValue), inverted: zebra.inverted };
+}
+
+// GLSL: stessi coefficienti di ZEBRA_HATCH_SPACING/WIDTH/AA in colormap.js
+// (passo, spessore e sfumatura del tratteggio, in pixel dello schermo).
+const ZEBRA_SURFACE_VERTEX_SHADER = `
+attribute vec3 color;
+attribute float aZebra;
+varying vec3 vColor;
+varying float vZebra;
+void main() {
+  vColor = color;
+  vZebra = aZebra;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+const ZEBRA_SURFACE_FRAGMENT_SHADER = `
+varying vec3 vColor;
+varying float vZebra;
+
+// Equivalenti in spazio colore LINEARE degli stessi RGB sRGB usati dalla
+// legenda/canvas 2D (15,15,15 / 8,47,167 / 90,90,90 su 255): vColor arriva
+// già in questo stesso spazio (THREE.Color.setHex converte sRGB→lineare da
+// sé), e solo alla fine linearToOutputTexel riconverte tutto in sRGB per lo
+// schermo — se questi valori restassero le sRGB grezze /255, dopo quella
+// stessa conversione finale il colore visualizzato non sarebbe più quello
+// giusto (troppo chiaro).
+const vec3 ZEBRA_HIGH = vec3(0.004777, 0.004777, 0.004777);
+const vec3 ZEBRA_LOW = vec3(0.002428, 0.028426, 0.386429);
+const vec3 ZEBRA_INVERT = vec3(0.102242, 0.102242, 0.102242);
+const float SPACING = 12.0;
+const float WIDTH = 5.0;
+const float AA = 1.5;
+
+// Stessa matematica (mod + centratura + wrap) di zebraCoverage in
+// colormap.js: 1 = pieno tratto, 0 = pieno sfondo, sfumato in mezzo.
+float zebraCoverage(vec2 fragCoord, bool flip) {
+  float diag = flip ? (fragCoord.x - fragCoord.y) : (fragCoord.x + fragCoord.y);
+  float m = mod(diag, SPACING) - WIDTH * 0.5;
+  m -= SPACING * floor(m / SPACING + 0.5);
+  float dist = abs(m) - WIDTH * 0.5;
+  return clamp(0.5 - dist / AA, 0.0, 1.0);
+}
+
+void main() {
+  vec3 outColor = vColor;
+  int code = int(vZebra + 0.5);
+  if (code != 0) {
+    vec3 zebraColor = code == 1 ? ZEBRA_HIGH : (code == 2 ? ZEBRA_LOW : ZEBRA_INVERT);
+    float cov = zebraCoverage(gl_FragCoord.xy, code == 2);
+    outColor = mix(outColor, zebraColor, cov);
+  }
+  gl_FragColor = vec4(outColor, 1.0);
+  // Materiali custom (a differenza di MeshBasicMaterial, che lo applica da
+  // solo tramite <colorspace_fragment>) devono convertire esplicitamente
+  // l'output nello spazio colore del renderer — linearToOutputTexel è
+  // sempre iniettata da three.js nel prefix del fragment shader, anche per
+  // ShaderMaterial custom (vedi WebGLProgram.js, getTexelEncodingFunction).
+  // Senza questa riga le celle SENZA zebra (vColor passato invariato)
+  // risultavano più scure del resto della scena: mancava la stessa
+  // conversione lineare→sRGB che riceve ogni altro layer via MeshBasicMaterial.
+  gl_FragColor = linearToOutputTexel(gl_FragColor);
+}
+`;
+
+// Materiale della superficie liscia quando lo zebra è attivo: stesso identico
+// aspetto "unlit" di overlayMaterial (niente luce/ombre, vedi la nota sopra
+// buildDataOverlay) ma con lo shader dedicato sopra invece di MeshBasicMaterial
+// — serve un materiale diverso solo quando serve davvero il tratteggio, il
+// resto dei casi (zebra spento) resta sul MeshBasicMaterial più semplice ed
+// economico di overlayMaterial().
+function zebraSurfaceMaterial(side) {
+  return new THREE.ShaderMaterial({
+    vertexShader: ZEBRA_SURFACE_VERTEX_SHADER,
+    fragmentShader: ZEBRA_SURFACE_FRAGMENT_SHADER,
+    side,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  });
+}
+
+// Sceglie e allega alla geometria il materiale giusto: con zebra attivo lo
+// shader dedicato (serve l'attributo aZebra, già scritto dal chiamante),
+// altrimenti il MeshBasicMaterial invariato di sempre.
+function finishSurfaceMesh(geometry, zebraActive) {
+  const material = zebraActive
+    ? zebraSurfaceMaterial(THREE.DoubleSide)
+    : overlayMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  return new THREE.Mesh(geometry, material);
+}
+
+// Overlay zebra sul filled contour: a differenza della superficie liscia
+// (un codice piatto per cella, voluto — vedi zebraSurfaceMaterial sopra), qui
+// il confine deve restare morbido quanto le isolinee stesse. contourFineSize
+// non sottocampiona oltre la griglia dati quando questa è già grande (per non
+// esplodere in triangoli, vedi sopra), quindi legare lo zebra alla sola
+// densità della mesh fine (un codice per vertice, come nella superficie
+// liscia) tornava comunque a gradini su griglie dati grandi. Soluzione: il
+// dato vero (non il colore a fasce, il valore normalizzato) viaggia in una
+// texture campionata dalla GPU con filtro LINEAR — interpolazione bilineare
+// hardware, gratuita e indipendente dal numero di triangoli, esattamente
+// come il canvas 2D che ricampiona sempre alla risoluzione di output invece
+// che alla risoluzione della griglia dati.
+function buildZebraDataTexture(data, w, h, range) {
+  const range01 = range.max - range.min || 1;
+  // RGBA Uint8 invece di un formato a canale singolo o in virgola mobile:
+  // supportato ovunque senza estensioni (il filtro LINEAR su texture float
+  // richiede OES_texture_float_linear, non garantita), 256 livelli sono
+  // ampiamente sufficienti per una soglia visiva (la stessa quantizzazione
+  // della LUT colore, vedi LUT_STEPS in colormap.js). R = valore normalizzato
+  // 0..1 sul range attivo, G = validità (0 = cella mascherata, es. sotto un
+  // edificio — G>0.5 nel fragment shader esclude quel testo dal tratteggio).
+  const buf = new Uint8Array(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    const v = data[i];
+    const valid = !Number.isNaN(v);
+    let t = valid ? (v - range.min) / range01 : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const o = i * 4;
+    buf[o] = Math.round(t * 255);
+    buf[o + 1] = valid ? 255 : 0;
+    buf[o + 3] = 255;
+  }
+  const tex = new THREE.DataTexture(buf, w, h, THREE.RGBAFormat, THREE.UnsignedByteType);
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const ZEBRA_CONTOUR_VERTEX_SHADER = `
+attribute vec3 color;
+attribute vec2 aZebraUV;
+varying vec3 vColor;
+varying vec2 vZebraUV;
+void main() {
+  vColor = color;
+  vZebraUV = aZebraUV;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+const ZEBRA_CONTOUR_FRAGMENT_SHADER = `
+uniform sampler2D zebraTex;
+uniform bool zebraHasHigh;
+uniform bool zebraHasLow;
+uniform float zebraHighT;
+uniform float zebraLowT;
+uniform bool zebraInverted;
+varying vec3 vColor;
+varying vec2 vZebraUV;
+
+const vec3 ZEBRA_HIGH = vec3(0.004777, 0.004777, 0.004777);
+const vec3 ZEBRA_LOW = vec3(0.002428, 0.028426, 0.386429);
+const vec3 ZEBRA_INVERT = vec3(0.102242, 0.102242, 0.102242);
+const float SPACING = 12.0;
+const float WIDTH = 5.0;
+const float AA = 1.5;
+
+float zebraCoverage(vec2 fragCoord, bool flip) {
+  float diag = flip ? (fragCoord.x - fragCoord.y) : (fragCoord.x + fragCoord.y);
+  float m = mod(diag, SPACING) - WIDTH * 0.5;
+  m -= SPACING * floor(m / SPACING + 0.5);
+  float dist = abs(m) - WIDTH * 0.5;
+  return clamp(0.5 - dist / AA, 0.0, 1.0);
+}
+
+void main() {
+  vec3 outColor = vColor;
+  // texture2D con filtro LINEAR: la GPU interpola bilinearmente i 4 texel
+  // vicini da sé, stesso identico ruolo di bilinearSample() lato CPU ma senza
+  // doverlo ricalcolare per ogni vertice della mesh fine.
+  vec4 samp = texture2D(zebraTex, vZebraUV);
+  if (samp.g > 0.5) {
+    float t = samp.r;
+    bool isHigh = zebraHasHigh && t >= zebraHighT;
+    bool isLow = !isHigh && zebraHasLow && t <= zebraLowT;
+    bool selected = isHigh || isLow;
+    if (selected != zebraInverted) {
+      vec3 zebraColor = zebraInverted ? ZEBRA_INVERT : (isHigh ? ZEBRA_HIGH : ZEBRA_LOW);
+      float cov = zebraCoverage(gl_FragCoord.xy, isLow);
+      outColor = mix(outColor, zebraColor, cov);
+    }
+  }
+  gl_FragColor = vec4(outColor, 1.0);
+  gl_FragColor = linearToOutputTexel(gl_FragColor);
+}
+`;
+
+// zebraT: { high, low, inverted } in spazio normalizzato (vedi
+// normalizeZebraThresholds) — le soglie NaN (lato disattivato dello slider
+// percentile) diventano hasHigh/hasLow false invece di passare NaN in un
+// uniform GLSL, il cui confronto non è garantito uguale su ogni driver.
+function zebraContourMaterial(side, texture, zebraT) {
+  return new THREE.ShaderMaterial({
+    vertexShader: ZEBRA_CONTOUR_VERTEX_SHADER,
+    fragmentShader: ZEBRA_CONTOUR_FRAGMENT_SHADER,
+    uniforms: {
+      zebraTex: { value: texture },
+      zebraHasHigh: { value: Number.isFinite(zebraT.high) },
+      zebraHasLow: { value: Number.isFinite(zebraT.low) },
+      zebraHighT: { value: Number.isFinite(zebraT.high) ? zebraT.high : 0 },
+      zebraLowT: { value: Number.isFinite(zebraT.low) ? zebraT.low : 0 },
+      zebraInverted: { value: !!zebraT.inverted },
+    },
+    side,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  });
+}
+
 // Colore LUT per un valore dato min/max del range attivo; null per NaN (cella
 // senza dato, coerente col "trasparente" della mappa 2D: nessun voxel).
 function lutColor(lut, value, min, max) {
@@ -953,7 +1210,7 @@ function continuousHeight(zLevels, boundaries, kf) {
 // unite da un piano inclinato invece che da una parete verticale a gradino.
 // Il colore resta quello proprio di ciascuna cella (nessuna media): a cambiare
 // è solo la geometria, il dato mostrato è sempre quello esatto della cella.
-function buildPlanSurface(slice, range, lut, level, terrainCut, I, J, dx, dy, zLevels, boundaries) {
+function buildPlanSurface(slice, range, lut, level, terrainCut, I, J, dx, dy, zLevels, boundaries, zebra) {
   if (!slice || slice.w !== I || slice.h !== J) return null;
   const { data, w } = slice;
   const kMax = zLevels.length - 1;
@@ -987,13 +1244,16 @@ function buildPlanSurface(slice, range, lut, level, terrainCut, I, J, dx, dy, zL
   const worldZ = (gy) => gy * dy - (J * dy) / 2;
   const positions = [];
   const colors = [];
+  const zebraCodes = zebra?.enabled ? [] : null;
   const c = new THREE.Color();
   let maxHeight = 0;
   for (let row = 0; row < J; row++) {
     for (let col = 0; col < I; col++) {
-      const color = lutColor(lut, data[row * w + col], range.min, range.max);
+      const value = data[row * w + col];
+      const color = lutColor(lut, value, range.min, range.max);
       if (color == null) continue;
       c.setHex(color);
+      const code = zebraCodes ? zebraCode(value, zebra) : 0;
       const x0 = worldX(col);
       const x1 = worldX(col + 1);
       const z0 = worldZ(row);
@@ -1011,6 +1271,7 @@ function buildPlanSurface(slice, range, lut, level, terrainCut, I, J, dx, dy, zL
       for (const p of quad) {
         positions.push(p[0], p[1], p[2]);
         colors.push(c.r, c.g, c.b);
+        if (zebraCodes) zebraCodes.push(code);
       }
     }
   }
@@ -1018,8 +1279,9 @@ function buildPlanSurface(slice, range, lut, level, terrainCut, I, J, dx, dy, zL
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  if (zebraCodes) geometry.setAttribute('aZebra', new THREE.Float32BufferAttribute(zebraCodes, 1));
   geometry.computeVertexNormals();
-  const mesh = new THREE.Mesh(geometry, overlayMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  const mesh = finishSurfaceMesh(geometry, !!zebraCodes);
   return { mesh, maxHeight };
 }
 
@@ -1030,7 +1292,7 @@ function buildPlanSurface(slice, range, lut, level, terrainCut, I, J, dx, dy, zL
 // ruotata resta un nastro dritto invece di una parete a gradini in orizzontale.
 // In verticale i confini sono già quelli esatti della griglia (zLevels), niente
 // da smussare lì. Colore per cella, nessuna media, come per la pianta.
-function buildSectionSurface(slice, range, lut, viewType, pivotX, pivotY, I, J, dx, dy, boundaries) {
+function buildSectionSurface(slice, range, lut, viewType, pivotX, pivotY, I, J, dx, dy, boundaries, zebra) {
   if (!slice) return null;
   const { data, w, h, line } = slice;
   const worldX = (gx) => (I * dx) / 2 - (gx + 0.5) * dx;
@@ -1041,6 +1303,7 @@ function buildSectionSurface(slice, range, lut, viewType, pivotX, pivotY, I, J, 
   };
   const positions = [];
   const colors = [];
+  const zebraCodes = zebra?.enabled ? [] : null;
   const c = new THREE.Color();
   let maxHeight = 0;
   for (let row = 0; row < h; row++) {
@@ -1048,9 +1311,11 @@ function buildSectionSurface(slice, range, lut, viewType, pivotX, pivotY, I, J, 
     const y1 = boundaries[row + 1];
     maxHeight = Math.max(maxHeight, y1);
     for (let col = 0; col < w; col++) {
-      const color = lutColor(lut, data[row * w + col], range.min, range.max);
+      const value = data[row * w + col];
+      const color = lutColor(lut, value, range.min, range.max);
       if (color == null) continue;
       c.setHex(color);
+      const code = zebraCodes ? zebraCode(value, zebra) : 0;
       const [gx0, gy0] = colPos(col - 0.5);
       const [gx1, gy1] = colPos(col + 0.5);
       const x0 = worldX(gx0);
@@ -1064,6 +1329,7 @@ function buildSectionSurface(slice, range, lut, viewType, pivotX, pivotY, I, J, 
       for (const p of quad) {
         positions.push(p[0], p[1], p[2]);
         colors.push(c.r, c.g, c.b);
+        if (zebraCodes) zebraCodes.push(code);
       }
     }
   }
@@ -1071,8 +1337,9 @@ function buildSectionSurface(slice, range, lut, viewType, pivotX, pivotY, I, J, 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  if (zebraCodes) geometry.setAttribute('aZebra', new THREE.Float32BufferAttribute(zebraCodes, 1));
   geometry.computeVertexNormals();
-  const mesh = new THREE.Mesh(geometry, overlayMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  const mesh = finishSurfaceMesh(geometry, !!zebraCodes);
   return { mesh, maxHeight };
 }
 
@@ -1117,6 +1384,14 @@ function clipConvexByValue(poly, threshold) {
         z: a.z + f * (b.z - a.z),
         v: threshold,
       };
+      // tu/tv (coordinate della texture zebra, vedi buildBandedSurface) sono
+      // affini nella cella quanto x/y/z: le interpolo qui solo se presenti,
+      // così i vertici nuovi creati dal taglio di fascia restano campionabili
+      // correttamente dalla texture anche quando cadono a metà di una cella.
+      if (a.tu !== undefined) {
+        p.tu = a.tu + f * (b.tu - a.tu);
+        p.tv = a.tv + f * (b.tv - a.tv);
+      }
       below.push(p);
       above.push(p);
       crossPts.push(p);
@@ -1173,11 +1448,12 @@ function isobandTriangle(v0, v1, v2) {
 // z-fighting via polygonOffset, non uno spostamento in world-space) la cui
 // larghezza è orientata da `normal`, la normale della superficie costante
 // per l'intera pianta/sezione.
-function buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, normal) {
+function buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, normal, zebraCtx) {
   const nCellsX = nPX - 1;
   const nCellsY = nPY - 1;
   if (nCellsX < 1 || nCellsY < 1) return null;
   const idx = (pc, pr) => pr * nPX + pc;
+  const { pointU, pointV } = zebraCtx || {};
 
   // Colore per fascia precalcolato una sola volta: dipende solo dal band
   // index, non dalla cella. setHex (non setRGB): interpreta i byte come
@@ -1198,13 +1474,24 @@ function buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, norma
   const positions = [];
   const colors = [];
   let maxHeight = 0;
-
+  // A differenza della superficie liscia (buildPlanSurface/buildSectionSurface,
+  // un codice zebra piatto per cella), qui lo zebra porta due coordinate UV
+  // (tu, tv) verso la texture dati costruita da buildZebraDataTexture: il
+  // fragment shader campiona quella texture con filtro LINEAR, cioè con
+  // interpolazione bilineare fatta dalla GPU sul dato reale, non sulla
+  // griglia fine dei triangoli — a differenza del primo tentativo (un codice
+  // interpolato per-vertice sulla mesh fine), il confine della selezione resta
+  // morbido anche quando la mesh fine coincide con la griglia dati (griglie
+  // grandi, dove contourFineSize non sottocampiona oltre, vedi sopra), esattamente
+  // come il canvas 2D che ricampiona sempre alla risoluzione di output.
+  const zebraUVs = zebraCtx ? [] : null;
   const emitPoly = (poly, band) => {
     const col = bandColors[band];
     for (let i = 1; i < poly.length - 1; i++) {
       for (const p of [poly[0], poly[i], poly[i + 1]]) {
         positions.push(p.x, p.y, p.z);
         colors.push(col[0], col[1], col[2]);
+        if (zebraUVs) zebraUVs.push(p.tu, p.tv);
       }
     }
   };
@@ -1245,10 +1532,12 @@ function buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, norma
       // La quota (pointY) è definita ovunque (terreno), solo il dato (t) è
       // NaN dove mascherato (es. sotto un edificio): il conteggio del
       // massimo non deve dipendere dalla validità del dato.
-      const p00xyz = { x: pointX[i00], y: pointY[i00], z: pointZ[i00] };
-      const p10xyz = { x: pointX[i10], y: pointY[i10], z: pointZ[i10] };
-      const p01xyz = { x: pointX[i01], y: pointY[i01], z: pointZ[i01] };
-      const p11xyz = { x: pointX[i11], y: pointY[i11], z: pointZ[i11] };
+      const mkPoint = (i) => {
+        const p = { x: pointX[i], y: pointY[i], z: pointZ[i] };
+        if (pointU) { p.tu = pointU[i]; p.tv = pointV[i]; }
+        return p;
+      };
+      const p00xyz = mkPoint(i00), p10xyz = mkPoint(i10), p01xyz = mkPoint(i01), p11xyz = mkPoint(i11);
       maxHeight = Math.max(maxHeight, p00xyz.y, p10xyz.y, p01xyz.y, p11xyz.y);
 
       for (const tri of [
@@ -1284,7 +1573,13 @@ function buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, norma
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
-  const mesh = new THREE.Mesh(geometry, overlayMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  let mesh;
+  if (zebraUVs) {
+    geometry.setAttribute('aZebraUV', new THREE.Float32BufferAttribute(zebraUVs, 2));
+    mesh = new THREE.Mesh(geometry, zebraContourMaterial(THREE.DoubleSide, zebraCtx.texture, zebraCtx.thresholds));
+  } else {
+    mesh = new THREE.Mesh(geometry, overlayMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+  }
 
   let lines = null;
   if (linePositions.length) {
@@ -1312,7 +1607,7 @@ function buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, norma
 // dato con interpolazione bilineare (vedi bilinearSample in colormap.js) su
 // una griglia fine invece che sui soli centri cella, e quantizza il colore in
 // CONTOUR_BANDS fasce invece di leggerlo in continuo dalla LUT.
-function buildContourPlanSurface(slice, range, lut, level, terrainCut, I, J, dx, dy, zLevels, boundaries) {
+function buildContourPlanSurface(slice, range, lut, level, terrainCut, I, J, dx, dy, zLevels, boundaries, zebra) {
   if (!slice || slice.w !== I || slice.h !== J) return null;
   const { data, w, h } = slice;
   const kMax = zLevels.length - 1;
@@ -1346,6 +1641,9 @@ function buildContourPlanSurface(slice, range, lut, level, terrainCut, I, J, dx,
   const pointZ = new Float32Array(nPX * nPY);
   const pointT = new Float32Array(nPX * nPY).fill(NaN);
   const range01 = range.max - range.min || 1;
+  const zebraT = normalizeZebraThresholds(zebra, range);
+  const pointU = zebraT ? new Float32Array(nPX * nPY) : null;
+  const pointV = zebraT ? new Float32Array(nPX * nPY) : null;
 
   for (let pr = 0; pr < nPY; pr++) {
     const rowF = rowIdx[pr];
@@ -1361,17 +1659,22 @@ function buildContourPlanSurface(slice, range, lut, level, terrainCut, I, J, dx,
         let t = (v - range.min) / range01;
         pointT[p] = t < 0 ? 0 : t > 1 ? 1 : t;
       }
+      // Stessa convenzione (colF/rowF = indice frazionario riga-colonna di
+      // `data`) usata sopra per bilinearSample: il centro texel (colF+0.5)/w
+      // combacia esattamente con quello che la GPU campiona in LINEAR.
+      if (pointU) { pointU[p] = (colF + 0.5) / w; pointV[p] = (rowF + 0.5) / h; }
     }
   }
 
-  return buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, [0, 1, 0]);
+  const zebraCtx = zebraT ? { pointU, pointV, texture: buildZebraDataTexture(data, w, h, range), thresholds: zebraT } : null;
+  return buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, [0, 1, 0], zebraCtx);
 }
 
 // Sezione a fasce piatte + isolinee: come buildSectionSurface ma con
 // interpolazione bilineare su una griglia fine sia lungo la traccia (col) sia
 // in quota (row, passo non uniforme secondo zLevels — riusa axisCenters con
 // gli spacing reali, esattamente come farebbe la mappa 2D con spacingY).
-function buildContourSectionSurface(slice, range, lut, viewType, pivotX, pivotY, I, J, dx, dy, boundaries, zLevels) {
+function buildContourSectionSurface(slice, range, lut, viewType, pivotX, pivotY, I, J, dx, dy, boundaries, zLevels, zebra) {
   if (!slice) return null;
   const { data, w, h, line } = slice;
   const worldX = (gx) => (I * dx) / 2 - (gx + 0.5) * dx;
@@ -1411,18 +1714,23 @@ function buildContourSectionSurface(slice, range, lut, viewType, pivotX, pivotY,
   const pointZ = new Float32Array(nPX * nPY);
   const pointT = new Float32Array(nPX * nPY).fill(NaN);
   const range01 = range.max - range.min || 1;
+  const zebraT = normalizeZebraThresholds(zebra, range);
+  const pointU = zebraT ? new Float32Array(nPX * nPY) : null;
+  const pointV = zebraT ? new Float32Array(nPX * nPY) : null;
   for (let pr = 0; pr < nPY; pr++) {
     const rowF = rowIdx[pr];
     for (let pc = 0; pc < nPX; pc++) {
       const p = pr * nPX + pc;
+      const colF = colIdx[pc];
       pointX[p] = colWorldX[pc];
       pointZ[p] = colWorldZ[pc];
       pointY[p] = rowWorldY[pr];
-      const v = bilinearSample(data, w, h, colIdx[pc], rowF);
+      const v = bilinearSample(data, w, h, colF, rowF);
       if (!Number.isNaN(v)) {
         let t = (v - range.min) / range01;
         pointT[p] = t < 0 ? 0 : t > 1 ? 1 : t;
       }
+      if (pointU) { pointU[p] = (colF + 0.5) / w; pointV[p] = (rowF + 0.5) / h; }
     }
   }
 
@@ -1436,7 +1744,8 @@ function buildContourSectionSurface(slice, range, lut, viewType, pivotX, pivotY,
   tx /= tlen; tz /= tlen;
   const normal = [tz, 0, -tx];
 
-  return buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, normal);
+  const zebraCtx = zebraT ? { pointU, pointV, texture: buildZebraDataTexture(data, w, h, range), thresholds: zebraT } : null;
+  return buildBandedSurface(pointX, pointY, pointZ, pointT, nPX, nPY, lut, normal, zebraCtx);
 }
 
 // Overlay 3D del dataset corrente (stesso dato/palette della vista 2D Data
@@ -1448,7 +1757,7 @@ function buildContourSectionSurface(slice, range, lut, viewType, pivotX, pivotY,
 // "segui il terreno" o con sezioni ruotate).
 export function buildDataOverlay(model, overlay) {
   if (!overlay?.colors?.length || !overlay.dimZ) return null;
-  const { views, range, colors, reversed, pivot, terrainCut, level, dimZ, smooth, spacingZ, contour } = overlay;
+  const { views, range, colors, reversed, pivot, terrainCut, level, dimZ, smooth, spacingZ, contour, zebra } = overlay;
   if (!views.plan && !views.sectionX && !views.sectionY) return null;
   const { I, J, dx, dy } = model.geometry;
   const toX = (i) => (I * dx) / 2 - (i + 0.5) * dx;
@@ -1465,8 +1774,15 @@ export function buildDataOverlay(model, overlay) {
     // Filled contour / mappa isaritmica (stessa modalità della vista 2D):
     // superficie campionata con interpolazione bilineare, fasce piatte e
     // isolinee — vedi buildContourPlanSurface/buildContourSectionSurface.
+    // Lo zebra qui riusa la stessa interpolazione bilineare della fascia
+    // colorata (il valore normalizzato per-vertice è già quello, vedi
+    // zebraCodeFromT), quindi il confine della selezione è morbido come le
+    // isolinee stesse — a differenza del ramo "smooth" sotto, dove il
+    // confine segue il bordo della cella dati (stessa cosa che succede nella
+    // vista 2D: il canvas contour campiona bilinearmente anche la maschera
+    // zebra, quello pixel/vector no, vedi zebraToImageData).
     if (views.plan) {
-      const built = buildContourPlanSurface(views.plan, range, lut, level, terrainCut, I, J, dx, dy, zLevels, boundaries);
+      const built = buildContourPlanSurface(views.plan, range, lut, level, terrainCut, I, J, dx, dy, zLevels, boundaries, zebra);
       if (built) {
         layer.add(built.mesh);
         if (built.lines) layer.add(built.lines);
@@ -1476,7 +1792,7 @@ export function buildDataOverlay(model, overlay) {
     }
     for (const key of ['sectionX', 'sectionY']) {
       if (!views[key]) continue;
-      const built = buildContourSectionSurface(views[key], range, lut, key, pivot.sectionX, pivot.sectionY, I, J, dx, dy, boundaries, zLevels);
+      const built = buildContourSectionSurface(views[key], range, lut, key, pivot.sectionX, pivot.sectionY, I, J, dx, dy, boundaries, zLevels, zebra);
       if (built) {
         layer.add(built.mesh);
         if (built.lines) layer.add(built.lines);
@@ -1485,13 +1801,17 @@ export function buildDataOverlay(model, overlay) {
       }
     }
   } else if (smooth) {
+    // Lo zebra è disponibile su superficie liscia e filled-contour (sopra);
+    // sui voxel a gradino (ramo else sotto) resterebbe ambiguo — un colore
+    // piatto per cella che si confonderebbe con la tinta zebra, niente
+    // interpolazione da smussare.
     if (views.plan) {
-      const built = buildPlanSurface(views.plan, range, lut, level, terrainCut, I, J, dx, dy, zLevels, boundaries);
+      const built = buildPlanSurface(views.plan, range, lut, level, terrainCut, I, J, dx, dy, zLevels, boundaries, zebra);
       if (built) { layer.add(built.mesh); maxHeight = Math.max(maxHeight, built.maxHeight); any = true; }
     }
     for (const key of ['sectionX', 'sectionY']) {
       if (!views[key]) continue;
-      const built = buildSectionSurface(views[key], range, lut, key, pivot.sectionX, pivot.sectionY, I, J, dx, dy, boundaries);
+      const built = buildSectionSurface(views[key], range, lut, key, pivot.sectionX, pivot.sectionY, I, J, dx, dy, boundaries, zebra);
       if (built) { layer.add(built.mesh); maxHeight = Math.max(maxHeight, built.maxHeight); any = true; }
     }
   } else {
@@ -2300,6 +2620,13 @@ export function disposeGroup(group) {
     if (!obj.geometry?.userData?.shared) obj.geometry?.dispose();
     if (obj.material) {
       obj.material.map?.dispose();
+      // La DataTexture dello zebra-contour (zebraContourMaterial, vedi sopra)
+      // non è un `.map`: vive in material.uniforms.zebraTex e va cercata lì,
+      // altrimenti ogni ricostruzione dell'overlay (dataset/ora/soglie zebra)
+      // ne crea una nuova senza mai liberare la precedente sulla GPU.
+      for (const key in obj.material.uniforms) {
+        if (obj.material.uniforms[key]?.value?.isTexture) obj.material.uniforms[key].value.dispose();
+      }
       obj.material.dispose();
     }
   });

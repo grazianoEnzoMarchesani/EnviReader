@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { buildLUT, sliceToImageData, sliceToContourImageData, orientColors, contourLegendGradient, formatValue, objectsToImageData } from '../lib/colormap';
+import { buildLUT, sliceToImageData, sliceToContourImageData, orientColors, contourLegendGradient, formatValue, objectsToImageData, zebraToImageData, percentileValue, zebraSwatchStyle } from '../lib/colormap';
 import { traceStreamlines2D } from '../lib/windField';
 import LegendBar from './LegendBar';
 
@@ -127,7 +127,182 @@ function windLayout(field, frameSize, density, size, isThumb = false) {
 }
 
 // Spessore massimo delle streamline (px) in funzione dello slider "dimensione"
-const streamWidth = (size) => 0.6 + 3 * (size / 100);
+export const streamWidth = (size) => 0.6 + 3 * (size / 100);
+
+/* ---------- legenda del vento: 1-5 valori di riferimento ---------- */
+
+// Lunghezza fissa di ogni cuneo nella legenda streamline (in modalità
+// "frecce" la lunghezza cambia con il valore, qui invece è lo spessore che
+// codifica il valore, quindi la lunghezza resta un segmento fisso e breve).
+const WIND_LEGEND_WEDGE_LEN = 30;
+const WIND_LEGEND_GAP = 6; // deve combaciare con il gap CSS di .map-wind-legend
+const WIND_LEGEND_CHAR_PX = 6.5; // larghezza media di un carattere mono a 10.5px
+
+// Arrotonda un valore di vento a una cifra "leggibile" senza zeri superflui
+// (refValue è già un multiplo 1/2/5 × 10^k via niceCeil in windField.js; le
+// frazioni intermedie generate qui possono introdurre rumore in virgola
+// mobile, es. 0.1*3/5 → 0.06000000000000001, che toFixed+Number ripulisce).
+function formatWindValue(v) {
+  const abs = Math.abs(v);
+  const decimals = abs >= 10 ? 0 : abs >= 1 ? 1 : abs >= 0.1 ? 2 : 3;
+  return String(Number(v.toFixed(decimals)));
+}
+
+function estimateLabelWidth(text) {
+  return text.length * WIND_LEGEND_CHAR_PX;
+}
+
+/* ---------- legenda zebra: soglie percentile a fianco di quella del vento ---------- */
+
+// Lato del quadratino a righe diagonali (stesso motivo, in CSS, dell'overlay
+// canvas — vedi zebraSwatchStyle in colormap.js): abbastanza piccolo da stare
+// su una riga con la legenda vento, abbastanza grande da mostrare 2-3 righe
+// del pattern e restare riconoscibile.
+const ZEBRA_SWATCH_PX = 12;
+
+// Elenco dei chip (colore + etichetta) da disegnare per la legenda zebra:
+// due (alto/basso) in modalità normale, uno solo (grigio) in modalità
+// invertita — dove "sopra/sotto" non ha più senso perché lo zebra copre il
+// complemento del range, non le due code separatamente (vedi ZEBRA_INVERT_RGB
+// in colormap.js).
+function buildZebraChips(zebra) {
+  if (!zebra?.opts?.enabled || !zebra.thresholds) return [];
+  const { opts, thresholds, span } = zebra;
+  const hasHigh = Number.isFinite(thresholds.high);
+  const hasLow = Number.isFinite(thresholds.low);
+  if (!hasHigh && !hasLow) return [];
+  if (opts.inverted) {
+    const range = hasLow && hasHigh
+      ? `${formatValue(thresholds.low, span)}–${formatValue(thresholds.high, span)}`
+      : hasHigh ? `<${formatValue(thresholds.high, span)}` : `>${formatValue(thresholds.low, span)}`;
+    const pct = hasLow && hasHigh
+      ? `p${opts.lowPercentile}–p${opts.highPercentile}`
+      : hasHigh ? `p${opts.highPercentile}` : `p${opts.lowPercentile}`;
+    return [{ kind: 'invert', label: `${range} (${pct})` }];
+  }
+  const chips = [];
+  if (hasLow) chips.push({ kind: 'high', label: `≤${formatValue(thresholds.low, span)} (p${opts.lowPercentile})` });
+  if (hasHigh) chips.push({ kind: 'low', label: `≥${formatValue(thresholds.high, span)} (p${opts.highPercentile})` });
+  return chips;
+}
+
+function estimateChipWidth(label) {
+  return ZEBRA_SWATCH_PX + WIND_LEGEND_GAP + estimateLabelWidth(label) + WIND_LEGEND_GAP;
+}
+
+// Sceglie quanti valori di riferimento (1..5, frazioni uguali di refValue)
+// stanno nella larghezza disponibile senza sovrapporsi, poi genera per
+// ciascuno la forma (freccia o cuneo) e l'etichetta da disegnare. Provato dal
+// più denso (5) al più rado (1): con poco spazio si ricade su un solo
+// valore, come prima di questa funzione.
+function buildWindLegendEntries(windLegend, availableWidth) {
+  const isWedge = windLegend.style === 'streamlines' || windLegend.style === 'combined';
+  const { len: maxLen, width: maxWidth, value: refValue } = windLegend;
+  const width = availableWidth > 0 ? availableWidth : Infinity;
+  for (let n = 5; n >= 1; n--) {
+    const entries = [];
+    for (let i = 1; i <= n; i++) {
+      const value = (refValue * i) / n;
+      const isLast = i === n;
+      const label = isWedge
+        ? formatWindValue(value) + (isLast ? ' m/s' : '')
+        : (isLast ? '= ' : '') + formatWindValue(value) + (isLast ? ' m/s' : '');
+      const shapeLen = isWedge ? WIND_LEGEND_WEDGE_LEN : (maxLen * i) / n;
+      entries.push({
+        label,
+        shapeWidth: Math.ceil(shapeLen) + 2,
+        len: shapeLen,
+        thickness: isWedge ? (maxWidth * i) / n : null,
+      });
+    }
+    const zeroLabelWidth = isWedge ? estimateLabelWidth('0') + WIND_LEGEND_GAP : 0;
+    const total =
+      zeroLabelWidth +
+      entries.reduce((sum, e) => sum + e.shapeWidth + WIND_LEGEND_GAP + estimateLabelWidth(e.label) + WIND_LEGEND_GAP, 0);
+    if (n === 1 || total <= width) return { entries, isWedge };
+  }
+  return { entries: [], isWedge };
+}
+
+// Chip della legenda zebra (quadratino a righe diagonali + valore reale e
+// percentile), appesi in coda alla riga del vento: vedi buildZebraChips sopra
+// e zebraSwatchStyle in colormap.js per il motivo (stessi colori/inclinazioni
+// dell'overlay sul canvas, cosi il quadratino "spiega" esattamente cio che si
+// vede sulla mappa).
+function ZebraChips({ chips }) {
+  if (!chips.length) return null;
+  return (
+    <span className="map-zebra-legend">
+      {chips.map((c, idx) => (
+        <span key={idx} style={{ display: 'contents' }}>
+          <span className="map-zebra-swatch" style={{ background: zebraSwatchStyle(c.kind) }} />
+          <span className="map-legend-label">{c.label}</span>
+        </span>
+      ))}
+    </span>
+  );
+}
+
+// Riga della legenda vento (1-5 frecce o cunei di riferimento, vedi
+// buildWindLegendEntries sopra) con, in coda, i chip della legenda zebra
+// (vedi buildZebraChips) quando lo zebra è attivo: stanno sempre sulla stessa
+// riga, mai su righe separate. I chip zebra sono già al minimo (1 o 2
+// quadratini piccoli, non riducibili), quindi è il vento a cedere spazio per
+// primo, riducendo il numero di valori mostrati (fino a 1) come già faceva
+// prima che esistesse lo zebra — vedi buildWindLegendEntries. Riusata identica
+// sotto ogni pannello 3D (ModelView.jsx): stesso overlay zebra, stessi chip,
+// stesso tratteggio (vedi lo shader dedicato in inxScene.js).
+export function WindLegendRow({ windLegend, availableWidth, zebra }) {
+  const chips = buildZebraChips(zebra);
+  if (!windLegend && !chips.length) return null;
+
+  const zebraWidth = chips.length
+    ? chips.reduce((sum, c) => sum + estimateChipWidth(c.label), 0) + WIND_LEGEND_GAP
+    : 0;
+  const windAvailable = availableWidth > 0 ? Math.max(0, availableWidth - zebraWidth) : availableWidth;
+  const plan = windLegend ? buildWindLegendEntries(windLegend, windAvailable) : { entries: [], isWedge: false };
+
+  if (plan.isWedge) {
+    const isCombined = windLegend.style === 'combined';
+    return (
+      <div className="map-wind-legend">
+        <span className="map-legend-label">0</span>
+        {plan.entries.map((e, idx) => {
+          const cx = 1 + e.len / 2;
+          return (
+            <span key={idx} style={{ display: 'contents' }}>
+              <svg width={e.shapeWidth} height="10" fill="currentColor" stroke="none">
+                <path
+                  className="wind-wedge"
+                  d={`M1 ${5 - 0.2} L${e.len + 1} ${5 - e.thickness / 2} L${e.len + 1} ${5 + e.thickness / 2} L1 ${5 + 0.2} Z`}
+                />
+                {isCombined && (
+                  <path className="wind-wedge-arrow" d={`M${cx - 2} 3 L${cx + 2} 5 L${cx - 2} 7 Z`} />
+                )}
+              </svg>
+              <span className="map-legend-label">{e.label}</span>
+            </span>
+          );
+        })}
+        <ZebraChips chips={chips} />
+      </div>
+    );
+  }
+  return (
+    <div className="map-wind-legend">
+      {plan.entries.map((e, idx) => (
+        <span key={idx} style={{ display: 'contents' }}>
+          <svg width={e.shapeWidth} height="10" stroke="currentColor" fill="none" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="1" y1="5" x2={e.len} y2="5" />
+            <path d={`M${e.len - 4} 2.5 L${e.len} 5 L${e.len - 4} 7.5`} />
+          </svg>
+          <span className="map-legend-label">{e.label}</span>
+        </span>
+      ))}
+      <ZebraChips chips={chips} />
+    </div>
+  );
+}
 
 export function renderWindOnCanvas(canvas, wind, frameSize) {
   if (!canvas || !wind || !frameSize || !(wind.refValue > 0)) return;
@@ -404,9 +579,10 @@ function crossGeometry(control, slice, W, H) {
 
 // Mappa raster: il canvas ha la risoluzione della griglia ENVI-met e viene
 // ingrandito via CSS (image-rendering: pixelated), come le celle di Leonardo.
-export default function MapChart({ slice, objectsSlice, objectsOpts, colors, reversed, min, max, onCellClick, marks, sectionControl, sectionLineStyle, compass, showCalendar, showClock, timeLabel, wind, onLegendClick, widgetScale, renderStyle, hdMode, legendTicks, legendTextScale }) {
+export default function MapChart({ slice, objectsSlice, objectsOpts, colors, reversed, min, max, onCellClick, marks, sectionControl, sectionLineStyle, compass, showCalendar, showClock, timeLabel, wind, onLegendClick, widgetScale, renderStyle, hdMode, legendTicks, legendTextScale, zebraOpts }) {
   const canvasRef = useRef(null);
   const objectsCanvasRef = useRef(null);
+  const zebraCanvasRef = useRef(null);
   const frameRef = useRef(null);
   const windCanvasRef = useRef(null);
   const [hover, setHover] = useState(null);
@@ -437,6 +613,34 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
     canvas.height = imgData.height;
     canvas.getContext('2d').putImageData(imgData, 0, 0);
   }, [objectsSlice, objectsOpts, hdMode, frameSize]);
+
+  // Soglie zebra ricalcolate dal percentile dei valori realmente visibili in
+  // questa vista (non dell'intero dataset), così "supera il 95° percentile"
+  // resta coerente con quello che l'utente sta guardando ora (pianta a un
+  // dato livello, o una sezione). Condiviso tra l'overlay canvas sotto e la
+  // legenda zebra (WindLegendRow) così i due mostrano sempre gli stessi valori.
+  const zebraThresholds = useMemo(() => {
+    if (!slice || !zebraOpts?.enabled) return null;
+    return {
+      high: percentileValue(slice.data, zebraOpts.highPercentile),
+      low: percentileValue(slice.data, zebraOpts.lowPercentile),
+    };
+  }, [slice, zebraOpts]);
+
+  useEffect(() => {
+    const canvas = zebraCanvasRef.current;
+    if (!canvas) return;
+    if (!slice || !zebraOpts?.enabled || !zebraThresholds) {
+      canvas.width = 0;
+      canvas.height = 0;
+      return;
+    }
+    const maxDim = computeMaxDim(hdMode, frameSize);
+    const imgData = zebraToImageData(slice.data, slice.w, slice.h, zebraThresholds.low, zebraThresholds.high, !!zebraOpts.inverted, slice.spacingX, slice.spacingY, slice.extentW, slice.extentH, maxDim, renderStyle === 'contour');
+    canvas.width = imgData.width;
+    canvas.height = imgData.height;
+    canvas.getContext('2d').putImageData(imgData, 0, 0);
+  }, [slice, zebraOpts, zebraThresholds, hdMode, frameSize, renderStyle]);
 
   // Dimensione in px CSS della cornice mappa: serve al canvas del vento, che
   // (a differenza della mappa raster) disegna alla risoluzione dello schermo
@@ -698,6 +902,7 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
           <canvas ref={canvasRef} className="map-canvas" style={{ imageRendering: renderStyle === 'contour' ? 'auto' : undefined }} onMouseMove={handleMove} onMouseLeave={() => setHover(null)} onClick={handleClick} />
         )}
         {objectsSlice && <canvas ref={objectsCanvasRef} className="map-objects-canvas" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', imageRendering: 'pixelated' }} />}
+        {zebraOpts?.enabled && <canvas ref={zebraCanvasRef} className="map-zebra-canvas" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', imageRendering: 'pixelated' }} />}
         {wind && <canvas ref={windCanvasRef} className="map-wind-canvas" />}
         {!sectionControl && marks?.x != null && marks.x >= 0 && marks.x < slice.w && (
           <svg className="map-mark-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -797,27 +1002,11 @@ export default function MapChart({ slice, objectsSlice, objectsOpts, colors, rev
         textScale={legendTextScale}
         onClick={onLegendClick}
       />
-      {windLegend && (windLegend.style === 'streamlines' || windLegend.style === 'combined') && (
-        <div className="map-wind-legend">
-          <span className="map-legend-label">0</span>
-          <svg width="46" height="10" fill="currentColor" stroke="none">
-            <path
-              className="wind-wedge"
-              d={`M1 ${5 - 0.2} L45 ${5 - windLegend.width / 2} L45 ${5 + windLegend.width / 2} L1 ${5 + 0.2} Z`}
-            />
-          </svg>
-          <span className="map-legend-label">{String(windLegend.value)} m/s</span>
-        </div>
-      )}
-      {windLegend && windLegend.style !== 'streamlines' && windLegend.style !== 'combined' && (
-        <div className="map-wind-legend">
-          <svg width={Math.ceil(windLegend.len) + 2} height="10" stroke="currentColor" fill="none" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="1" y1="5" x2={windLegend.len} y2="5" />
-            <path d={`M${windLegend.len - 4} 2.5 L${windLegend.len} 5 L${windLegend.len - 4} 7.5`} />
-          </svg>
-          <span className="map-legend-label">= {String(windLegend.value)} m/s</span>
-        </div>
-      )}
+      <WindLegendRow
+        windLegend={windLegend}
+        availableWidth={frameSize ? frameSize.w - 6 : 0}
+        zebra={zebraOpts?.enabled ? { opts: zebraOpts, thresholds: zebraThresholds, span: max - min } : null}
+      />
     </div>
   );
 }

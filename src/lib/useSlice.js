@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getFilesInFolder, getFileCoupleSeries, readEDX, loadSlice, loadPointSeries, findWindVariables, sectionLinePath, terrainCut } from './envimet';
+import { getFilesInFolder, getFileCoupleSeries, readEDX, loadSlice, loadPointSeries, findWindVariables, sectionLinePath, terrainCut, applyTerrainCut, heightAtLevel, groundSurfaceHeight, loadColumnShift } from './envimet';
 import { findInxFile, readInxRotation } from './inx';
 
 const clamp = (v, max) => Math.min(Math.max(0, v), Math.max(0, max));
@@ -9,9 +9,11 @@ const clamp = (v, max) => Math.min(Math.max(0, v), Math.max(0, max));
 // sectionX/sectionY); la pianta non dipende mai dall'angolo.
 // terrain è la quota di taglio già pronta (terrainCut in envimet.js) o null:
 // calcolata una volta a monte, i cicli di estrazione non fanno alcuna scelta.
-// biometFix attiva, solo nelle sezioni, il fix del bug biomet (vedi
-// extractSlice in envimet.js): true quando l'utente lo ha acceso e il
-// dataset corrente è un output biomet.
+// biometFix attiva il fix del bug biomet (vedi extractSlice in envimet.js):
+// true quando l'utente lo ha acceso e il dataset corrente è un output biomet.
+// Ricolloca la colonna sopra edifici/terreno (layer Objects) prima di
+// applicare Follow Terrain, sia in sezione che in pianta — col fix la
+// colonna biomet si comporta come un dato normale rispetto al taglio.
 function sliceConfig(viewType, dims, level, sectionX, sectionY, angle, terrain, biometFix) {
   if (viewType === 'sectionX' || viewType === 'sectionY') {
     if (angle) {
@@ -21,7 +23,7 @@ function sliceConfig(viewType, dims, level, sectionX, sectionY, angle, terrain, 
       ? { sectionX: clamp(sectionX, dims.x - 1), biometFix }
       : { sectionY: clamp(sectionY, dims.y - 1), biometFix };
   }
-  return { level: clamp(level, dims.z - 1), terrain };
+  return { level: clamp(level, dims.z - 1), terrain, biometFix };
 }
 
 // Le tre viste (pianta, sezione X, sezione Y) di un fileset in un colpo solo:
@@ -217,7 +219,7 @@ export function useWindVolumeCells(enabled, fileset, groupPath, timeIndex, geome
         setCells(null);
         return;
       }
-      setCells(e.data.empty ? null : { arrowCells: e.data.arrowCells, segCells: e.data.segCells, headCells: e.data.headCells });
+      setCells(e.data.empty ? null : { arrowCells: e.data.arrowCells, segCells: e.data.segCells, headCells: e.data.headCells, refValue: e.data.refValue });
     };
     worker.addEventListener('message', onMessage);
     worker.postMessage({ requestId, structure: fileset.structure, groupPath, timeIndex, geometry, spacingZ, style, size, density });
@@ -259,8 +261,79 @@ export function useTerrainCut(terrain, state) {
   );
 }
 
+// Quota reale (in metri) raggiunta dal "Livello" corrente nel punto del
+// mirino (sectionX, sectionY): con Follow Terrain applica lo stesso taglio
+// usato da pianta/time series, col fix biomet applica lo shift di colonna
+// (vedi extractSlice), altrimenti traduce l'indice Z in metri e basta.
+// Un solo punto — il mirino — non l'intera griglia: lo shift per pixel
+// richiede uno scan del layer Objects, troppo costoso da ripetere ovunque.
+export function useLevelElevation(fileset, groupPath, sectionX, sectionY, level, terrainCutObj, biometFixActive) {
+  const [elevation, setElevation] = useState(null);
+
+  useEffect(() => {
+    if (!fileset || groupPath == null) {
+      setElevation(null);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      try {
+        const series = getFileCoupleSeries(getFilesInFolder(fileset.structure, groupPath));
+        if (!series.length) {
+          if (alive) setElevation(null);
+          return;
+        }
+        const pair = series[0];
+        const edx = await readEDX(pair.EDX);
+        const dims = edx.dimensions;
+        const cx = clamp(sectionX, dims.x - 1);
+        const cy = clamp(sectionY, dims.y - 1);
+        let k = clamp(level, dims.z - 1);
+        let shift = 0;
+        let groundHeight = null;
+        if (biometFixActive) {
+          shift = await loadColumnShift(pair.EDT, edx, cx, cy);
+          if (terrainCutObj) k = Math.min(Math.floor(applyTerrainCut(terrainCutObj, shift)), dims.z - 1);
+          // Col fix, `shift` (celle di edificio/terreno impilate alla base
+          // della colonna ricompattata, vedi extractSlice) è l'equivalente
+          // dell'indice terreno per la quota del suolo: stessa formula.
+          groundHeight = groundSurfaceHeight(edx.spacing.z, shift);
+        } else if (terrainCutObj) {
+          const groundIndex = terrainCutObj.data[cy * dims.x + cx];
+          k = Math.min(Math.floor(applyTerrainCut(terrainCutObj, groundIndex)), dims.z - 1);
+          groundHeight = groundSurfaceHeight(edx.spacing.z, groundIndex);
+        }
+        const height = heightAtLevel(edx.spacing.z, k);
+        if (alive) setElevation({ k, shift, height, groundHeight });
+      } catch (err) {
+        console.error('Errore nel calcolo della quota reale:', err);
+        if (alive) setElevation(null);
+      }
+    })();
+    return () => { alive = false; };
+  }, [fileset, groupPath, sectionX, sectionY, level, terrainCutObj, biometFixActive]);
+
+  return elevation;
+}
+
+// Formatta la quota calcolata da useLevelElevation nello stesso testo ovunque
+// compaia (sidebar, card Time series, card Pianta): quota assoluta, e se il
+// terreno in quel punto non è a quota ~0 anche l'altezza dal terreno, col
+// suffisso "fix" quando il dataset biomet è ricollocato. Unico punto della
+// formula: cambiare qui la cambia in ogni card.
+export function formatElevationHint(tr, formatValue, levelElevation, followTerrain, biometFixActive) {
+  if (!levelElevation || levelElevation.height == null) return null;
+  const aboveGround = levelElevation.groundHeight != null ? levelElevation.height - levelElevation.groundHeight : null;
+  const showAboveGround = aboveGround != null && Math.abs(levelElevation.groundHeight) > 0.01;
+  const key = showAboveGround ? 'hint_level_elevation_terrain_split' : followTerrain ? 'hint_level_elevation_terrain' : 'hint_level_elevation_plain';
+  const text = tr(key)
+    .replace('{height}', formatValue(levelElevation.height))
+    .replace('{aboveGround}', showAboveGround ? formatValue(aboveGround) : '');
+  return biometFixActive ? text + tr('hint_level_elevation_fix_suffix') : text;
+}
+
 // Andamento nel tempo del valore nel punto (sectionX, sectionY) al livello corrente
-export function usePointSeries(fileset, groupPath, variableName, sectionX, sectionY, level, terrain) {
+export function usePointSeries(fileset, groupPath, variableName, sectionX, sectionY, level, terrain, biometFix) {
   const [values, setValues] = useState(null);
 
   useEffect(() => {
@@ -276,7 +349,7 @@ export function usePointSeries(fileset, groupPath, variableName, sectionX, secti
           if (alive) setValues(null);
           return;
         }
-        const config = { x: Math.max(0, sectionX), y: Math.max(0, sectionY), level: Math.max(0, level), terrain };
+        const config = { x: Math.max(0, sectionX), y: Math.max(0, sectionY), level: Math.max(0, level), terrain, biometFix };
         const result = await loadPointSeries(series, variableName, config);
         if (alive) setValues(result);
       } catch (err) {
@@ -285,7 +358,7 @@ export function usePointSeries(fileset, groupPath, variableName, sectionX, secti
       }
     })();
     return () => { alive = false; };
-  }, [fileset, groupPath, variableName, sectionX, sectionY, level, terrain]);
+  }, [fileset, groupPath, variableName, sectionX, sectionY, level, terrain, biometFix]);
 
   return values;
 }
@@ -299,7 +372,7 @@ export function usePointSeries(fileset, groupPath, variableName, sectionX, secti
 // taglio terreno va quindi ricalcolato per cursore a partire dal terreno
 // grezzo del fileset, non riusato dall'impostazione corrente (che può
 // differire da quella con cui il cursore è stato salvato).
-export function useCursorSeries(fileset, groupPath, variableName, cursors, rawTerrain) {
+export function useCursorSeries(fileset, groupPath, variableName, cursors, rawTerrain, biometFix) {
   const [seriesById, setSeriesById] = useState({});
 
   useEffect(() => {
@@ -318,7 +391,7 @@ export function useCursorSeries(fileset, groupPath, variableName, cursors, rawTe
         const entries = await Promise.all(
           cursors.map(async (b) => {
             const terrain = b.followTerrain ? terrainCut(rawTerrain, b.level, b.levelOutMode, b.levelOutHeight) : null;
-            const config = { x: Math.max(0, b.sectionX), y: Math.max(0, b.sectionY), level: Math.max(0, b.level), terrain };
+            const config = { x: Math.max(0, b.sectionX), y: Math.max(0, b.sectionY), level: Math.max(0, b.level), terrain, biometFix };
             return [b.id, await loadPointSeries(series, variableName, config)];
           }),
         );
@@ -329,7 +402,7 @@ export function useCursorSeries(fileset, groupPath, variableName, cursors, rawTe
       }
     })();
     return () => { alive = false; };
-  }, [fileset, groupPath, variableName, cursors, rawTerrain]);
+  }, [fileset, groupPath, variableName, cursors, rawTerrain, biometFix]);
 
   return seriesById;
 }

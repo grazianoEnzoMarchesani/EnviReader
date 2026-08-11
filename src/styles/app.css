@@ -11,23 +11,13 @@ a { color: inherit; }
 
 button { font-family: inherit; }
 
-/* Anello di focus unico per tutta l'app: usa l'accent dei token invece
-   dell'outline predefinito del browser. Solo :focus-visible, così il mouse non
-   lascia l'anello attaccato ai controlli dopo il click. */
+/* Nessun anello di focus in tutta l'app: su richiesta, l'evidenziazione
+   dell'elemento selezionato non deve essere visibile né con mouse né con
+   tastiera. Il rilascio del focus (blur) resta comunque gestito dai singoli
+   controlli dove serve, per non far "rubare" le frecce agli slider. */
+:focus,
 :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-/* Controlli che stanno a filo del proprio contenitore (righe di lista, tab,
-   segmented): l'offset positivo verrebbe tagliato, quindi l'anello va all'interno. */
-.palette-list-select:focus-visible,
-.sidebar-tab:focus-visible,
-.segmented > button:focus-visible,
-.lang-btn:focus-visible,
-.map-legend:focus-visible,
-.thumb-legend:focus-visible {
-  outline-offset: -2px;
+  outline: none;
 }
 
 /* Preferenza di sistema "riduci animazioni": azzera transizioni e animazioni
@@ -300,6 +290,8 @@ button { font-family: inherit; }
 .slider-block { margin-bottom: 16px; }
 .slider-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .slider-label-right { display: flex; align-items: center; gap: 6px; }
+.slider-hint-row { margin: -4px 0 8px; }
+.level-elevation-inline { display: block; font-size: 11px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .control-label { font-size: 12.5px; font-weight: 600; color: var(--text); white-space: nowrap; }
 .slider-value {
   font-size: 12px;
@@ -431,6 +423,31 @@ button { font-family: inherit; }
 }
 .option-btn.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); font-weight: 700; }
 .option-btn:disabled { color: var(--text-faint); cursor: not-allowed; opacity: 0.6; }
+
+/* selettore a pillole orizzontale: scelte pure a poche vie, o variante annidata sotto un Toggle */
+.segmented-control {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.segmented-control--nested { margin-top: 8px; margin-bottom: 16px; }
+.segmented-option {
+  flex: 1;
+  text-align: center;
+  padding: 8px 6px;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-weight: 500;
+  font-size: 12px;
+  cursor: pointer;
+}
+.segmented-option:first-child { border-left: none; }
+.segmented-option.active { background: var(--accent-soft); color: var(--accent-text); font-weight: 700; }
+.segmented-option:disabled { color: var(--text-faint); cursor: not-allowed; opacity: 0.6; }
 .sidebar-desc { font-size: 12px; line-height: 1.55; color: var(--text-secondary); margin-top: 4px; }
 
 .ghost-btn {
@@ -654,6 +671,12 @@ button { font-family: inherit; }
 }
 
 /* ---------- cursori di posizione ---------- */
+.cursor-terrain-badge {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
 .cursor-dot {
   position: relative;
   display: inline-block;
@@ -883,7 +906,7 @@ button { font-family: inherit; }
   display: flex;
   flex-direction: column;
 }
-.chart-header { margin-bottom: 12px; }
+.chart-header { margin-bottom: 12px; min-height: var(--chart-header-h, 0px); }
 .chart-title { font-size: 13.5px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
 .chart-stats { font-size: 11.5px; color: var(--text-faint); font-family: var(--mono); }
 .chart-title-group { display: flex; flex-direction: column; min-width: 0; }
@@ -1252,6 +1275,26 @@ button { font-family: inherit; }
   fill: var(--text-secondary);
   stroke: none;
 }
+/* Freccetta al centro del cuneo, solo in stile Combined: richiama le
+   frecce direzionali disegnate lungo le streamline sulla mappa/3D. */
+.map-wind-legend .wind-wedge-arrow {
+  fill: var(--text);
+  stroke: none;
+}
+/* Legenda zebra: quadratini a righe diagonali (vedi zebraSwatchStyle in
+   colormap.js, stesso motivo dell'overlay sul canvas) + valore/percentile.
+   margin-left: auto la spinge in fondo alla riga del vento quando c'è spazio
+   (le due legende restano visivamente separate); quando lo spazio manca la
+   legenda vento ha già ceduto voci (vedi WindLegendRow) e i due gruppi
+   finiscono comunque affiancati sulla stessa riga, mai su righe diverse. */
+.map-zebra-legend { display: flex; align-items: center; gap: 6px; margin-left: auto; flex: none; }
+.map-zebra-swatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  border: 1px solid var(--border);
+}
 
 .thumb-row { display: flex; gap: 8px; margin-top: 10px; }
 .thumb {
@@ -1358,6 +1401,7 @@ button { font-family: inherit; }
 .ts-tooltip-value { font-family: var(--mono); font-weight: 700; color: var(--text); }
 .ts-tooltip-name { color: var(--text-secondary); }
 .ts-key { width: 12px; height: 2px; border-radius: 1px; flex: none; }
+.ts-terrain-badge { flex: none; color: var(--text-secondary); opacity: 0.8; }
 .ts-legend { display: flex; justify-content: center; gap: 18px; padding: 6px 0 2px; }
 .ts-legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); }
 

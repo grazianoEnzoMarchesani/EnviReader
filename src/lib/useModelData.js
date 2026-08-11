@@ -44,7 +44,7 @@ export function useObjectsVolume(fileset) {
 // attivi (pianta/sezioni) così i colori restano confrontabili quando più piani
 // sono visibili insieme. null se non c'è nulla da mostrare (overlay spento,
 // nessun piano attivo, o dataset non ancora caricato).
-export function useDataOverlay(slices, terrainCut, views, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ, range, contour) {
+export function useDataOverlay(slices, terrainCut, views, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ, range, contour, zebra) {
   return useMemo(() => {
     if (!dimZ || (!views.plan && !views.sectionX && !views.sectionY)) return null;
     if (!(views.plan && slices.plan) && !(views.sectionX && slices.sectionX) && !(views.sectionY && slices.sectionY)) return null;
@@ -64,8 +64,9 @@ export function useDataOverlay(slices, terrainCut, views, colors, reversed, sect
       smooth,
       spacingZ,
       contour,
+      zebra,
     };
-  }, [slices.plan, slices.sectionX, slices.sectionY, terrainCut, views.plan, views.sectionX, views.sectionY, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ, range, contour]);
+  }, [slices.plan, slices.sectionX, slices.sectionY, terrainCut, views.plan, views.sectionX, views.sectionY, colors, reversed, sectionX, sectionY, level, dimZ, smooth, spacingZ, range, contour, zebra]);
 }
 
 export function computeStats(model) {

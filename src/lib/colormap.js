@@ -47,6 +47,132 @@ export function orientColors(colors, reversed) {
   return reversed ? [...colors].reverse() : colors;
 }
 
+/* ---------- overlay "zebra": evidenzia le celle oltre una soglia percentile ---------- */
+
+// Valore al percentile p [0..100] dello slice corrente (NaN esclusi),
+// interpolato linearmente tra i due campioni più vicini nell'array ordinato —
+// stessa definizione usata da la maggior parte dei software di analisi dati.
+// Ai limiti (p<=0 o p>=100) ritorna NaN invece del minimo/massimo assoluto:
+// altrimenti lo zebra evidenzierebbe comunque le celle col valore estremo,
+// mentre l'utente che porta lo slider al bordo si aspetta che quel lato non
+// evidenzi più nulla (vedi hasLow/hasHigh in zebraToImageData).
+export function percentileValue(data, p) {
+  if (p <= 0 || p >= 100) return NaN;
+  const valid = [];
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i];
+    if (!Number.isNaN(v)) valid.push(v);
+  }
+  if (!valid.length) return NaN;
+  valid.sort((a, b) => a - b);
+  const idx = (p / 100) * (valid.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  return valid[lo] + (valid[hi] - valid[lo]) * (idx - lo);
+}
+
+// Pattern diagonale a strisce (come lo "zebra pattern" degli esposimetri
+// fotografici, usato per segnalare le zone sovra/sottoesposte): stesso schema
+// di anti-aliasing analitico di hatchCoverage, ma passo e spessore più larghi
+// così il pattern resta leggibile sopra qualsiasi palette colore.
+// Le due soglie usano inclinazioni opposte (px+py vs px-py), non solo colori
+// diversi: chi non distingue rosso/blu (discromia) deve poter comunque capire
+// quale lato è sopra e quale sotto guardando solo la direzione delle righe.
+const ZEBRA_HATCH_SPACING = 12;
+const ZEBRA_HATCH_WIDTH = 5;
+const ZEBRA_HATCH_AA = 1.5;
+
+function zebraCoverage(px, py, flip) {
+  const diag = flip ? px - py : px + py;
+  let m = diag % ZEBRA_HATCH_SPACING;
+  if (m < 0) m += ZEBRA_HATCH_SPACING;
+  m -= ZEBRA_HATCH_WIDTH / 2;
+  m -= ZEBRA_HATCH_SPACING * Math.round(m / ZEBRA_HATCH_SPACING);
+  const dist = Math.abs(m) - ZEBRA_HATCH_WIDTH / 2;
+  return Math.min(1, Math.max(0, 0.5 - dist / ZEBRA_HATCH_AA));
+}
+
+// Nero per le celle sopra la soglia alta (sovraesposte), blu per quelle sotto
+// la soglia bassa (sottoesposte) — stessa convenzione cromatica usata dagli
+// istogrammi delle fotocamere per distinguere le due direzioni di clipping.
+const ZEBRA_HIGH_RGB = [15, 15, 15];
+const ZEBRA_LOW_RGB = [8, 47, 167];
+// Modalità invertita: qui lo zebra copre il complemento della selezione (tutto
+// tranne le celle nel range scelto), quindi non ha più senso distinguere
+// "sopra"/"sotto" per colore — un grigio neutro unico segnala "fuori dal range
+// di interesse" senza suggerire una direzione di sfondamento che non c'è.
+const ZEBRA_INVERT_RGB = [90, 90, 90];
+
+export function zebraToImageData(data, w, h, lowValue, highValue, inverted, spacingX, spacingY, extentW, extentH, maxDim = 1024, smooth = false) {
+  const extW = extentW || w;
+  const extH = extentH || h;
+  const { targetW, targetH } = targetSize(extW, extH, maxDim);
+
+  // Modalità contour (smooth=true): campionamento bilineare, stessa
+  // interpolazione del filled contour (vedi sliceToContourImageData), così il
+  // bordo della maschera zebra segue il valore interpolato con continuità
+  // anziché saltare a scalini sui confini grezzi della griglia dati. Nelle
+  // modalità pixel/vector (smooth=false) resta nearest-neighbor per cella,
+  // coerente con gli altri due layer squadrettati.
+  let sampleAt;
+  if (smooth) {
+    const centersX = axisCenters(spacingX, w, extW);
+    const centersY = axisCenters(spacingY, h, extH);
+    const colIdx = continuousIndex(centersX, w, extW, targetW, false);
+    const rowIdx = continuousIndex(centersY, h, extH, targetH, true);
+    sampleAt = (pxi, py) => bilinearSample(data, w, h, colIdx[pxi], rowIdx[py]);
+  } else {
+    if (!spacingX?.length) spacingX = new Array(w).fill(extW / w);
+    if (!spacingY?.length) spacingY = new Array(h).fill(extH / h);
+    const mapX = axisCellMap(spacingX, w, extW, targetW, false);
+    const mapY = axisCellMap(spacingY, h, extH, targetH, true);
+    sampleAt = (pxi, py) => data[mapY[py] * w + mapX[pxi]];
+  }
+
+  const img = new ImageData(targetW, targetH);
+  const px = img.data;
+  const hasHigh = Number.isFinite(highValue);
+  const hasLow = Number.isFinite(lowValue);
+
+  for (let py = 0; py < targetH; py++) {
+    for (let pxi = 0; pxi < targetW; pxi++) {
+      const v = sampleAt(pxi, py);
+      if (Number.isNaN(v)) continue;
+      const isHigh = hasHigh && v >= highValue;
+      const isLow = !isHigh && hasLow && v <= lowValue;
+      const selected = isHigh || isLow;
+      if (selected === inverted) continue; // normale: copre la selezione; invertito: copre il complemento
+      // Fuori dal range percentile (alto) usa lo stesso orientamento della
+      // modalità invertita; sotto il percentile basso usa l'inclinazione
+      // opposta, cosi le due soglie restano distinguibili anche in scala di
+      // grigi o con daltonismo.
+      const cov = zebraCoverage(pxi, py, isLow);
+      if (cov <= 0) continue;
+      const [r, g, b] = inverted ? ZEBRA_INVERT_RGB : (isHigh ? ZEBRA_HIGH_RGB : ZEBRA_LOW_RGB);
+      const o = (py * targetW + pxi) * 4;
+      px[o] = r; px[o + 1] = g; px[o + 2] = b; px[o + 3] = 255 * cov;
+    }
+  }
+  return img;
+}
+
+// Motivo a righe diagonali per il quadratino della legenda zebra, in CSS:
+// stessi colori e stessa distinzione di inclinazione di zebraCoverage sopra
+// (alto vs basso hanno pendenze opposte, l'invertita è neutra), così il
+// quadratino nella legenda spiega visivamente cosa si vede sull'overlay,
+// senza ridefinire i colori altrove.
+function cssHatch(rgb, angleDeg) {
+  const [r, g, b] = rgb;
+  const c = `rgb(${r},${g},${b})`;
+  return `repeating-linear-gradient(${angleDeg}deg, ${c} 0px, ${c} 2px, transparent 2px, transparent 5px)`;
+}
+
+export function zebraSwatchStyle(kind) {
+  if (kind === 'invert') return cssHatch(ZEBRA_INVERT_RGB, 45);
+  if (kind === 'low') return cssHatch(ZEBRA_LOW_RGB, -45);
+  return cssHatch(ZEBRA_HIGH_RGB, 45);
+}
+
 export function buildLUT(colors, reversed = false) {
   const stops = orientColors(colors, reversed).map(hexToRgb);
   const lut = new Uint8ClampedArray(LUT_STEPS * 3);

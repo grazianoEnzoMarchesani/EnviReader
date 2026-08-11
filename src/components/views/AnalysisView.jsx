@@ -11,10 +11,11 @@ import { IconLayers3D, IconBuilding, IconTerrain, IconTerrainFix, IconTree, Icon
 import ViewSettingsModal from '../ViewSettingsModal';
 import MapChart, { MapThumb } from '../MapChart';
 import PointSeriesCard from '../PointSeriesCard';
-import { useSlices, useInxRotation, useWindFields, useTerrainCut } from '../../lib/useSlice';
+import { useSlices, useInxRotation, useWindFields, useTerrainCut, useLevelElevation, formatElevationHint } from '../../lib/useSlice';
 import { terrainCutProfile, isBiometDataset, hasVerticalExtent } from '../../lib/envimet';
 import { useFlip } from '../../lib/useFlip';
-import { formatValue } from '../../lib/colormap';
+import { useEqualHeaderHeight } from '../../lib/useEqualHeaderHeight';
+import { formatValue, percentileValue } from '../../lib/colormap';
 import { niceCeil } from '../../lib/windField';
 import { viewRanges, VIEW_KEYS } from '../../lib/sliceRange';
 import { filesetLabel, timeLabel } from '../../lib/labels';
@@ -134,6 +135,13 @@ export default function AnalysisView() {
     objectStyle: state.objectStyle,
   }), [state.objOverlayOpacity, state.objOverlayBuildings, state.objOverlayTerrain, state.objOverlayVegetation, state.objectStyle]);
 
+  const zebraOpts = useMemo(() => ({
+    enabled: state.zebraMode !== 'off',
+    highPercentile: state.zebraHighPercentile,
+    lowPercentile: state.zebraLowPercentile,
+    inverted: state.zebraMode === 'inverted',
+  }), [state.zebraMode, state.zebraHighPercentile, state.zebraLowPercentile]);
+
   const objectsThumbsDiff = useMemo(() => ({
     plan: objectsSlicesA.plan || objectsSlicesB.plan,
     sectionX: objectsSlicesA.sectionX || objectsSlicesB.sectionX,
@@ -184,6 +192,22 @@ export default function AnalysisView() {
   const sliceA = slicesA[state.viewType];
   const sliceB = slicesB[state.viewType];
   const sliceDiff = slicesDiff[state.viewType];
+
+  // Valore reale (nell'unità del dataset mostrato) dei due percentili scelti
+  // per l'overlay zebra, sullo slice di Fileset A: la sidebar (DataTab, a
+  // monte) non ha accesso allo slice caricato, quindi lo legge da qui.
+  useEffect(() => {
+    if (state.zebraMode === 'off' || !sliceA) {
+      set({ zebraHighValue: null, zebraLowValue: null });
+      return;
+    }
+    const high = percentileValue(sliceA.data, state.zebraHighPercentile);
+    const low = percentileValue(sliceA.data, state.zebraLowPercentile);
+    set({
+      zebraHighValue: Number.isFinite(high) ? high : null,
+      zebraLowValue: Number.isFinite(low) ? low : null,
+    });
+  }, [sliceA, state.zebraMode, state.zebraHighPercentile, state.zebraLowPercentile]);
 
   // Gli slice mostrati ora, letti dall'exporter (exportUtils) che gira fuori
   // da React: azzerati allo smontaggio della vista, altrimenti i Float32Array
@@ -286,9 +310,19 @@ export default function AnalysisView() {
     state[`fileset${key}Open`] ? tr('map_no_data') : tr('map_open_hint');
   // Coordinata che definisce la vista corrente: quota per la pianta,
   // posizione della sezione (fissa nella vista stessa) per le sezioni
+  const planLevelElevation = useLevelElevation(
+    state.filesetA,
+    state.dataGroup,
+    state.sectionX,
+    state.sectionY,
+    state.level,
+    state.followTerrain ? terrainCutA : null,
+    biometFixActive,
+  );
+  const planElevationHint = state.viewType === 'plan' ? formatElevationHint(tr, formatValue, planLevelElevation, state.followTerrain, biometFixActive) : null;
   const contextValueLabel =
     state.viewType === 'plan'
-      ? `${tr('chip_level_prefix')} ${state.level}`
+      ? `${tr('chip_level_prefix')} ${state.level}${planElevationHint ? ` · ${planElevationHint}` : ''}`
       : state.viewType === 'sectionX'
         ? `${tr('chip_sectionx_prefix')} ${state.sectionX}`
         : `${tr('chip_sectiony_prefix')} ${state.sectionY}`;
@@ -312,7 +346,7 @@ export default function AnalysisView() {
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('A', vType, range),
       body: sliceA ? (
-        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={mainPalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} renderStyle={state.renderStyle} hdMode={state.hdMode} legendTicks={state.legendTicks} legendTextScale={state.legendTextScale} />
+        <MapChart slice={sliceA} objectsSlice={objectsSliceA} objectsOpts={objectsOpts} colors={mainPalette.colors} reversed={mainReversed} min={rangeA.min} max={rangeA.max} onCellClick={(col, row) => handleCellClick(col, row, sliceA)} marks={marksFor(sliceA, terrainCutA)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassA} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} wind={windFor(windFieldsA[state.viewType], false)} onLegendClick={() => handleLegendClick('A', state.viewType, rangeA)} renderStyle={state.renderStyle} hdMode={state.hdMode} legendTicks={state.legendTicks} legendTextScale={state.legendTextScale} zebraOpts={zebraOpts} />
       ) : null,
     },
     {
@@ -331,7 +365,7 @@ export default function AnalysisView() {
       reversed: mainReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('B', vType, range),
       body: sliceB ? (
-        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={mainPalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} renderStyle={state.renderStyle} hdMode={state.hdMode} legendTicks={state.legendTicks} legendTextScale={state.legendTextScale} />
+        <MapChart slice={sliceB} objectsSlice={objectsSliceB} objectsOpts={objectsOpts} colors={mainPalette.colors} reversed={mainReversed} min={rangeB.min} max={rangeB.max} onCellClick={(col, row) => handleCellClick(col, row, sliceB)} marks={marksFor(sliceB, terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassB} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} wind={windFor(windFieldsB[state.viewType], false)} onLegendClick={() => handleLegendClick('B', state.viewType, rangeB)} renderStyle={state.renderStyle} hdMode={state.hdMode} legendTicks={state.legendTicks} legendTextScale={state.legendTextScale} zebraOpts={zebraOpts} />
       ) : null,
     },
     {
@@ -349,7 +383,7 @@ export default function AnalysisView() {
       reversed: diffReversed,
       onThumbLegendClick: (vType, range) => handleLegendClick('Diff', vType, range),
       body: sliceDiff ? (
-        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={diffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} renderStyle={state.renderStyle} hdMode={state.hdMode} legendTicks={state.legendTicks} legendTextScale={state.legendTextScale} />
+        <MapChart slice={sliceDiff} objectsSlice={objectsSliceA || objectsSliceB} objectsOpts={objectsOpts} colors={diffPalette.colors} reversed={diffReversed} min={rangeDiff.min} max={rangeDiff.max} onCellClick={(col, row) => handleCellClick(col, row, sliceDiff)} marks={marksFor(sliceDiff, terrainCutA ?? terrainCutB)} sectionControl={sectionControl} sectionLineStyle={sectionLineStyle} compass={compassDiff} showCalendar={state.showCalendarWidget} showClock={state.showClockWidget} widgetScale={state.widgetScale} timeLabel={timeStamp} onLegendClick={() => handleLegendClick('Diff', state.viewType, rangeDiff)} renderStyle={state.renderStyle} hdMode={state.hdMode} legendTicks={state.legendTicks} legendTextScale={state.legendTextScale} zebraOpts={zebraOpts} />
       ) : null,
     },
   ];
@@ -367,6 +401,16 @@ export default function AnalysisView() {
   const gapBack = ((z - 1) * 18).toFixed(2);
   const cardWidth = `min(100%, calc(${z} * (100% - ${(effN - 1) * 18}px) / ${effN} + ${gapBack}px - 0.5px))`;
   const flipRef = useFlip();
+  // A parità di riga, l'header più corto (es. Diff, il cui testo è più breve
+  // di A/B e va a capo meno spesso) lascerebbe il proprio corpo mappa più in
+  // alto rispetto alle card vicine: qui si allinea l'altezza degli header
+  // alla più alta della riga, indipendentemente da quante righe va a capo.
+  useEqualHeaderHeight(
+    flipRef,
+    '.chart-header',
+    '--chart-header-h',
+    [chartsToShow.map((c) => `${c.title}|${c.stats}`).join('\n'), cardWidth],
+  );
 
   const compareOptions = [
     { key: 'single', label: tr('compare_single'), help: { title: tr('help_compare_single_title'), body: tr('help_compare_single_body') } },
