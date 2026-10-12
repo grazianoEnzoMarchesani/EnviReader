@@ -23,6 +23,7 @@ export const STORAGE_KEYS = [
   'envireader.positionCursors.v1',
   'envireader.positionBookmarks.v1',
   'envireader.mapConsent.v1',
+  'envireader.privacySeen.v1',
 ];
 export const STORAGE_PREFIXES = ['envireader.webgisCalibration.'];
 
@@ -73,6 +74,7 @@ const en = {
             ['`envireader.positionCursors.v1`, `envireader.positionBookmarks.v1`', 'Crosshair positions you save (the second is the name used by older versions)', 'Keep your own work'],
             ['`envireader.webgisCalibration.<model name>`', 'Manual offset and rotation you set to align a model on the map; the key contains the location name written in the INX file', 'Keep your own work'],
             ['`envireader.mapConsent.v1`', 'Your answer about the background map, with the date; it expires after six months and then you are asked again', 'Remember your choice'],
+            ['`envireader.privacySeen.v1`', 'The revision date of this notice you last saw, so it is shown again only when it changes', 'Remember that you saw it'],
           ],
         } },
         { p: 'They identify nobody and are not used for tracking, so under Article 122 of the Italian Privacy Code and the ePrivacy Directive they are technical storage and need no consent. They are listed here because you are entitled to know.' },
@@ -182,6 +184,7 @@ const it = {
             ['`envireader.positionCursors.v1`, `envireader.positionBookmarks.v1`', 'Posizioni del mirino che salvi (la seconda è il nome usato dalle versioni precedenti)', 'Conservare il tuo lavoro'],
             ['`envireader.webgisCalibration.<nome modello>`', 'Spostamento e rotazione manuali impostati per allineare un modello sulla mappa; la chiave contiene il nome della località scritto nel file INX', 'Conservare il tuo lavoro'],
             ['`envireader.mapConsent.v1`', 'La tua risposta sulla mappa di sfondo, con la data; scade dopo sei mesi e ti viene richiesta di nuovo', 'Ricordare la tua scelta'],
+            ['`envireader.privacySeen.v1`', 'La data di revisione di questa informativa che hai visto per ultima, così te la mostriamo di nuovo solo se cambia', 'Ricordare che l’hai vista'],
           ],
         } },
         { p: 'Non identificano nessuno e non servono al tracciamento: ai sensi dell’art. 122 del Codice privacy e della direttiva ePrivacy sono archiviazione tecnica e non richiedono consenso. Sono elencati perché hai diritto di saperlo.' },

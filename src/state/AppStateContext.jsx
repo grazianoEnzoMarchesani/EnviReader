@@ -1,3 +1,4 @@
+import { needsPrivacyNotice } from '../lib/privacySeen';
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { DATA_GROUPS, DATASETS } from '../data/constants';
 import { pickDirectory, listDataGroups, getFilesInFolder, getFileCoupleSeries, readEDX, seriesLabel, loadTerrain, readSimName } from '../lib/envimet';
@@ -129,7 +130,7 @@ const initialState = {
   customRangeModal: null,
   timeSeriesOpen: true,
   showCredits: false,
-  showPrivacy: false,
+  showPrivacy: needsPrivacyNotice(), // si apre da sola al primo avvio (vedi privacySeen.js)
   viewSettingsOpen: false,
   showBuildings: true,
   showVegetation: true,

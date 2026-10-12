@@ -1,9 +1,10 @@
-import { Fragment } from 'react';
+import { Fragment, useEffect } from 'react';
 import { useAppState } from '../state/AppStateContext';
 import { useI18n } from '../i18n/I18nContext';
 import { useModalKeyboard } from '../lib/useModalKeyboard';
 import { useModalTransition } from '../lib/useModalTransition';
 import { PRIVACY_TEXT, CONTACT_EMAIL_OBFUSCATED } from '../data/privacyText';
+import { markPrivacySeen } from '../lib/privacySeen';
 import { setMapConsent, resetMapConsent, useMapConsent } from '../lib/mapConsent';
 
 // Markup inline minimo: **grassetto**, `codice`, [testo](indirizzo).
@@ -46,6 +47,10 @@ export default function PrivacyModal() {
   const { state, toggle } = useAppState();
   const { tr, lang } = useI18n();
   const consent = useMapConsent();
+
+  useEffect(() => {
+    if (state.showPrivacy) markPrivacySeen();
+  }, [state.showPrivacy]);
 
   const close = () => toggle('showPrivacy');
   useModalKeyboard(state.showPrivacy, null, close);
