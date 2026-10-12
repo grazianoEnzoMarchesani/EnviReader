@@ -50,6 +50,10 @@ Built with React, Vite, three.js and MapLibre GL.
 
 EnviReader started as *ENVI-met webReader* (v1.4 and v1.5, plain JavaScript, still available in the [releases](https://github.com/grazianoEnzoMarchesani/EnviReader/releases)). Version 2.0 is a full rewrite as a component-based React app.
 
+## License and citation
+
+EnviReader is free software, released under the [GNU General Public License v3.0 or later](LICENSE). If you use it in your work, please cite it (see [CITATION.cff](CITATION.cff), or use *Cite this repository* on GitHub). Authors: Graziano Enzo Marchesani, Roberta Cocci Grifoni, Mohammadjavad Khodaparast (Università di Camerino).
+
 ## Disclaimer
 
 EnviReader is an independent project. It is not affiliated with, endorsed by or supported by ENVI-met GmbH. ENVI-met is a trademark of its owner. The ENVI-met materials database is proprietary and is not included in this repository.

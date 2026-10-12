@@ -1,0 +1,33 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "EnviReader"
+type: software
+abstract: >-
+  EnviReader reads, explores and compares ENVI-met simulation results (EDX/EDT, INX)
+  directly in the browser: 2D maps and sections, a 3D model viewer with wind streamlines
+  and sun position, time series, boundary conditions and a Web GIS view. All processing
+  happens in the browser; no data is uploaded.
+authors:
+  - family-names: Marchesani
+    given-names: Graziano Enzo
+    orcid: "https://orcid.org/0000-0002-4723-5099"
+    affiliation: "Università di Camerino"
+  - family-names: Cocci Grifoni
+    given-names: Roberta
+    orcid: "https://orcid.org/0000-0002-7092-6293"
+    affiliation: "Università di Camerino"
+  - family-names: Khodaparast
+    given-names: Mohammadjavad
+    orcid: "https://orcid.org/0009-0005-9019-616X"
+    affiliation: "Università di Camerino"
+repository-code: "https://github.com/grazianoEnzoMarchesani/EnviReader"
+url: "https://grazianoenzomarchesani.github.io/EnviReader/"
+license: GPL-3.0-or-later
+version: 2.0.0
+keywords:
+  - ENVI-met
+  - microclimate
+  - urban climate
+  - data visualization
+  - environmental simulation
+doi: 10.5281/zenodo.14500978
