@@ -8,7 +8,7 @@
     <!-- Politica di sicurezza e privacy: l'app parla solo con se stessa e, dopo il consenso
          dell'utente, con i servizi di mappa dichiarati in src/data/privacyText.js.
          Se aggiungi un host, aggiornalo anche lì (scripts/privacy-audit.mjs lo controlla). -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://server.arcgisonline.com; connect-src 'self' blob: https://tiles.openfreemap.org https://server.arcgisonline.com; font-src 'self' data:; worker-src 'self' blob:; child-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' blob: https://tiles.openfreemap.org; font-src 'self' data:; worker-src 'self' blob:; child-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'" />
     <meta name="referrer" content="no-referrer" />
     <script src="./theme-init.js"></script>
   </head>

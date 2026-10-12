@@ -11,7 +11,6 @@ import LegendBar from '../LegendBar';
 import { overlayRange } from '../../lib/sliceRange';
 import IconToggle from '../controls/IconToggle';
 import { setMapConsent, useMapConsent } from '../../lib/mapConsent';
-import Segmented from '../controls/Segmented';
 import HelpTooltip from '../controls/HelpTooltip';
 import { IconBuilding, IconTree, IconTerrain, IconReceptor, IconGrid, IconLayers3D, IconSectionX, IconSectionY, IconSettings } from '../icons/ToolbarIcons';
 import WebGisViewer from '../WebGisViewer';
@@ -83,7 +82,6 @@ export default function WebGisView() {
   const hasLocation = !!lowerLeftLngLat(model?.location);
 
   const [calibration, updateCalibration] = useCalibration(model);
-  const [basemap, setBasemap] = useState('satellite');
   const mapConsent = useMapConsent();
   const [calibrationOpen, setCalibrationOpen] = useState(false);
 
@@ -134,10 +132,6 @@ export default function WebGisView() {
     updateCalibration(presets[corner]);
   };
 
-  const basemapOptions = [
-    { key: 'satellite', label: tr('webgis_basemap_satellite') },
-    { key: 'streets', label: tr('webgis_basemap_streets') },
-  ];
 
   return (
     <div className="model-view-page webgis-view-page">
@@ -172,7 +166,9 @@ export default function WebGisView() {
                 <div className="view-bar-group">
                   <span className="control-label" style={{ marginBottom: 0 }}>{tr('webgis_group_basemap')}</span>
                   {mapConsent === 'granted' ? (
-                    <Segmented options={basemapOptions} value={basemap} onSelect={setBasemap} variant="dark" />
+                    <button type="button" className="ghost-btn" onClick={() => setMapConsent('denied')}>
+                      {tr('webgis_map_disable')}
+                    </button>
                   ) : (
                     <button type="button" className="ghost-btn" onClick={() => setMapConsent('unset')}>
                       {tr('webgis_map_enable')}
@@ -251,7 +247,6 @@ export default function WebGisView() {
                 wireframe={state.wireframe}
                 objectStyle={state.objectStyle}
                 calibration={calibration}
-                basemap={basemap}
               />
             ) : model && !hasLocation ? (
               <>

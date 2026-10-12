@@ -1,8 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
-// Consenso a caricare lo sfondo del Web GIS da servizi esterni (tile OpenFreeMap
-// e immagini satellitari Esri). Finché non è concesso l'app non fa nessuna
-// richiesta a terzi. La scelta resta in localStorage per sei mesi.
+// Consenso a caricare lo sfondo del Web GIS da un servizio esterno (tile
+// OpenFreeMap). Finché non è concesso l'app non fa nessuna richiesta a terzi. La scelta resta in localStorage per sei mesi.
 // Se la sezione "dati memorizzati" dell'informativa (src/data/privacyText.js)
 // cambia, cambiala nello stesso commit.
 

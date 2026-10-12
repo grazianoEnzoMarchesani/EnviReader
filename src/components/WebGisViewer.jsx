@@ -5,7 +5,7 @@ import { Map as MapLibreMap, NavigationControl, MercatorCoordinate } from 'mapli
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { buildModelScene, buildDataOverlay, disposeGroup, setLayerVisibility, setWireframe } from '../lib/inxScene';
 import { lowerLeftLngLat } from '../lib/geodesy';
-import { buildBaseStyle, applyBasemapVisibility } from '../lib/mapStyle';
+import { buildBaseStyle, transformRequest } from '../lib/mapStyle';
 import '../lib/maplibreWorker';
 
 // Zoom iniziale che fa stare per intero l'estensione del dominio (con un
@@ -108,11 +108,11 @@ function domainCenterLngLat(anchorLngLat, calibration, modelRotationDeg, domainS
   return [lng, lat];
 }
 
-export default function WebGisViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, flags, wireframe, objectStyle, calibration, basemap, mapEnabled }) {
+export default function WebGisViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, flags, wireframe, objectStyle, calibration, mapEnabled }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const stageRef = useRef(null); // { scene, camera, renderer, group, layers, dataOverlayLayer }
-  const actionsRef = useRef(null); // { rebuildModel, applyFlags, rebuildDataOverlay, applyBasemap }
+  const actionsRef = useRef(null); // { rebuildModel, applyFlags, rebuildDataOverlay }
   const calibrationRef = useRef(calibration);
   const anchorRef = useRef(lowerLeftLngLat(model.location));
   const rotationDegRef = useRef(model.location.rotation || 0);
@@ -120,7 +120,7 @@ export default function WebGisViewer({ model, objectsVolume, spacingZ, dimZ, dat
   // Props sempre fresche per le callback async di maplibre (evento 'load' del
   // custom layer, che può arrivare in qualunque momento dopo il mount).
   const propsRef = useRef(null);
-  propsRef.current = { model, objectsVolume, spacingZ, dimZ, dataOverlay, flags, wireframe, objectStyle, basemap };
+  propsRef.current = { model, objectsVolume, spacingZ, dimZ, dataOverlay, flags, wireframe, objectStyle };
 
   calibrationRef.current = calibration;
 
@@ -153,7 +153,8 @@ export default function WebGisViewer({ model, objectsVolume, spacingZ, dimZ, dat
 
     const map = new MapLibreMap({
       container: containerRef.current,
-      style: buildBaseStyle(!!mapEnabled, propsRef.current.basemap),
+      style: buildBaseStyle(!!mapEnabled),
+      transformRequest,
       center: [lng, lat],
       zoom,
       pitch: 55,
@@ -210,11 +211,7 @@ export default function WebGisViewer({ model, objectsVolume, spacingZ, dimZ, dat
       map.triggerRepaint();
     };
 
-    const applyBasemap = () => {
-      applyBasemapVisibility(map, propsRef.current.basemap);
-    };
-
-    actionsRef.current = { rebuildModel, applyFlags, rebuildDataOverlay, applyBasemap };
+    actionsRef.current = { rebuildModel, applyFlags, rebuildDataOverlay };
 
     const customLayer = {
       id: 'webgis-model-layer',
@@ -245,7 +242,6 @@ export default function WebGisViewer({ model, objectsVolume, spacingZ, dimZ, dat
 
     map.on('load', () => {
       map.addLayer(customLayer);
-      applyBasemap();
       rebuildModel();
       rebuildDataOverlay();
     });
@@ -261,11 +257,6 @@ export default function WebGisViewer({ model, objectsVolume, spacingZ, dimZ, dat
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (mapRef.current?.loaded()) actionsRef.current?.applyBasemap();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basemap]);
 
   useEffect(() => {
     if (mapRef.current?.loaded()) actionsRef.current?.rebuildModel();

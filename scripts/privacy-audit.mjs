@@ -10,12 +10,12 @@ import { join, extname } from 'node:path';
 import { STORAGE_KEYS, STORAGE_PREFIXES, PRIVACY_TEXT } from '../src/data/privacyText.js';
 
 // Host che l'app contatta davvero (solo dopo consenso): devono comparire anche nella CSP
-const NETWORK_HOSTS = ['tiles.openfreemap.org', 'server.arcgisonline.com'];
+const NETWORK_HOSTS = ['tiles.openfreemap.org'];
 // Host che compaiono solo come link cliccabili, attribuzioni o commenti
 const LINK_HOSTS = [
   'github.com', 'openfreemap.org', 'www.openmaptiles.org', 'www.openstreetmap.org',
   'stamen.com', 'www.garanteprivacy.it', 'doi.org', 'www.envi-met.com', 'vite.dev',
-  'www.w3.org', 'maplibre.org', 'www.esri.com',
+  'www.w3.org', 'maplibre.org',
 ];
 const FORBIDDEN_IN_SRC = [
   /document\.cookie/, /sendBeacon/, /\bgtag\s*\(/, /google-analytics|googletagmanager/i,
@@ -81,7 +81,7 @@ if (!/name="referrer"\s+content="no-referrer"/.test(html)) fail('index.html: met
 // L'informativa deve nominare ogni servizio contattato
 for (const [lang, t] of Object.entries(PRIVACY_TEXT)) {
   const flat = JSON.stringify(t);
-  for (const needle of ['OpenFreeMap', 'Esri', 'GitHub Pages']) {
+  for (const needle of ['OpenFreeMap', 'GitHub Pages']) {
     if (!flat.includes(needle)) fail(`privacyText.js (${lang}): non nomina ${needle}`);
   }
 }

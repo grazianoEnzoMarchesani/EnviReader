@@ -20,7 +20,7 @@ Works in all major browsers; no installation needed.
 
 ## Privacy
 
-No cookies, no analytics, no third-party scripts, fonts or CDNs: everything the app needs is served from the same site. The only contact with third parties is the optional background map of the Web GIS view (OpenFreeMap street map, Esri satellite imagery), which stays **off until you accept it** because the map services see your IP address and which area you are looking at. The full notice is in the app (button *Privacy*) and in [src/data/privacyText.js](src/data/privacyText.js). `npm run audit:privacy` checks, on every deploy, that the code contacts no host and stores no key that the notice does not declare, and a Content-Security-Policy in `index.html` enforces the same list in the browser.
+No cookies, no analytics, no third-party scripts, fonts or CDNs: everything the app needs is served from the same site. The only contact with third parties is the optional background map of the Web GIS view (OpenFreeMap street map), which stays **off until you accept it** because the map services see your IP address and which area you are looking at. The full notice is in the app (button *Privacy*) and in [src/data/privacyText.js](src/data/privacyText.js). `npm run audit:privacy` checks, on every deploy, that the code contacts no host and stores no key that the notice does not declare, and a Content-Security-Policy in `index.html` restricts the page itself to the same list.
 
 ## Run locally
 

@@ -5,7 +5,7 @@
 // chiave di storage che qui non è dichiarata.
 //
 // Punti di rete da tenere allineati:
-//   src/lib/mapStyle.js     OpenFreeMap + Esri, solo dopo consenso (mapConsent.js)
+//   src/lib/mapStyle.js     OpenFreeMap, solo dopo consenso (mapConsent.js)
 //   hosting                 GitHub Pages (.github/workflows/pages.yml)
 //
 // Markup inline: **grassetto**, `codice`, [testo](indirizzo).
@@ -35,7 +35,7 @@ const en = {
       h: 'In short',
       blocks: [
         { p: 'EnviReader reads and draws your ENVI-met files **entirely in your browser**. Nothing you open — EDX/EDT result files, INX models, SIMX or FOX files, coordinates, names, values — is uploaded to a server. The app sets no cookies, runs no analytics, carries no advertising and does not profile its visitors. Scripts, fonts, styles and libraries are all served from this same site: no third-party script, font or CDN is loaded.' },
-        { p: 'One feature reaches third parties, and **it stays off until you accept it**: the background map of the Web GIS view. If you accept, the map services receive **your IP address** and can tell roughly **where on Earth your model is located**, because every map tile you look at is requested by position. If you decline, the 3D model is shown on a plain background and the rest of the app works the same.' },
+        { p: 'One feature reaches third parties, and **it stays off until you accept it**: the background map of the Web GIS view. If you accept, the map service receives **your IP address** and can tell roughly **where on Earth your model is located**, because every map tile you look at is requested by position. If you decline, the 3D model is shown on a plain background and the rest of the app works the same.' },
         { p: 'If the location of your project is confidential, decline the map (or run EnviReader on your own computer, see the README).' },
       ],
     },
@@ -87,15 +87,14 @@ const en = {
           rows: [
             ['GitHub Pages (GitHub, Inc.)', 'Hosts the app (code, translations, styles). Keeps standard access logs.', 'Every visit — unavoidable: it is where the page comes from'],
             ['[OpenFreeMap](https://openfreemap.org)', 'Street-map vector tiles and map fonts for the Web GIS. Each tile request encodes a map position and zoom, so, with your IP address, the provider can tell **which area you are looking at**.', '**Only after you accept** the background map, in the Web GIS view'],
-            ['Esri, ArcGIS Online (Environmental Systems Research Institute, Inc.)', 'Satellite imagery tiles for the Web GIS. Same information as above: tile positions reveal **which area you are looking at**.', '**Only after you accept** the background map, and only while the satellite background is selected'],
           ],
         } },
         { ul: [
           '**Purposes:** delivering the page; drawing the background map when you ask for it.',
           '**Legal basis:** for the map, your **consent**, Article 6(1)(a) GDPR, which you can withdraw at any time from the box at the top of this notice (withdrawal does not undo requests already made). For hosting, the controller’s legitimate interest in providing a working service, Article 6(1)(f); the controller has no access to the hosting logs and uses them for nothing.',
-          '**Transfers outside the EU.** GitHub and Esri are US companies. By accepting the map you also expressly consent to the transfer of your IP address and of the map positions you view to them, Article 49(1)(a) GDPR, knowing that the United States may not offer a level of data protection equivalent to the EU’s. Hosting by GitHub relies on the EU–US Data Privacy Framework and standard contractual clauses where applicable.',
+          '**Transfers outside the EU.** GitHub is a US company; hosting relies on the EU–US Data Privacy Framework and standard contractual clauses where applicable. OpenFreeMap is run by an independent operator and its servers may be outside the EU. By accepting the map you expressly consent to the transfer of your IP address and of the map positions you view, Article 49(1)(a) GDPR, knowing that the countries involved may not offer a level of data protection equivalent to the EU’s; the consent box tells you this before you accept.',
           '**Not collected by the controller:** the controller runs no server and receives neither your IP address nor anything else about you; the logs above stay with the providers, each of which acts as an independent controller under its own policy.',
-          '**If you decline:** nothing is requested from OpenFreeMap or Esri; the 3D model, data overlays, charts, statistics and exports work the same.',
+          '**If you decline:** nothing is requested from OpenFreeMap; the 3D model, data overlays, charts, statistics and exports work the same.',
           '**Links.** The app links to its GitHub repository, and the map credits link to the map data sources. Nothing is contacted until you click, and those sites have their own policies.',
         ] },
       ],
@@ -122,7 +121,7 @@ const en = {
   ],
   ui: {
     choiceTitle: 'Your choice',
-    mapLabel: 'Background map (OpenFreeMap, Esri)',
+    mapLabel: 'Background map (OpenFreeMap)',
     mapOn: 'on',
     mapOff: 'off',
     mapUnset: 'not chosen yet',
@@ -197,15 +196,14 @@ const it = {
           rows: [
             ['GitHub Pages (GitHub, Inc.)', 'Ospita l’app (codice, traduzioni, stili). Conserva i normali log di accesso.', 'A ogni visita — inevitabile: è da lì che arriva la pagina'],
             ['[OpenFreeMap](https://openfreemap.org)', 'Tasselli vettoriali della mappa stradale e caratteri per il Web GIS. Ogni richiesta di tassello codifica posizione e zoom, quindi, con il tuo IP, il fornitore può capire **quale zona stai guardando**.', '**Solo dopo che accetti** la mappa di sfondo, nella vista Web GIS'],
-            ['Esri, ArcGIS Online (Environmental Systems Research Institute, Inc.)', 'Tasselli di immagini satellitari per il Web GIS. Stesse informazioni: le posizioni dei tasselli rivelano **quale zona stai guardando**.', '**Solo dopo che accetti** la mappa di sfondo, e solo mentre è selezionato lo sfondo satellitare'],
           ],
         } },
         { ul: [
           '**Finalità:** consegnare la pagina; disegnare la mappa di sfondo quando lo chiedi.',
           '**Base giuridica:** per la mappa, il tuo **consenso**, art. 6(1)(a) GDPR, revocabile in ogni momento dal riquadro in cima a questa informativa (la revoca non annulla le richieste già fatte). Per l’hosting, il legittimo interesse del titolare a fornire un servizio funzionante, art. 6(1)(f); il titolare non ha accesso ai log dell’hosting e non li usa per nulla.',
-          '**Trasferimenti extra-UE.** GitHub ed Esri sono società statunitensi. Accettando la mappa acconsenti espressamente anche al trasferimento a loro del tuo indirizzo IP e delle posizioni di mappa che guardi, art. 49(1)(a) GDPR, sapendo che gli Stati Uniti possono non offrire un livello di protezione dei dati equivalente a quello dell’UE. L’hosting presso GitHub si basa sull’EU–US Data Privacy Framework e, dove applicabile, sulle clausole contrattuali standard.',
+          '**Trasferimenti extra-UE.** GitHub è una società statunitense; l’hosting si basa sull’EU–US Data Privacy Framework e, dove applicabile, sulle clausole contrattuali standard. OpenFreeMap è gestito da un operatore indipendente e i suoi server possono trovarsi fuori dall’UE. Accettando la mappa acconsenti espressamente al trasferimento del tuo indirizzo IP e delle posizioni di mappa che guardi, art. 49(1)(a) GDPR, sapendo che i Paesi coinvolti possono non offrire un livello di protezione dei dati equivalente a quello dell’UE; la finestra del consenso te lo dice prima che tu accetti.',
           '**Non raccolto dal titolare:** il titolare non gestisce alcun server e non riceve né il tuo IP né altro su di te; i log sopra restano ai fornitori, ciascuno titolare autonomo secondo la propria policy.',
-          '**Se rifiuti:** non viene richiesto nulla a OpenFreeMap né a Esri; il modello 3D, le sovrapposizioni di dati, i grafici, le statistiche e le esportazioni funzionano uguale.',
+          '**Se rifiuti:** non viene richiesto nulla a OpenFreeMap; il modello 3D, le sovrapposizioni di dati, i grafici, le statistiche e le esportazioni funzionano uguale.',
           '**Link.** L’app rimanda al suo repository GitHub, e i crediti della mappa rimandano alle fonti dei dati cartografici. Nulla viene contattato finché non clicchi, e quei siti hanno le loro policy.',
         ] },
       ],
@@ -232,7 +230,7 @@ const it = {
   ],
   ui: {
     choiceTitle: 'La tua scelta',
-    mapLabel: 'Mappa di sfondo (OpenFreeMap, Esri)',
+    mapLabel: 'Mappa di sfondo (OpenFreeMap)',
     mapOn: 'attiva',
     mapOff: 'disattiva',
     mapUnset: 'non ancora scelta',
