@@ -4,6 +4,7 @@ import { I18nProvider, useI18n } from './i18n/I18nContext';
 import TopBar from './components/TopBar';
 import CreditsModal from './components/CreditsModal';
 import PrivacyModal from './components/PrivacyModal';
+import PrivacyBanner from './components/PrivacyBanner';
 import CustomRangeModal from './components/CustomRangeModal';
 import ShortcutsModal from './components/ShortcutsModal';
 import AnalysisSidebar from './components/sidebar/AnalysisSidebar';
@@ -148,6 +149,7 @@ function AppLayout() {
       </div>
       <CreditsModal />
       <PrivacyModal />
+      <PrivacyBanner />
       <ShortcutsModal />
       <CustomRangeModal />
     </div>

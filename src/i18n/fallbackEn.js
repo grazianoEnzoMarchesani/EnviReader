@@ -477,6 +477,9 @@ export const FALLBACK_I18N = {
     "webgis_consent_privacy": "Read the privacy notice",
     "webgis_map_disable": "Turn off background map",
     "webgis_map_enable": "Enable background map",
+    "privacy_banner_text": "EnviReader processes your files only in your browser: nothing is uploaded, no cookies, no tracking. Only the optional background map of the Web GIS view contacts a third party, and only if you accept.",
+    "privacy_banner_more": "Read the full privacy notice",
+    "privacy_banner_ok": "Got it",
     "btn_privacy": "Privacy"
   }
 };

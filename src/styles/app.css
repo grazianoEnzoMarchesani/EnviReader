@@ -1958,3 +1958,9 @@ button { font-family: inherit; }
 .privacy-table th, .privacy-table td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
 .privacy-table th { color: var(--text); font-weight: 700; }
 .privacy-card code { font-family: monospace; font-size: 11.5px; word-break: break-word; }
+
+/* Avviso privacy al primo avvio */
+.privacy-banner { position: fixed; left: 16px; bottom: 16px; z-index: 90; width: min(380px, calc(100vw - 32px)); background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18); }
+.privacy-banner-text { font-size: 12.5px; line-height: 1.5; color: var(--text-secondary); margin: 0 0 10px; }
+.privacy-banner-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.privacy-banner-link { background: none; border: 0; padding: 0; cursor: pointer; font: inherit; font-size: 12.5px; text-align: left; }

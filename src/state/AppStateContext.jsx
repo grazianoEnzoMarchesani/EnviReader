@@ -130,7 +130,8 @@ const initialState = {
   customRangeModal: null,
   timeSeriesOpen: true,
   showCredits: false,
-  showPrivacy: needsPrivacyNotice(), // si apre da sola al primo avvio (vedi privacySeen.js)
+  showPrivacy: false,
+  showPrivacyBanner: needsPrivacyNotice(), // avviso sobrio al primo avvio (vedi privacySeen.js)
   viewSettingsOpen: false,
   showBuildings: true,
   showVegetation: true,

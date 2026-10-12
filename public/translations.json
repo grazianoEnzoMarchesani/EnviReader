@@ -465,7 +465,10 @@
     "webgis_consent_privacy": "Leggi l’informativa privacy",
     "webgis_map_enable": "Attiva la mappa di sfondo",
     "btn_privacy": "Privacy",
-    "webgis_map_disable": "Disattiva la mappa di sfondo"
+    "webgis_map_disable": "Disattiva la mappa di sfondo",
+    "privacy_banner_text": "EnviReader elabora i tuoi file solo nel browser: niente viene caricato, nessun cookie, nessun tracciamento. Solo la mappa di sfondo opzionale della vista Web GIS contatta una terza parte, e solo se accetti.",
+    "privacy_banner_more": "Leggi l’informativa completa",
+    "privacy_banner_ok": "Ho capito"
   },
   "en": {
     "app_tagline": "Desktop environmental analysis",
@@ -933,7 +936,10 @@
     "webgis_consent_privacy": "Read the privacy notice",
     "webgis_map_enable": "Enable background map",
     "btn_privacy": "Privacy",
-    "webgis_map_disable": "Turn off background map"
+    "webgis_map_disable": "Turn off background map",
+    "privacy_banner_text": "EnviReader processes your files only in your browser: nothing is uploaded, no cookies, no tracking. Only the optional background map of the Web GIS view contacts a third party, and only if you accept.",
+    "privacy_banner_more": "Read the full privacy notice",
+    "privacy_banner_ok": "Got it"
   },
   "es": {
     "app_tagline": "Análisis ambiental de escritorio",
@@ -1402,7 +1408,10 @@
     "webgis_map_enable": "Activar el mapa de fondo",
     "btn_privacy": "Privacidad",
     "privacy_lang_note": "El aviso de privacidad está disponible en inglés e italiano; aquí se muestra la versión en inglés.",
-    "webgis_map_disable": "Desactivar el mapa de fondo"
+    "webgis_map_disable": "Desactivar el mapa de fondo",
+    "privacy_banner_text": "EnviReader procesa tus archivos solo en tu navegador: no se sube nada, sin cookies ni rastreo. Solo el mapa de fondo opcional de la vista Web GIS contacta con un tercero, y solo si aceptas.",
+    "privacy_banner_more": "Leer el aviso de privacidad completo",
+    "privacy_banner_ok": "Entendido"
   },
   "fr": {
     "app_tagline": "Analyse environnementale de bureau",
@@ -1871,7 +1880,10 @@
     "webgis_map_enable": "Activer la carte de fond",
     "btn_privacy": "Confidentialité",
     "privacy_lang_note": "La politique de confidentialité est disponible en anglais et en italien ; la version anglaise est affichée ici.",
-    "webgis_map_disable": "Désactiver la carte de fond"
+    "webgis_map_disable": "Désactiver la carte de fond",
+    "privacy_banner_text": "EnviReader traite vos fichiers uniquement dans votre navigateur : rien n’est envoyé, pas de cookies, pas de suivi. Seule la carte de fond facultative de la vue Web GIS contacte un tiers, et seulement si vous acceptez.",
+    "privacy_banner_more": "Lire la politique de confidentialité complète",
+    "privacy_banner_ok": "Compris"
   },
   "de": {
     "app_tagline": "Desktop-Umweltanalyse",
@@ -2340,6 +2352,9 @@
     "webgis_map_enable": "Hintergrundkarte aktivieren",
     "btn_privacy": "Datenschutz",
     "privacy_lang_note": "Die Datenschutzerklärung liegt auf Englisch und Italienisch vor; hier gilt die englische Fassung.",
-    "webgis_map_disable": "Hintergrundkarte deaktivieren"
+    "webgis_map_disable": "Hintergrundkarte deaktivieren",
+    "privacy_banner_text": "EnviReader verarbeitet Ihre Dateien nur in Ihrem Browser: nichts wird hochgeladen, keine Cookies, kein Tracking. Nur die optionale Hintergrundkarte der Web-GIS-Ansicht kontaktiert Dritte, und nur mit Ihrer Zustimmung.",
+    "privacy_banner_more": "Vollständige Datenschutzerklärung lesen",
+    "privacy_banner_ok": "Verstanden"
   }
 }
