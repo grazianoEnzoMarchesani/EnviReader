@@ -3,6 +3,7 @@ import { AppStateProvider, useAppState } from './state/AppStateContext';
 import { I18nProvider, useI18n } from './i18n/I18nContext';
 import TopBar from './components/TopBar';
 import CreditsModal from './components/CreditsModal';
+import PrivacyModal from './components/PrivacyModal';
 import CustomRangeModal from './components/CustomRangeModal';
 import ShortcutsModal from './components/ShortcutsModal';
 import AnalysisSidebar from './components/sidebar/AnalysisSidebar';
@@ -146,6 +147,7 @@ function AppLayout() {
         </main>
       </div>
       <CreditsModal />
+      <PrivacyModal />
       <ShortcutsModal />
       <CustomRangeModal />
     </div>

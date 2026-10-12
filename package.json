@@ -7,9 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
+    "audit:privacy": "node scripts/privacy-audit.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
+    "gif.js": "^0.2.0",
+    "html-to-image": "^1.11.11",
     "jszip": "^3.10.1",
     "maplibre-gl": "^6.0.0",
     "react": "^19.2.7",

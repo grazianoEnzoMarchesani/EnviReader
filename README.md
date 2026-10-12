@@ -2,7 +2,7 @@
 
 Read, explore and compare [ENVI-met](https://www.envi-met.com) simulation results directly in the browser. Open an output folder, and EnviReader draws maps, sections, 3D models and time series from the `EDX`/`EDT` files.
 
-**Live app: [envireader.altervista.org](https://envireader.altervista.org)**
+**Live app: [grazianoenzomarchesani.github.io/EnviReader](https://grazianoenzomarchesani.github.io/EnviReader/)**
 
 > **Your data never leaves your computer.** Files are read and processed locally in the browser. Nothing is uploaded to any server.
 
@@ -18,6 +18,10 @@ Read, explore and compare [ENVI-met](https://www.envi-met.com) simulation result
 
 Works in all major browsers; no installation needed.
 
+## Privacy
+
+No cookies, no analytics, no third-party scripts, fonts or CDNs: everything the app needs is served from the same site. The only contact with third parties is the optional background map of the Web GIS view (OpenFreeMap street map, Esri satellite imagery), which stays **off until you accept it** because the map services see your IP address and which area you are looking at. The full notice is in the app (button *Privacy*) and in [src/data/privacyText.js](src/data/privacyText.js). `npm run audit:privacy` checks, on every deploy, that the code contacts no host and stores no key that the notice does not declare, and a Content-Security-Policy in `index.html` enforces the same list in the browser.
+
 ## Run locally
 
 ```bash
@@ -25,9 +29,10 @@ npm install
 npm run dev      # development server
 npm run build    # production build in dist/
 npm run lint
+npm run audit:privacy   # after a build: hosts and storage keys vs. the privacy notice
 ```
 
-The `dist/` folder is fully static and can be served from any folder of any web server.
+The `dist/` folder is fully static and can be served from any folder of any web server. Pushing to `main` deploys it to GitHub Pages (`.github/workflows/pages.yml`).
 
 ## Project layout
 

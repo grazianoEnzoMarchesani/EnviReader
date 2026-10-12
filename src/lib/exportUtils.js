@@ -1,4 +1,8 @@
 import JSZip from 'jszip';
+import { toCanvas } from 'html-to-image';
+import GIF from 'gif.js';
+// Worker del GIF servito da questo stesso sito (niente CDN): Vite lo copia in dist/assets
+import gifWorkerUrl from 'gif.js/dist/gif.worker.js?url';
 import * as XLSX from 'xlsx';
 import { generateBoundarySVGs } from './exportBoundary';
 import { hasVerticalExtent } from './envimet';
@@ -343,10 +347,6 @@ export async function exportCharts({ state, setState, exportMode, zipAll, groupF
   // Dichiarato qui: se l'export fallisce a metà va rimosso comunque
   let styleEl = null;
   try {
-    if (!window.htmlToImage) {
-      throw new Error("html-to-image library is not loaded.");
-    }
-
     if (originalAppView !== 'analysis') {
       onProgress('Preparing map views...');
       setState({ appView: 'analysis' });
@@ -424,7 +424,7 @@ export async function exportCharts({ state, setState, exportMode, zipAll, groupF
         const flipKey = card.getAttribute('data-flip-key'); // 'A', 'B', or 'Diff'
         const el = card.querySelector('.map-body');
         if (flipKey && el) {
-          const canvas = await window.htmlToImage.toCanvas(el, {
+          const canvas = await toCanvas(el, {
             backgroundColor: bgColor.trim() || null
           });
           
@@ -509,20 +509,17 @@ export async function exportCharts({ state, setState, exportMode, zipAll, groupF
 
     // 3. Optional: Capture GIFs for temporal trend
     if (saveGif && numSteps > 0) {
-      if (!window.GIF) {
-        throw new Error("GIF library is not loaded.");
-      }
-
       onProgress('Loading GIF worker...');
-      const workerRes = await fetch('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');
-      const workerBlobData = await workerRes.blob();
+      // gif.js crea il Worker da un URL: lo script è un asset locale, ma passa da
+      // un blob same-origin per non dipendere dal path di deploy (base './').
+      const workerBlobData = await (await fetch(gifWorkerUrl)).blob();
       const workerUrl = URL.createObjectURL(workerBlobData);
 
       onProgress('Preparing GIF encoders...');
       const gifEncoders = [];
       for (const vType of allViewTypes) {
         for (const type of mapTypes) {
-          const gif = new window.GIF({
+          const gif = new GIF({
             workers: 2,
             quality: 10,
             workerScript: workerUrl,

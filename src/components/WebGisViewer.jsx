@@ -5,32 +5,8 @@ import { Map as MapLibreMap, NavigationControl, MercatorCoordinate } from 'mapli
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { buildModelScene, buildDataOverlay, disposeGroup, setLayerVisibility, setWireframe } from '../lib/inxScene';
 import { lowerLeftLngLat } from '../lib/geodesy';
-
-// Sorgenti raster senza API key. Niente tile OpenStreetMap: il loro server
-// non manda header CORS, quindi maplibre-gl (che carica i tile come texture
-// WebGL) li rifiuta con un errore di sicurezza — a differenza di Leaflet, che
-// li mostra come semplici <img> e non ha questo problema. I servizi ArcGIS
-// Online supportano CORS e coprono sia satellite che stradale.
-const BASEMAP_SOURCES = {
-  satellite: {
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles &copy; Esri',
-  },
-  streets: {
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-    attribution: 'Tiles &copy; Esri',
-  },
-};
-
-function buildStyle() {
-  const sources = {};
-  const layers = [];
-  for (const [key, src] of Object.entries(BASEMAP_SOURCES)) {
-    sources[key] = { type: 'raster', tiles: [src.url], tileSize: 256, maxzoom: 19, attribution: src.attribution };
-    layers.push({ id: key, type: 'raster', source: key, layout: { visibility: 'none' } });
-  }
-  return { version: 8, sources, layers };
-}
+import { buildBaseStyle, applyBasemapVisibility } from '../lib/mapStyle';
+import '../lib/maplibreWorker';
 
 // Zoom iniziale che fa stare per intero l'estensione del dominio (con un
 // margine) nella finestra della mappa, alla latitudine del sito.
@@ -132,7 +108,7 @@ function domainCenterLngLat(anchorLngLat, calibration, modelRotationDeg, domainS
   return [lng, lat];
 }
 
-export default function WebGisViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, flags, wireframe, objectStyle, calibration, basemap }) {
+export default function WebGisViewer({ model, objectsVolume, spacingZ, dimZ, dataOverlay, flags, wireframe, objectStyle, calibration, basemap, mapEnabled }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const stageRef = useRef(null); // { scene, camera, renderer, group, layers, dataOverlayLayer }
@@ -177,7 +153,7 @@ export default function WebGisViewer({ model, objectsVolume, spacingZ, dimZ, dat
 
     const map = new MapLibreMap({
       container: containerRef.current,
-      style: buildStyle(),
+      style: buildBaseStyle(!!mapEnabled, propsRef.current.basemap),
       center: [lng, lat],
       zoom,
       pitch: 55,
@@ -235,9 +211,7 @@ export default function WebGisViewer({ model, objectsVolume, spacingZ, dimZ, dat
     };
 
     const applyBasemap = () => {
-      for (const key of Object.keys(BASEMAP_SOURCES)) {
-        if (map.getLayer(key)) map.setLayoutProperty(key, 'visibility', key === propsRef.current.basemap ? 'visible' : 'none');
-      }
+      applyBasemapVisibility(map, propsRef.current.basemap);
     };
 
     actionsRef.current = { rebuildModel, applyFlags, rebuildDataOverlay, applyBasemap };

@@ -456,7 +456,15 @@
     "hint_level_elevation_fix_suffix": " · fix",
     "hint_level_elevation_plain": "{height} m",
     "level_out_variant_standard": "Standard",
-    "level_out_variant_cascade": "Cascata"
+    "level_out_variant_cascade": "Cascata",
+    "webgis_consent_title": "Caricare la mappa di sfondo?",
+    "webgis_consent_text": "I tuoi file non lasciano mai il browser. Per disegnare la mappa di sfondo, però, EnviReader contatta servizi esterni: OpenFreeMap (mappa stradale) ed Esri (immagini satellitari). Ricevono il tuo indirizzo IP e possono capire quale zona del mondo stai guardando, cioè dove si trova il tuo modello. Del modello non viene inviato nient’altro.",
+    "webgis_consent_note": "Se rifiuti, il modello 3D resta su uno sfondo neutro e non parte nessuna richiesta verso nessuno. Puoi cambiare idea in qualsiasi momento dal pannello Privacy.",
+    "webgis_consent_accept": "Accetta",
+    "webgis_consent_decline": "Rifiuta",
+    "webgis_consent_privacy": "Leggi l’informativa privacy",
+    "webgis_map_enable": "Attiva la mappa di sfondo",
+    "btn_privacy": "Privacy"
   },
   "en": {
     "app_tagline": "Desktop environmental analysis",
@@ -915,7 +923,15 @@
     "hint_level_elevation_fix_suffix": " · fix",
     "hint_level_elevation_plain": "{height} m",
     "level_out_variant_standard": "Standard",
-    "level_out_variant_cascade": "Cascade"
+    "level_out_variant_cascade": "Cascade",
+    "webgis_consent_title": "Load the background map?",
+    "webgis_consent_text": "Your files never leave your browser. To draw the background map, though, EnviReader contacts external services: OpenFreeMap (street map) and Esri (satellite imagery). They receive your IP address and can tell which area of the world you are looking at, that is, where your model is located. Nothing else about your model is sent.",
+    "webgis_consent_note": "If you decline, the 3D model is shown on a plain background and no request is made to anyone. You can change your mind at any time from the Privacy panel.",
+    "webgis_consent_accept": "Accept",
+    "webgis_consent_decline": "Decline",
+    "webgis_consent_privacy": "Read the privacy notice",
+    "webgis_map_enable": "Enable background map",
+    "btn_privacy": "Privacy"
   },
   "es": {
     "app_tagline": "Análisis ambiental de escritorio",
@@ -1374,7 +1390,16 @@
     "hint_level_elevation_fix_suffix": " · fix",
     "hint_level_elevation_plain": "{height} m",
     "level_out_variant_standard": "Estándar",
-    "level_out_variant_cascade": "Cascada"
+    "level_out_variant_cascade": "Cascada",
+    "webgis_consent_title": "¿Cargar el mapa de fondo?",
+    "webgis_consent_text": "Tus archivos nunca salen del navegador. Para dibujar el mapa de fondo, sin embargo, EnviReader contacta con servicios externos: OpenFreeMap (mapa de calles) y Esri (imágenes de satélite). Reciben tu dirección IP y pueden saber qué zona del mundo estás viendo, es decir, dónde está tu modelo. No se envía nada más de tu modelo.",
+    "webgis_consent_note": "Si lo rechazas, el modelo 3D se muestra sobre un fondo neutro y no se hace ninguna petición a nadie. Puedes cambiar de opinión en cualquier momento desde el panel de Privacidad.",
+    "webgis_consent_accept": "Aceptar",
+    "webgis_consent_decline": "Rechazar",
+    "webgis_consent_privacy": "Leer el aviso de privacidad",
+    "webgis_map_enable": "Activar el mapa de fondo",
+    "btn_privacy": "Privacidad",
+    "privacy_lang_note": "El aviso de privacidad está disponible en inglés e italiano; aquí se muestra la versión en inglés."
   },
   "fr": {
     "app_tagline": "Analyse environnementale de bureau",
@@ -1833,7 +1858,16 @@
     "hint_level_elevation_fix_suffix": " · fix",
     "hint_level_elevation_plain": "{height} m",
     "level_out_variant_standard": "Standard",
-    "level_out_variant_cascade": "Cascade"
+    "level_out_variant_cascade": "Cascade",
+    "webgis_consent_title": "Charger la carte de fond ?",
+    "webgis_consent_text": "Vos fichiers ne quittent jamais votre navigateur. Pour afficher la carte de fond, EnviReader contacte toutefois des services externes : OpenFreeMap (plan des rues) et Esri (imagerie satellite). Ils reçoivent votre adresse IP et peuvent savoir quelle zone du monde vous regardez, c’est-à-dire où se trouve votre modèle. Rien d’autre sur votre modèle n’est transmis.",
+    "webgis_consent_note": "Si vous refusez, le modèle 3D s’affiche sur un fond neutre et aucune requête n’est envoyée à personne. Vous pouvez changer d’avis à tout moment depuis le panneau Confidentialité.",
+    "webgis_consent_accept": "Accepter",
+    "webgis_consent_decline": "Refuser",
+    "webgis_consent_privacy": "Lire la politique de confidentialité",
+    "webgis_map_enable": "Activer la carte de fond",
+    "btn_privacy": "Confidentialité",
+    "privacy_lang_note": "La politique de confidentialité est disponible en anglais et en italien ; la version anglaise est affichée ici."
   },
   "de": {
     "app_tagline": "Desktop-Umweltanalyse",
@@ -2292,6 +2326,15 @@
     "hint_level_elevation_fix_suffix": " · fix",
     "hint_level_elevation_plain": "{height} m",
     "level_out_variant_standard": "Standard",
-    "level_out_variant_cascade": "Kaskade"
+    "level_out_variant_cascade": "Kaskade",
+    "webgis_consent_title": "Hintergrundkarte laden?",
+    "webgis_consent_text": "Ihre Dateien verlassen nie Ihren Browser. Für die Hintergrundkarte kontaktiert EnviReader jedoch externe Dienste: OpenFreeMap (Straßenkarte) und Esri (Satellitenbilder). Diese erhalten Ihre IP-Adresse und können erkennen, welchen Ort der Welt Sie ansehen, also wo Ihr Modell liegt. Sonst wird nichts über Ihr Modell übertragen.",
+    "webgis_consent_note": "Wenn Sie ablehnen, wird das 3D-Modell auf neutralem Hintergrund angezeigt und es erfolgt keine Anfrage an Dritte. Sie können Ihre Entscheidung jederzeit im Datenschutz-Panel ändern.",
+    "webgis_consent_accept": "Akzeptieren",
+    "webgis_consent_decline": "Ablehnen",
+    "webgis_consent_privacy": "Datenschutzerklärung lesen",
+    "webgis_map_enable": "Hintergrundkarte aktivieren",
+    "btn_privacy": "Datenschutz",
+    "privacy_lang_note": "Die Datenschutzerklärung liegt auf Englisch und Italienisch vor; hier gilt die englische Fassung."
   }
 }

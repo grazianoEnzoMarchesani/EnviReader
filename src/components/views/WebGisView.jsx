@@ -10,6 +10,7 @@ import { orientColors, contourLegendGradient } from '../../lib/colormap';
 import LegendBar from '../LegendBar';
 import { overlayRange } from '../../lib/sliceRange';
 import IconToggle from '../controls/IconToggle';
+import { setMapConsent, useMapConsent } from '../../lib/mapConsent';
 import Segmented from '../controls/Segmented';
 import HelpTooltip from '../controls/HelpTooltip';
 import { IconBuilding, IconTree, IconTerrain, IconReceptor, IconGrid, IconLayers3D, IconSectionX, IconSectionY, IconSettings } from '../icons/ToolbarIcons';
@@ -83,6 +84,7 @@ export default function WebGisView() {
 
   const [calibration, updateCalibration] = useCalibration(model);
   const [basemap, setBasemap] = useState('satellite');
+  const mapConsent = useMapConsent();
   const [calibrationOpen, setCalibrationOpen] = useState(false);
 
   const terrainCutA = useTerrainCut(state.terrainA, state);
@@ -169,7 +171,13 @@ export default function WebGisView() {
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
                   <span className="control-label" style={{ marginBottom: 0 }}>{tr('webgis_group_basemap')}</span>
-                  <Segmented options={basemapOptions} value={basemap} onSelect={setBasemap} variant="dark" />
+                  {mapConsent === 'granted' ? (
+                    <Segmented options={basemapOptions} value={basemap} onSelect={setBasemap} variant="dark" />
+                  ) : (
+                    <button type="button" className="ghost-btn" onClick={() => setMapConsent('unset')}>
+                      {tr('webgis_map_enable')}
+                    </button>
+                  )}
                 </div>
                 <div className="vertical-divider" />
                 <div className="view-bar-group">
@@ -232,6 +240,8 @@ export default function WebGisView() {
           <div className={`model-viewer${showViewer ? ' is-3d' : ''}`}>
             {showViewer ? (
               <WebGisViewer
+                key={mapConsent === 'granted' ? 'map' : 'nomap'}
+                mapEnabled={mapConsent === 'granted'}
                 model={model}
                 objectsVolume={objectsVolume}
                 spacingZ={spacingZ}
@@ -260,6 +270,28 @@ export default function WebGisView() {
               </>
             )}
           </div>
+          {showViewer && mapConsent === 'unset' && (
+            <div className="modal-backdrop" role="presentation">
+              <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="map-consent-title" style={{ width: 460 }}>
+                <div className="modal-title" id="map-consent-title">{tr('webgis_consent_title')}</div>
+                <p className="modal-text">{tr('webgis_consent_text')}</p>
+                <p className="modal-text">{tr('webgis_consent_note')}</p>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="primary-btn" style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)' }} onClick={() => setMapConsent('denied')}>
+                    {tr('webgis_consent_decline')}
+                  </button>
+                  <button className="primary-btn" autoFocus onClick={() => setMapConsent('granted')}>
+                    {tr('webgis_consent_accept')}
+                  </button>
+                </div>
+                <p className="modal-text" style={{ marginTop: 12, marginBottom: 0 }}>
+                  <button type="button" className="modal-link" style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit' }} onClick={() => toggle('showPrivacy')}>
+                    {tr('webgis_consent_privacy')}
+                  </button>
+                </p>
+              </div>
+            </div>
+          )}
           {showViewer && dataOverlay && (
             <LegendBar
               min={dataOverlay.range.min}

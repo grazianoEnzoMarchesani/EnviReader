@@ -68,6 +68,7 @@ export default function TopBar() {
               </button>
             ))}
           </div>
+          <button className="btn btn-ghost-top" onClick={() => toggle('showPrivacy')}>{tr('btn_privacy')}</button>
           <button className="btn btn-ghost-top" onClick={() => setShowSaveModal(true)}>{tr('btn_save_charts')}</button>
           <button 
             className="btn btn-ghost-top" 

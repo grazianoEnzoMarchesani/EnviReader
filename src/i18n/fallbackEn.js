@@ -468,6 +468,14 @@ export const FALLBACK_I18N = {
     "shortcut_model_analysis": "Model / Analysis Views",
     "shortcut_toggle_sidebar": "Toggle Toolbars",
     "shortcut_theme": "Dark / Light Theme",
-    "shortcut_help": "Shortcuts Help"
+    "shortcut_help": "Shortcuts Help",
+    "webgis_consent_title": "Load the background map?",
+    "webgis_consent_text": "Your files never leave your browser. To draw the background map, though, EnviReader contacts external services: OpenFreeMap (street map) and Esri (satellite imagery). They receive your IP address and can tell which area of the world you are looking at, that is, where your model is located. Nothing else about your model is sent.",
+    "webgis_consent_note": "If you decline, the 3D model is shown on a plain background and no request is made to anyone. You can change your mind at any time from the Privacy panel.",
+    "webgis_consent_accept": "Accept",
+    "webgis_consent_decline": "Decline",
+    "webgis_consent_privacy": "Read the privacy notice",
+    "webgis_map_enable": "Enable background map",
+    "btn_privacy": "Privacy"
   }
 };

@@ -1,0 +1,30 @@
+{
+  "cross-t": {
+    "x": 238,
+    "y": 0,
+    "width": 46,
+    "height": 54,
+    "pixelRatio": 2
+  },
+  "dash-t": {
+    "x": 330,
+    "y": 0,
+    "width": 2,
+    "height": 6,
+    "pixelRatio": 2
+  },
+  "dots-t": {
+    "x": 0,
+    "y": 0,
+    "width": 238,
+    "height": 238,
+    "pixelRatio": 2
+  },
+  "hatch-t": {
+    "x": 284,
+    "y": 0,
+    "width": 46,
+    "height": 46,
+    "pixelRatio": 2
+  }
+}
