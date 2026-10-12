@@ -1,25 +1,50 @@
-# EnviReader: Advanced Environmental Data Analysis and Visualization
+# EnviReader
 
-## About This Version (v2.0)
+Read, explore and compare [ENVI-met](https://www.envi-met.com) simulation results directly in the browser. Open an output folder, and EnviReader draws maps, sections, 3D models and time series from the `EDX`/`EDT` files.
 
-With version 1.5 (initially *ENVI-met webReader*), the goal was to enable the reading and visualization of EDX/EDT files directly in the browser, eliminating the need to install desktop software or transfer sensitive data to external servers.
+**Live app: [envireader.altervista.org](https://envireader.altervista.org)**
 
-However, as the project expanded, the pure JavaScript codebase became difficult to maintain. The addition of new features constantly risked compromising the program's stability. This structural limitation made a complete rewrite of the software necessary.
+> **Your data never leaves your computer.** Files are read and processed locally in the browser. Nothing is uploaded to any server.
 
-The transition to a component-based infrastructure has simplified maintenance. It is now possible to integrate new environmental analysis tools in isolation, without altering the functioning of the *core*.
-The workspace has been redesigned to facilitate the prolonged analysis of maps and charts related to the urban climate. The integration of Dark Mode aims to reduce eye strain during working sessions.
-The technical limitations that bound optimal use to Google Chrome have been removed, ensuring fluidity across all major browsers. Native multilingual support has also been introduced.
-The "zero data transfer" principle remains unaltered: model processing occurs exclusively on the user's machine. The new computation engine optimizes memory management, reducing loading times for large files.
+## Features
 
-EnviReader v2.0 provides a stable and optimized environment for navigating complex 3D models and crossing 2D charts, significantly reducing CPU load. The new code structure guarantees the scalability necessary to facilitate the development and integration of future implementations.
+- **2D analysis** — plan views and vertical sections of any output variable, continuous contours (isolines) or cell grid, wind vectors and animated streamlines, a time player for daily playback, and custom color palettes / threshold ranges.
+- **3D model viewer** — buildings, vegetation, terrain and receptors from the `INX` model, with the data overlaid in 3D, a 3D wind volume and a sun-position / shadow module driven by date and time.
+- **Compare** two simulations side by side, or as a difference.
+- **Receptors and time series** — charts for single points, exportable as images.
+- **Boundary conditions view** — inspect the forcing data of a simulation and export its charts.
+- **Web GIS view** — place the model on a map.
+- **Light and dark theme**, five languages (English, Italiano, Deutsch, Español, Français), keyboard shortcuts (see [docs/keyboard_shortcuts.txt](docs/keyboard_shortcuts.txt)).
 
-The stability of the new architecture has allowed features to expand beyond simple data extraction, introducing tools for visual and spatial exploration.
+Works in all major browsers; no installation needed.
 
-The system now integrates an interactive 3D viewer for the analysis of urban geometry. The user can navigate the model to examine the development of architectural volumes and the arrangement of vegetation, evaluating the interaction between city morphology and climatic variables. This is paired with a module for the dynamic calculation of the solar position based on time and day, necessary for shading simulation.
+## Run locally
 
-For the study of microclimate and air currents, the static vector representation has been integrated with wind streamlines. These animated traces map flows, turbulence, and the canyon effect, allowing for the preliminary identification of critical issues related to ventilation and thermal comfort without having to query individual calculation cells.
+```bash
+npm install
+npm run dev      # development server
+npm run build    # production build in dist/
+npm run lint
+```
 
-In the realm of 2D analysis, contour visualization (isolines) has been introduced to represent the spatial distribution of temperature, humidity, and pollutants through continuous gradients, surpassing the previous discrete grid format. Temporal analysis is managed by an integrated player for the sequential playback of daily data. Finally, a dedicated editor allows the configuration of custom color palettes, useful for isolating specific thermal ranges or threshold values for research purposes.
+The `dist/` folder is fully static and can be served from any folder of any web server.
 
-### Upcoming Documentation
-The complete documentation of the codebase will soon be uploaded to GitHub. The guide will be structured to facilitate the understanding of the new component-based architecture and to encourage development, the integration of new features, and contributions from the community.
+## Project layout
+
+| Path | Contents |
+|---|---|
+| `src/components/` | UI: views, sidebar, charts, modals, controls |
+| `src/lib/` | Parsers (`EDX`/`EDT`/`INX`/`FOX`), slicing, color maps, wind field, 3D scene, export |
+| `src/state/` | Global application state |
+| `src/data/` | Constants, palettes, presets |
+| `src/i18n/`, `public/translations.json` | Translations |
+
+Built with React, Vite, three.js and MapLibre GL.
+
+## History
+
+EnviReader started as *ENVI-met webReader* (v1.4 and v1.5, plain JavaScript, still available in the [releases](https://github.com/grazianoEnzoMarchesani/EnviReader/releases)). Version 2.0 is a full rewrite as a component-based React app.
+
+## Disclaimer
+
+EnviReader is an independent project. It is not affiliated with, endorsed by or supported by ENVI-met GmbH. ENVI-met is a trademark of its owner. The ENVI-met materials database is proprietary and is not included in this repository.
