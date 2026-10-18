@@ -20,7 +20,7 @@ It is free software, written at the University of Camerino for research and teac
 
 Whatever the browser dialog says, the files are read inside the page and are not sent anywhere.
 
-[![Video: Opening a fileset, 41 s](docs/videos/F01_opening-a-fileset.jpg)](docs/videos/F01_opening-a-fileset.mp4)
+[![Video: Opening a fileset, 41 s](docs/videos/F01_opening-a-fileset.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F01_opening-a-fileset.mp4)
 
 ## Features
 
@@ -33,11 +33,11 @@ The app has four views, in the bar at the top: *2D Data Analysis*, *3D Data Anal
 - **Opening a fileset.** EnviReader scans the folder and its subfolders for `EDT`/`EDX` pairs, groups them by subfolder (`atmosphere`, `biomet/UTCI`, `surface`, …) and sorts them by the date and time in the file name. It also reads the model (`INX`), the simulation settings (`SIMX`) and the terrain. The button then shows the simulation name.
 - **Data group and dataset.** The data group is the output subfolder; the dataset is the variable, read from the `EDX` header (*Potential Air Temperature (°C)*, *Wind Speed (m/s)*, *UTCI (°C)*, …). When you change group, the dataset stays selected if the new group has it.
 
-[![Video: Data group and dataset, 40 s](docs/videos/F10_data-group-and-dataset.jpg)](docs/videos/F10_data-group-and-dataset.mp4)
+[![Video: Data group and dataset, 40 s](docs/videos/F10_data-group-and-dataset.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F10_data-group-and-dataset.mp4)
 
 - **Two simulations side by side.** Fileset B is optional. With B open the maps can show *Only A*, *Only B*, *A vs B* or *A vs B vs Diff*. The difference is computed cell by cell, on a scale symmetric around zero, with its own diverging palette and a choice between A − B and B − A. Click the button again to close B.
 
-[![Video: Comparing two simulations, 43 s](docs/videos/F02_comparing-two-simulations.jpg)](docs/videos/F02_comparing-two-simulations.mp4)
+[![Video: Comparing two simulations, 43 s](docs/videos/F02_comparing-two-simulations.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F02_comparing-two-simulations.mp4)
 
 ### 2D Data Analysis
 
@@ -45,7 +45,7 @@ The app has four views, in the bar at the top: *2D Data Analysis*, *3D Data Anal
 
 The large map shows the plan or one of the two vertical sections, longitudinal and transverse; the other two views sit below it as thumbnails, each with its own small legend. Click a thumbnail, or press `1`, `2`, `3`, to swap. Groups with a single level, such as `surface`, show the plan only.
 
-[![Video: Plan and sections, 40 s](docs/videos/F21_plan-and-sections.jpg)](docs/videos/F21_plan-and-sections.mp4)
+[![Video: Plan and sections, 40 s](docs/videos/F21_plan-and-sections.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F21_plan-and-sections.mp4)
 
 #### Crosshair and tooltip
 
@@ -56,37 +56,37 @@ The two sections cross at a point, the crosshair, which together with the level 
 - Near a section line in the plan a handle appears: drag it to rotate the sections. A chip with the angle brings them back to square.
 - A, B and Diff follow the same crosshair.
 
-[![Video: Crosshair and tooltip, 40 s](docs/videos/F27_crosshair-and-tooltip.jpg)](docs/videos/F27_crosshair-and-tooltip.mp4)
+[![Video: Crosshair and tooltip, 40 s](docs/videos/F27_crosshair-and-tooltip.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F27_crosshair-and-tooltip.mp4)
 
 #### View zoom
 
 *View zoom*, from 1× to 3×, enlarges the maps up to one per row at full width.
 
-[![Video: View zoom, 40 s](docs/videos/F22_view-zoom.jpg)](docs/videos/F22_view-zoom.mp4)
+[![Video: View zoom, 40 s](docs/videos/F22_view-zoom.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F22_view-zoom.mp4)
 
 #### North, date and time on the map
 
 Three switches put a north arrow, the day and the time of the current step on the map. The arrow follows the model rotation stored in the `INX`. They are indicators only.
 
-[![Video: North, date and time on the map, 40 s](docs/videos/F30_north-date-and-time.jpg)](docs/videos/F30_north-date-and-time.mp4)
+[![Video: North, date and time on the map, 40 s](docs/videos/F30_north-date-and-time.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F30_north-date-and-time.mp4)
 
 #### Time slider
 
 The *Time* slider picks the step shown in the maps. Each step is one output file, labelled with its date and time. Move with `−` / `+`, drag the slider, type a step number and press `Enter`, or use `←` / `→`. The maps, the thumbnails, the clock on the map and the time series follow.
 
-[![Video: Time slider, 40 s](docs/videos/F11_time-slider.jpg)](docs/videos/F11_time-slider.mp4)
+[![Video: Time slider, 40 s](docs/videos/F11_time-slider.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F11_time-slider.mp4)
 
 #### Time player
 
 The ▶ button next to *Time* opens a small player: step back, play/pause, step forward, and speeds 1×, 5× and 10× (1× is one step every 0.6 s). After the last step it starts again from the first. Playback keeps going when the player is closed and when you change view, so the 3D model, the sun and the wind volume follow it too. Key `Space`.
 
-[![Video: Time player, 36 s](docs/videos/F12_time-player.jpg)](docs/videos/F12_time-player.mp4)
+[![Video: Time player, 36 s](docs/videos/F12_time-player.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F12_time-player.mp4)
 
 #### Time series at a point
 
 The *Time series* panel below the maps plots the dataset over time at the crosshair. The header names the point and its height. A vertical line marks the step shown in the maps; over the chart, a tooltip gives date, time and value. Click the chart to jump to that step. Move the crosshair, in the plan or in a section, and the curve follows. With fileset B open, B is drawn as a dashed line, and each saved position adds a line of its own. Click the header to fold the panel.
 
-[![Video: Time series at a point, 38 s](docs/videos/F40_time-series.jpg)](docs/videos/F40_time-series.mp4)
+[![Video: Time series at a point, 38 s](docs/videos/F40_time-series.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F40_time-series.mp4)
 
 #### Levels, sections and terrain
 
@@ -189,7 +189,7 @@ Export always runs from the 2D view, then restores view, time and comparison. No
 
 Light and dark theme (`Shift+D`), following the system on first launch; the 3D background, the 3D wind and the boundary charts follow it too. Five languages: English, Italiano, Deutsch, Español, Français.
 
-[![Video: Theme and language, 36 s](docs/videos/F03-F04_theme-and-language.jpg)](docs/videos/F03-F04_theme-and-language.mp4)
+[![Video: Theme and language, 36 s](docs/videos/F03-F04_theme-and-language.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F03-F04_theme-and-language.mp4)
 
 #### Keyboard shortcuts
 
@@ -214,13 +214,13 @@ Press `Shift+?` for the list in the app. Shortcuts are ignored while typing in a
 
 The same list is in [docs/keyboard_shortcuts.txt](docs/keyboard_shortcuts.txt).
 
-[![Video: Keyboard shortcuts, 40 s](docs/videos/F05_keyboard-shortcuts.jpg)](docs/videos/F05_keyboard-shortcuts.mp4)
+[![Video: Keyboard shortcuts, 40 s](docs/videos/F05_keyboard-shortcuts.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F05_keyboard-shortcuts.mp4)
 
 #### Privacy and credits
 
 A first-run banner reminds you that the files stay in the browser. The *Privacy* panel has the full notice and a button that deletes everything the app has stored (palettes, presets, saved positions, calibrations, map consent). Click the EnviReader logo for version, authors and citation.
 
-[![Video: Privacy and credits, 40 s](docs/videos/F06-F07_privacy-and-credits.jpg)](docs/videos/F06-F07_privacy-and-credits.mp4)
+[![Video: Privacy and credits, 40 s](docs/videos/F06-F07_privacy-and-credits.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F06-F07_privacy-and-credits.mp4)
 
 ## Technical notes
 

@@ -27,6 +27,8 @@ jobs:
       - run: npm run build
       # Fallisce se il codice contatta host o memorizza chiavi non dichiarati nell'informativa
       - run: npm run audit:privacy
+      # I video del README: GitHub non li riproduce dal repo, Pages li serve come video/mp4
+      - run: cp -r docs/videos dist/videos
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
