@@ -58,7 +58,7 @@ function AppLayout() {
           time: clamp(s.time + (e.code === 'ArrowRight' ? 1 : -1), 0, Math.max(0, s.seriesLabels.length - 1))
         }));
       }
-      // Navigazione spaziale (Frecce Su / Giù oppure W / S)
+      // Navigazione spaziale (Frecce Su / Giù: solo il livello Z)
       else if (e.code === 'ArrowUp' || e.code === 'ArrowDown') {
         e.preventDefault();
         const dir = (e.code === 'ArrowUp') ? 1 : -1;

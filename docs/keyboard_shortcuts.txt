@@ -1,20 +1,23 @@
 EnviReader Keyboard Shortcuts
 
-Time & Slicing Navigation
+Shortcuts are ignored while typing in a text field. Press Shift + ? in the app
+to show the same list.
+
+Time & Navigation
 ---------------------------------------------------
 Spacebar            : Play / Pause the time slider
 ArrowRight          : Move time one step forward
 ArrowLeft           : Move time one step backward
-ArrowUp / W         : Move the current slice up (increases Z level in Plan view, or moves X/Y section forward)
-ArrowDown / S       : Move the current slice down (decreases Z level in Plan view, or moves X/Y section backward)
+ArrowUp             : Move the horizontal level (Z) up, in any view
+ArrowDown           : Move the horizontal level (Z) down, in any view
 
-Quick Views (2D & 3D)
+Quick Views
 ---------------------------------------------------
-1 (or Numpad 1)     : Switch to Plan View (Top down)
-2 (or Numpad 2)     : Switch to Section X View (Right)
-3 (or Numpad 3)     : Switch to Section Y View (Front)
+1 (or Numpad 1)     : 2D: Plan view          | 3D: snap camera to top view
+2 (or Numpad 2)     : 2D: Section X view     | 3D: snap camera to right view
+3 (or Numpad 3)     : 2D: Section Y view     | 3D: snap camera to front view
 
-Visual Layers Toggles
+Visual Layers
 ---------------------------------------------------
 B                   : Toggle Buildings layer visibility
 V                   : Toggle Vegetation layer visibility
@@ -22,15 +25,20 @@ T                   : Toggle Terrain layer visibility
 R                   : Toggle Receptors visibility
 O                   : Toggle Data Voxels Overlay in 3D (switches between bare model and analytical data)
 
-Wind Overlays
+Data & Environment
 ---------------------------------------------------
+S                   : Toggle Sun path simulation (sun position and shadows in 3D)
 F                   : Toggle Wind Field (2D vectors on the active slices)
 Shift + F           : Toggle Wind Volume (3D volumetric streamlines/vectors)
+C                   : Cycle Compare Modes (only when a second fileset B is open)
+                      2D: Single -> B -> A|B -> Diff
+                      3D: Single -> B -> A|B
 
 General Interface
 ---------------------------------------------------
-A                   : Switch to Data Analysis View (2D)
-M                   : Switch to 3D Model View
-C                   : Cycle Compare Modes (Available only when a second fileset B is open: Single -> B -> A|B / Diff)
-\ (Backslash)       : Expand / Collapse the left sidebar
+A                   : Switch between 2D and 3D Data Analysis (from any other view, opens 2D)
+G                   : Switch to WebGIS view
+E                   : Switch to Boundary conditions view
+\ (Backslash)       : Expand / Collapse both side panels
 Shift + D           : Toggle Dark / Light theme
+Shift + ?           : Show / Hide this shortcuts help

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildLUT, sliceToImageData, sliceToContourImageData, orientColors, contourLegendGradient, formatValue, objectsToImageData, zebraToImageData, percentileValue, zebraSwatchStyle } from '../lib/colormap';
 import { traceStreamlines2D } from '../lib/windField';
 import LegendBar from './LegendBar';
+import { useI18n } from '../i18n/I18nContext';
 
 // Anteprima in miniatura di uno slice, usata nei riquadri di cambio vista.
 // Mantiene le proporzioni fisiche: altezza fissa e larghezza proporzionale,
@@ -489,6 +490,8 @@ function NorthArrow({ rotation, visible }) {
 }
 
 export function MapCalendar({ timeLabel }) {
+  // hook prima del return anticipato (regole degli hook)
+  const { lang } = useI18n();
   if (!timeLabel) return null;
   const parts = timeLabel.split(' · ');
   const dateStr = parts[0];
@@ -497,8 +500,9 @@ export function MapCalendar({ timeLabel }) {
   let weekday = '';
   if (dateParts.length === 3) {
       const d = new Date(dateParts[0], parseInt(dateParts[1], 10) - 1, dateParts[2]);
-      const wdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-      weekday = wdays[d.getDay()];
+      // giorno abbreviato nella lingua dell'interfaccia; niente timeZone UTC:
+      // la data è costruita a mezzanotte locale e in UTC cadrebbe nel giorno prima
+      weekday = new Intl.DateTimeFormat(lang, { weekday: 'short' }).format(d);
   }
   return (
     <span className="map-calendar">

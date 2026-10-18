@@ -164,9 +164,10 @@ const initialState = {
   windVolumeLoading: false,
   cameraProjection: 'perspective', // 'perspective' | 'parallel' (viewer 3D)
   gizmoNorthMode: 'true', // riferimento cardinali del ViewCube: 'true' (nord vero) | 'grid' (lato piatto del modello)
-  // true = ruotare uno dei due viewer 3D (A/B) ruota anche l'altro allo stesso
-  // orientamento (zoom e pan restano indipendenti); attivo di default perché è
-  // il caso d'uso più comune nel confronto A/B
+  // true = rotazione, zoom e pan di uno dei due viewer 3D (A/B) si ripetono
+  // sull'altro: stesso orientamento, zoom e pan proporzionali all'inquadratura
+  // di default di ciascun pannello (vedi cameraSyncRef in Model3DViewer);
+  // attivo di default perché è il caso d'uso più comune nel confronto A/B
   syncCamera3D: true,
   ambientOcclusion: true, // Occlusione ambientale (AO) nel viewer 3D per migliorare la resa tridimensionale
   sunPathEnabled: false, // simulazione percorso solare + ombre nel modello 3D: segue state.time (vedi src/lib/sunLink.js)

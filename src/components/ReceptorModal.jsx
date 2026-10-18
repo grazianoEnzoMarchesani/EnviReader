@@ -38,9 +38,9 @@ export default function ReceptorModal({ receptor, structure, onClose }) {
   let heightSelectNode = null;
 
   if (loading) {
-    content = <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading...</div>;
+    content = <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>{tr('receptor_loading')}</div>;
   } else if (!data) {
-    content = <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>No data found for receptor: {receptorDisplay.name}</div>;
+    content = <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-secondary)' }}>{tr('receptor_no_data')} {receptorDisplay.name}</div>;
   } else {
     // find height column
     const heightKey = data.headers.find(h => {
@@ -67,7 +67,7 @@ export default function ReceptorModal({ receptor, structure, onClose }) {
         
         heightSelectNode = (
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'color-mix(in srgb, var(--text) 3%, transparent)', padding: '12px 16px', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '24px' }}>
-            <label style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Altezza (z)</label>
+            <label style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{tr('receptor_height_label')}</label>
             <div style={{ position: 'relative' }}>
               <select 
                 style={{
@@ -124,7 +124,7 @@ export default function ReceptorModal({ receptor, structure, onClose }) {
 
     content = (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        {numericHeaders.length === 0 && <p className="modal-text">No numeric data found.</p>}
+        {numericHeaders.length === 0 && <p className="modal-text">{tr('receptor_no_numeric')}</p>}
         {numericHeaders.map(header => (
           <div key={header} style={{ background: 'var(--surface)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: '0 2px 8px rgba(0,0,0,0.03)' }}>
             <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -151,7 +151,7 @@ export default function ReceptorModal({ receptor, structure, onClose }) {
         <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface)', zIndex: 2 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text)' }}>
-              Receptor: <span style={{ color: 'var(--accent)' }}>{receptorDisplay.name}</span>
+              {tr('receptor_modal_title')} <span style={{ color: 'var(--accent)' }}>{receptorDisplay.name}</span>
             </span>
           </div>
           <button 
