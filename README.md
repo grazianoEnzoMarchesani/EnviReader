@@ -39,6 +39,10 @@ The app has four views, in the bar at the top: *2D Data Analysis*, *3D Data Anal
 
 [![Video: Comparing two simulations, 43 s](docs/videos/F02_comparing-two-simulations.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F02_comparing-two-simulations.mp4)
 
+[![Video: Compare modes, 40 s](docs/videos/F20_compare-modes.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F20_compare-modes.mp4)
+
+[![Video: Difference order, 40 s](docs/videos/F36_difference-order.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F36_difference-order.mp4)
+
 ### 2D Data Analysis
 
 #### Plan and sections
@@ -91,10 +95,21 @@ The *Time series* panel below the maps plots the dataset over time at the crossh
 #### Levels, sections and terrain
 
 - **Plan level** with the real height, in metres, at the crosshair. Keys `↑` / `↓`.
+
+[![Video: Plan level and height, 38 s](docs/videos/F13_plan-level.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F13_plan-level.mp4)
+
 - **Section position** for the longitudinal and transverse sections, and **section rotation** from −90° to +90°: the sections become oblique vertical planes.
+
+[![Video: Section position and rotation, 39 s](docs/videos/F14-F15_section-position-rotation.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F14-F15_section-position-rotation.mp4)
+
 - **Follow terrain** (on by default): the plan drapes over the terrain, so the level counts from the ground. It affects the plan, the section profiles, the time series, the 3D overlay and the height readout.
 - **Leveling mode.** As the level rises, the cut gradually stops following the terrain and becomes flat. *Standard* flattens the relief evenly; *Cascade* (default) keeps each column at its height until the level reaches it, like water filling the low areas first. *Transition height* sets over how many levels this happens.
+
+[![Video: Follow terrain and leveling, 44 s](docs/videos/F16-F17_follow-terrain-leveling.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F16-F17_follow-terrain-leveling.mp4)
+
 - **Biomet section fix.** In biomet datasets (PMV, PET, SET, UTCI) ENVI-met exports each column pressed against the bottom of the domain. The fix puts the values back above buildings and terrain, in 2D, in 3D and in the time series.
+
+[![Video: Biomet section fix, 38 s](docs/videos/F29_biomet-fix.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F29_biomet-fix.mp4)
 
 #### Color scale
 
@@ -110,38 +125,73 @@ The *Time series* panel below the maps plots the dataset over time at the crossh
 
 Click a legend to set a manual range for that view, with a two-handle slider or Min/Max fields. The automatic ranges cover the current step only and are recomputed at every step; to compare different hours on the same colors, use a manual range.
 
+[![Video: Legend bounds and manual range, 46 s](docs/videos/F25-F26_legend-bounds.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F25-F26_legend-bounds.mp4)
+
 #### Rendering and objects
 
 - **Pixel**, one color per cell at the grid resolution; **Contour**, filled bands with isolines; **Vector (SVG)**, the grid drawn as vector shapes, heavier but ready for SVG export.
 - **HD** resamples the map to the physical resolution of the screen.
+
+[![Video: Pixel, contour and vector, 40 s](docs/videos/F23-F24_pixel-contour-vector.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F23-F24_pixel-contour-vector.mp4)
+
 - **Objects overlay**: buildings, terrain and vegetation outlines over the data, with adjustable opacity.
+
+[![Video: Buildings, terrain and vegetation on the map, 40 s](docs/videos/F28_objects-on-map.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F28_objects-on-map.mp4)
+
 - **Object styles**, shared with 3D: *Default* (minimal voxels), *Style 1* (technical: thick outlines, 45° hatching, vegetation as circles sized by density), *Style 2* (white architectural model), *Style 3* (silhouette and outline).
+
+[![Video: Object styles, 40 s](docs/videos/F32_object-styles.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F32_object-styles.mp4)
+
 - **View settings**: section line thickness, dash and color; intermediate legend values; legend text size; widget size.
+
+[![Video: View settings, 40 s](docs/videos/F31_view-settings.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F31_view-settings.mp4)
 
 #### Zebra
 
 Diagonal stripes, as on a camera exposure meter, mark the cells above a high percentile (black) and below a low percentile (blue, slanted the other way, so the two stay distinct without relying on color). *Inverted* greys out everything outside the chosen range instead. The slider shows the real value of each percentile, computed on the visible view.
 
+[![Video: Zebra overlay, 40 s](docs/videos/F18_zebra-overlay.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F18_zebra-overlay.mp4)
+
 #### Wind
 
 With the *Flow u/v/w* components (usually in `atmosphere`), the wind is drawn on the plan, on the sections and on the thumbnails as *Arrows*, *Streamlines* or *Combined*, with opacity, size and density from 0 to 100%. The reference value in the wind legend is the same for A, B and every view, so lengths can be compared anywhere. Key `F`.
+
+[![Video: Wind field, 40 s](docs/videos/F33-F34_wind-field.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F33-F34_wind-field.mp4)
 
 #### Palettes
 
 - **Scientific**: Turbo, Viridis, Thermal, Coolwarm, Mono grey; RdBu, PiYG and Warm-Cool for differences.
 - **Catalog**: the 62 palettes of EnviReader 1.x (C1–C62).
+
+[![Video: Palettes, 39 s](docs/videos/F35_palettes.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F35_palettes.mp4)
+
 - **My palettes**: an editor with 2 to 8 color stops and a live preview on the maps. Every palette can be reversed.
+
+[![Video: Palette editor, 38 s](docs/videos/F37_palette-editor.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F37_palette-editor.mp4)
+
 - **Sharing**: import and export as JSON, or copy a text code (`EVR1:hex-hex-…:Name`) to send by chat or email.
+
+[![Video: Sharing palettes, 37 s](docs/videos/F38_sharing-palettes.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F38_sharing-palettes.mp4)
 
 #### Saved positions
 
 The *Cursors* tab saves the current crosshair (sections, angle, level, terrain settings) under a name and a color. Each saved position adds its own line to the time series, which is how you compare several points of the same model over time. Import and export as JSON.
 
+[![Video: Saved positions, 46 s](docs/videos/F39_saved-positions.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F39_saved-positions.mp4)
+
 #### Presets
 
 - **15 built-in presets**: air temperature, wind, relative humidity, mean radiant temperature and UTCI, each at 08:00, 14:00 and 20:00. The time is matched to the nearest step at that hour.
+
+[![Video: Built-in presets, 35 s](docs/videos/F90_built-in-presets.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F90_built-in-presets.mp4)
+
 - **My presets**: save the current state under a name. A preset stores data group, dataset, time of day, level, sections, terrain settings, wind settings, legend bounds and palettes. It does not store render style, zebra, comparison mode, view type or 3D options.
+
+[![Video: Your own presets, 40 s](docs/videos/F91_own-presets.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F91_own-presets.mp4)
+
 - **Sharing**: exported presets carry the custom palettes they use; the `preset.json` of EnviReader 1.x can be imported too.
+
+[![Video: Sharing presets, 42 s](docs/videos/F92_sharing-presets.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F92_sharing-presets.mp4)
 
 ### 3D Data Analysis (beta)
 
@@ -150,7 +200,17 @@ The *Cursors* tab saves the current crosshair (sections, angle, level, terrain s
 
 [![Video: The 3D model, 46 s](docs/videos/F41-F42_the-3d-model.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F41-F42_the-3d-model.mp4)
 - **Data overlay** (`O`): the current dataset as a plan and sections inside the model, with the 2D palette. *Smooth surface* (default) draws a continuous surface, off it draws one voxel per cell; the color stays the exact cell value. In *Contour* style the surface gets 3D isolines.
+
+[![Video: Data overlay in 3D, 38 s](docs/videos/F43_data-overlay-3d.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F43_data-overlay-3d.mp4)
+
+[![Video: 3D legend, 37 s](docs/videos/F44_3d-legend.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F44_3d-legend.mp4)
+
+[![Video: Pixel, contour and HD in 3D, 37 s](docs/videos/F45_pixel-contour-hd-3d.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F45_pixel-contour-hd-3d.mp4)
+
 - **Interaction**: click the terrain to move the crosshair; drag near a section trace to rotate the sections; drag elsewhere to orbit.
+
+[![Video: Crosshair and section rotation in 3D, 38 s](docs/videos/F46_crosshair-rotation-3d.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F46_crosshair-rotation-3d.mp4)
+
 - **ViewCube**: click a face, edge or corner to align the camera; Home and 90° rotation buttons. Keys `1` / `2` / `3` for top, right and front.
 
 [![Video: The ViewCube, 41 s](docs/videos/F47_viewcube.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F47_viewcube.mp4)
@@ -158,9 +218,20 @@ The *Cursors* tab saves the current crosshair (sections, angle, level, terrain s
 
 [![Video: View settings in 3D, 40 s](docs/videos/F48_view-settings-3d.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F48_view-settings-3d.mp4)
 - **A vs B**: two models side by side, with an option to link their cameras. There is no difference view in 3D.
+
+[![Video: A vs B in 3D with synced cameras, 41 s](docs/videos/F49_ab-3d-synced-cameras.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F49_ab-3d-synced-cameras.mp4)
+
 - **Sun and shadows** (`S`): sunlight and cast shadows for the date and time of the current step, with a sun path diagram (yearly month arcs and hourly analemmas, today's arc highlighted) and the sun's azimuth and altitude. The data colors are not shaded. Needs coordinates in the `INX`.
+
+[![Video: Sun and shadows, 37 s](docs/videos/F50_sun-and-shadows.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F50_sun-and-shadows.mp4)
+
 - **Wind in 3D**: on the data slices (`F`) or as a volume filling the whole domain (`Shift+F`), from the u, v, w components.
+
+[![Video: Wind in 3D, 40 s](docs/videos/F51_wind-3d.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F51_wind-3d.mp4)
+
 - **Receptors**: click a receptor to open a chart for each variable in its output file, with a height selector when it has several levels.
+
+[![Video: Receptors, 37 s](docs/videos/F52_receptors.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F52_receptors.mp4)
 
 ### WebGIS (alpha)
 
@@ -171,9 +242,18 @@ The *Cursors* tab saves the current crosshair (sections, angle, level, terrain s
 ### Boundary conditions
 
 - **Simulation settings** from the `SIMX`: name, model file, start and duration, wind and roughness, initial temperature and humidity, output folder, and which quantities are forced in a Full Forcing run.
+
+[![Video: Simulation settings, 37 s](docs/videos/F70_simulation-settings.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F70_simulation-settings.mp4)
+
 - **Simple Forcing**: hourly temperature and humidity charts.
 - **Full Forcing** from the `FOX` file: site, coordinates, time zone and period, an overview chart, and one chart per quantity (temperature, humidity, wind, direct, diffuse and long-wave radiation, precipitation, pressure, cloud cover, background pollutants), up to three heights each. Yearly files of 8760 hours are drawn as a min–max envelope. If the `SIMX` names a `FOX` that is not in the folder, you can open it by hand.
+
+[![Video: Simple and Full Forcing, 37 s](docs/videos/F71-F72_full-forcing.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F71-F72_full-forcing.mp4)
+
 - **Period**: the simulation period, the whole file, a single month, or a range dragged on the overview chart.
+
+[![Video: Period, zoom and fileset, 47 s](docs/videos/F73-F74_period-zoom-fileset.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F73-F74_period-zoom-fileset.mp4)
+
 - Switch between the boundary conditions of A and B.
 
 ### Export
