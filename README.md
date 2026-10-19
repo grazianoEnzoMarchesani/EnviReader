@@ -147,10 +147,16 @@ The *Cursors* tab saves the current crosshair (sections, angle, level, terrain s
 
 - **Model viewer.** Buildings (2.5D or full 3D), voxel terrain, vegetation and receptors rebuilt from the `INX`, with grid size, resolution and maximum height. Needs a data group with more than one level.
 - **Layers**: buildings `B`, vegetation `V`, terrain `T`, receptors `R`, and the domain walls with width, depth and height dimensions.
+
+[![Video: The 3D model, 46 s](docs/videos/F41-F42_the-3d-model.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F41-F42_the-3d-model.mp4)
 - **Data overlay** (`O`): the current dataset as a plan and sections inside the model, with the 2D palette. *Smooth surface* (default) draws a continuous surface, off it draws one voxel per cell; the color stays the exact cell value. In *Contour* style the surface gets 3D isolines.
 - **Interaction**: click the terrain to move the crosshair; drag near a section trace to rotate the sections; drag elsewhere to orbit.
 - **ViewCube**: click a face, edge or corner to align the camera; Home and 90° rotation buttons. Keys `1` / `2` / `3` for top, right and front.
+
+[![Video: The ViewCube, 41 s](docs/videos/F47_viewcube.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F47_viewcube.mp4)
 - **View settings**: wireframe, ambient occlusion, perspective or parallel projection, north reference (true north, or the grid of the model).
+
+[![Video: View settings in 3D, 40 s](docs/videos/F48_view-settings-3d.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F48_view-settings-3d.mp4)
 - **A vs B**: two models side by side, with an option to link their cameras. There is no difference view in 3D.
 - **Sun and shadows** (`S`): sunlight and cast shadows for the date and time of the current step, with a sun path diagram (yearly month arcs and hourly analemmas, today's arc highlighted) and the sun's azimuth and altitude. The data colors are not shaded. Needs coordinates in the `INX`.
 - **Wind in 3D**: on the data slices (`F`) or as a volume filling the whole domain (`Shift+F`), from the u, v, w components.
@@ -182,6 +188,10 @@ The *Cursors* tab saves the current crosshair (sections, angle, level, terrain s
 - all in one ZIP, with descriptive file names.
 
 Export always runs from the 2D view, then restores view, time and comparison. Nothing is exported from 3D or WebGIS.
+
+[![Video: Exporting images, 56 s](docs/videos/F80a_exporting-images.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F80a_exporting-images.mp4)
+
+[![Video: Exporting GIFs and data, 50 s](docs/videos/F80b_gif-and-data.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/F80b_gif-and-data.mp4)
 
 ### Interface
 
