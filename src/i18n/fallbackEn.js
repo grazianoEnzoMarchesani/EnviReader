@@ -175,7 +175,7 @@ export const FALLBACK_I18N = {
     "credits_feedback_text": "If you have ideas for improving this application, want to report issues, or wish to contribute to its development, please feel free to reach out through the GitHub repository.",
     "credits_academic_title": "Academic Citation (Required)",
     "credits_academic_text": "To support the continued development of this tool, it is mandatory to cite EnviReader when used in academic, research, or scientific contexts. Please cite it as:",
-    "credits_citation": "Marchesani, G.E., Cocci Grifoni, R., Khodaparast, M. (2026) EnviReader v2.0.1: A visualization tool for ENVI-met output files. Zenodo. https://doi.org/10.5281/zenodo.14500978",
+    "credits_citation": "Marchesani, G.E., Cocci Grifoni, R., Khodaparast, M. (2026) EnviReader v2.0.1: A visualization tool for ENVI-met output files. Zenodo. https://doi.org/10.5281/zenodo.23327539",
     "btn_close": "Close",
     "nav_analysis": "2D Data Analysis",
     "nav_model": "3D Data Analysis (beta)",

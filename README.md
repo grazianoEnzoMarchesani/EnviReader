@@ -1,8 +1,13 @@
 # EnviReader
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23327539.svg)](https://doi.org/10.5281/zenodo.23327539)
+[![License: GPL v3+](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/grazianoEnzoMarchesani/EnviReader)](https://github.com/grazianoEnzoMarchesani/EnviReader/releases)
+[![Deploy](https://img.shields.io/github/actions/workflow/status/grazianoEnzoMarchesani/EnviReader/pages.yml?label=pages)](https://github.com/grazianoEnzoMarchesani/EnviReader/actions/workflows/pages.yml)
+
 Read, explore and compare [ENVI-met](https://www.envi-met.com) simulation results in the browser. Open an output folder and EnviReader draws maps, sections, the 3D model, time series and the boundary conditions from the `EDX`/`EDT`, `INX`, `SIMX` and `FOX` files.
 
-**Live app: [grazianoenzomarchesani.github.io/EnviReader](https://grazianoenzomarchesani.github.io/EnviReader/)** · [Releases](https://github.com/grazianoEnzoMarchesani/EnviReader/releases) · DOI [10.5281/zenodo.14500978](https://doi.org/10.5281/zenodo.14500978)
+**Live app: [grazianoenzomarchesani.github.io/EnviReader](https://grazianoenzomarchesani.github.io/EnviReader/)** · [Releases](https://github.com/grazianoEnzoMarchesani/EnviReader/releases) · DOI [10.5281/zenodo.23327539](https://doi.org/10.5281/zenodo.23327539)
 
 > **Your data never leaves your computer.** Files are read and processed in the browser. Nothing is uploaded to any server.
 
@@ -10,7 +15,7 @@ Read, explore and compare [ENVI-met](https://www.envi-met.com) simulation result
 
 An ENVI-met simulation produces a folder of binary files, one per output time, and looking at them takes software that not everyone who needs the results has installed. EnviReader opens that folder in a web page, with nothing to install and nothing sent anywhere, so the person who ran the simulation, a colleague reviewing it, a student or a designer comparing two scenarios can all look at the same data.
 
-It is free software, written at the University of Camerino for research and teaching on urban microclimate. The aim is that a result can be checked, compared with another scenario and exported as a figure for a paper or a report.
+It is open source software, written at the School of Architecture and Design Eduardo Vittoria, University of Camerino, for research and teaching on urban microclimate. The aim is that a result can be checked, compared with another scenario and exported as a figure for a paper or a report.
 
 ## Getting started
 
@@ -378,7 +383,7 @@ EnviReader started as *ENVI-met webReader* (v1.4 and v1.5, plain JavaScript, sti
 
 ## License and citation
 
-EnviReader is free software, released under the [GNU General Public License v3.0 or later](LICENSE). If you use it in your work, please cite it: DOI [10.5281/zenodo.14500978](https://doi.org/10.5281/zenodo.14500978), [CITATION.cff](CITATION.cff), or *Cite this repository* on GitHub. Authors: Graziano Enzo Marchesani, Roberta Cocci Grifoni, Mohammadjavad Khodaparast (Università di Camerino).
+EnviReader is open source software, released under the [GNU General Public License v3.0 or later](LICENSE). If you use it in your work, please cite it: DOI [10.5281/zenodo.23327539](https://doi.org/10.5281/zenodo.23327539), [CITATION.cff](CITATION.cff), or *Cite this repository* on GitHub. Authors: Graziano Enzo Marchesani, Roberta Cocci Grifoni, Mohammadjavad Khodaparast (School of Architecture and Design Eduardo Vittoria, University of Camerino).
 
 ## Disclaimer
 
