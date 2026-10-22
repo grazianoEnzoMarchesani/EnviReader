@@ -16,6 +16,8 @@ const LINK_HOSTS = [
   'github.com', 'openfreemap.org', 'www.openmaptiles.org', 'www.openstreetmap.org',
   'stamen.com', 'www.garanteprivacy.it', 'doi.org', 'www.envi-met.com', 'vite.dev',
   'www.w3.org', 'maplibre.org',
+  // anteprima social (og:image): la leggono i crawler dei social, la pagina non la richiede
+  'grazianoenzomarchesani.github.io',
 ];
 const FORBIDDEN_IN_SRC = [
   /document\.cookie/, /sendBeacon/, /\bgtag\s*\(/, /google-analytics|googletagmanager/i,

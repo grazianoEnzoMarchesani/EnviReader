@@ -11,6 +11,8 @@ Read, explore and compare [ENVI-met](https://www.envi-met.com) simulation result
 
 > **Your data never leaves your computer.** Files are read and processed in the browser. Nothing is uploaded to any server.
 
+[![Trailer: EnviReader 2.0.1, 64 s](docs/videos/EnviReader_trailer.jpg)](https://grazianoenzomarchesani.github.io/EnviReader/videos/EnviReader_trailer.mp4)
+
 ## Why EnviReader
 
 An ENVI-met simulation produces a folder of binary files, one per output time, and looking at them takes software that not everyone who needs the results has installed. EnviReader opens that folder in a web page, with nothing to install and nothing sent anywhere, so the person who ran the simulation, a colleague reviewing it, a student or a designer comparing two scenarios can all look at the same data.
@@ -22,6 +24,8 @@ It is open source software, written at the School of Architecture and Design Edu
 1. Open the [live app](https://grazianoenzomarchesani.github.io/EnviReader/) in Chrome, Edge, Firefox or Safari.
 2. Click **+ Open fileset A** and choose the output folder of a simulation, the one that contains `atmosphere/`, `biomet/`, `surface/` and so on.
 3. To compare, click **+ Open fileset B (compare)** and choose a second output folder.
+
+No ENVI-met results at hand? Download one scenario of the [Via Milano, Pescara dataset](https://doi.org/10.5281/zenodo.20022483) (CC BY 4.0, four runs of about 1.6 GB each), unzip it and open the folder inside as fileset A. Open a second scenario as fileset B to compare.
 
 Whatever the browser dialog says, the files are read inside the page and are not sent anywhere.
 
