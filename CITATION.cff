@@ -23,8 +23,8 @@ authors:
 repository-code: "https://github.com/grazianoEnzoMarchesani/EnviReader"
 url: "https://grazianoenzomarchesani.github.io/EnviReader/"
 license: GPL-3.0-or-later
-version: 2.0.1
-date-released: 2026-10-13
+version: 2.0.2
+date-released: 2026-10-28
 keywords:
   - ENVI-met
   - microclimate

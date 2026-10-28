@@ -385,6 +385,30 @@ Built with React, Vite, three.js and MapLibre GL.
 
 EnviReader started as *ENVI-met webReader* (v1.4 and v1.5, plain JavaScript, still available in the [releases](https://github.com/grazianoEnzoMarchesani/EnviReader/releases)). Version 2.0 is a full rewrite as a component-based React app.
 
+## Changelog
+
+### v2.0.2
+
+- **Support for ENVI-met v6 area input files (`.inx`):**
+  - Added native support for the new JSON format introduced with ENVI-met v6 alongside the historical v4/v5 quasi-XML format.
+  - Automatically handles UTF-8 BOM encoding on import.
+  - Corrected 2D grid matrix indexing (`buildings.top`, `bot`, `no`, `fixedHeight`, `terrain`, `soilProfiles`) between column-major JSON storage and the internal flat grid representation.
+  - Corrected model rotation parsing (`modelRot`) to properly orient the 2D North arrow and 3D ViewCube / solar compass.
+  - Supported both 2.5D extruded buildings and Full 3D voxel models (`spatialData3D.buildingNos`).
+  - Preserved 100% backward compatibility with all previous ENVI-met `.inx` files.
+
+### v2.0.1
+
+- Maintenance release: GPL-3.0-or-later license, `CITATION.cff` with authors and ORCIDs.
+- Privacy panel with first-run notice (EN/IT), no third-party CDNs or scripts, strict Content-Security-Policy and automated privacy audit (`npm run audit:privacy`).
+- OpenFreeMap Toner background map for WebGIS with explicit opt-in consent.
+- Bundled offline color palettes for walls, roofs and soils.
+- Deployment automated to GitHub Pages.
+
+### v2.0.0
+
+- Complete modern rewrite as a component-based React application with Vite, Three.js and MapLibre GL.
+
 ## License and citation
 
 EnviReader is open source software, released under the [GNU General Public License v3.0 or later](LICENSE). If you use it in your work, please cite it: DOI [10.5281/zenodo.23327539](https://doi.org/10.5281/zenodo.23327539), [CITATION.cff](CITATION.cff), or *Cite this repository* on GitHub. Authors: Graziano Enzo Marchesani, Roberta Cocci Grifoni, Mohammadjavad Khodaparast (School of Architecture and Design Eduardo Vittoria, University of Camerino).
